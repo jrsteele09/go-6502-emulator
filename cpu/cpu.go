@@ -1,11 +1,26 @@
-package cpu6502
+package cpu
 
 import (
 	"fmt"
 
-	"github.com/jrsteele09/go-65xx-emulator/cpu65xxx"
-	"github.com/jrsteele09/go-65xx-emulator/memory"
+	"github.com/jrsteele09/go-6502-emulator/memory"
 )
+
+type Completed bool
+
+type Cpu6502 interface {
+	Stop()
+	Resume()
+	Execute() (Completed, error)
+	Nmi()
+	Irq()
+	Reset()
+	Push(b byte)
+	Pop() byte
+	Registers() *Registers
+	Memory() memory.MemoryFunctions[uint16]
+	Operands() []byte
+}
 
 const (
 	resetVectorAddr  uint16 = 0xFFFC
@@ -20,24 +35,24 @@ type HaltExecution interface {
 }
 
 type Cpu struct {
-	Reg               *cpu65xxx.Registers
+	Reg               *Registers
 	mem               memory.MemoryFunctions[uint16]
-	opCodes           []*cpu65xxx.OpCodeDef
+	opCodes           []*OpCodeDef
 	cycles            uint64
 	instructionCycles int
-	instruction       cpu65xxx.InstructionFunc
+	instruction       InstructionFunc
 	operands          []byte
 	irq               bool
 	nmi               bool
 	halted            bool
 }
 
-var _ cpu65xxx.Cpu = &Cpu{}
+var _ Cpu6502 = &Cpu{}
 
 func NewCpu(m memory.MemoryFunctions[uint16]) *Cpu {
-	cpu := &Cpu{mem: m, Reg: cpu65xxx.NewRegisters()}
+	cpu := &Cpu{mem: m, Reg: NewRegisters()}
 	cpu.opCodes = OpCodes(cpu)
-	cpu.Reg.SetStatus(cpu65xxx.UnusedFlag, true)
+	cpu.Reg.SetStatus(UnusedFlag, true)
 	cpu.Reg.S = 0xff
 	cpu.irq = false
 	cpu.nmi = false
@@ -45,7 +60,7 @@ func NewCpu(m memory.MemoryFunctions[uint16]) *Cpu {
 	return cpu
 }
 
-func (p *Cpu) Registers() *cpu65xxx.Registers {
+func (p *Cpu) Registers() *Registers {
 	return p.Reg
 }
 
@@ -65,7 +80,7 @@ func (p *Cpu) Resume() {
 	p.halted = false
 }
 
-func (p *Cpu) Execute() (cpu65xxx.Completed, error) {
+func (p *Cpu) Execute() (Completed, error) {
 	if p.halted {
 		return false, nil
 	}
@@ -90,13 +105,13 @@ func (p *Cpu) Execute() (cpu65xxx.Completed, error) {
 func (p *Cpu) checkInterrupts() bool {
 	if p.nmi {
 		return true
-	} else if p.irq && !p.Reg.IsSet(cpu65xxx.InterruptDisableFlag) {
+	} else if p.irq && !p.Reg.IsSet(InterruptDisableFlag) {
 		return true
 	}
 	return false
 }
 
-func (p *Cpu) readOpCode() (cpu65xxx.Completed, error) {
+func (p *Cpu) readOpCode() (Completed, error) {
 	opCode := p.NextByte()
 	opCodeDef := p.opCodes[opCode]
 	if opCodeDef == nil {
@@ -112,9 +127,9 @@ func (p *Cpu) readOpCode() (cpu65xxx.Completed, error) {
 	return false, nil
 }
 
-func (p *Cpu) interruptInstruction() (cpu65xxx.Completed, error) {
+func (p *Cpu) interruptInstruction() (Completed, error) {
 	p.interruptStackPush()
-	p.Reg.SetStatus(cpu65xxx.InterruptDisableFlag, true)
+	p.Reg.SetStatus(InterruptDisableFlag, true)
 	var PCH byte
 	var PCL byte
 	if p.nmi {
@@ -134,9 +149,9 @@ func (p *Cpu) interruptInstruction() (cpu65xxx.Completed, error) {
 func (p *Cpu) interruptStackPush() {
 	p.Push(byte(p.Reg.PC >> 8))
 	p.Push(byte(p.Reg.PC & 0xff))
-	p.Reg.SetStatus(cpu65xxx.BreakFlag, false)
+	p.Reg.SetStatus(BreakFlag, false)
 	p.Push(byte(p.Reg.Status))
-	p.Reg.SetStatus(cpu65xxx.InterruptDisableFlag, true)
+	p.Reg.SetStatus(InterruptDisableFlag, true)
 }
 
 func (p *Cpu) NextByte() byte {
@@ -163,11 +178,11 @@ func (p *Cpu) Nmi() {
 }
 
 func (p *Cpu) Irq() {
-	p.irq = !p.Reg.IsSet(cpu65xxx.InterruptDisableFlag)
+	p.irq = !p.Reg.IsSet(InterruptDisableFlag)
 }
 
 func (p *Cpu) Reset() {
-	p.Reg.SetStatus(cpu65xxx.InterruptDisableFlag, true)
+	p.Reg.SetStatus(InterruptDisableFlag, true)
 	resetVecLow := p.mem.Read(uint16(resetVectorAddr))
 	resetVecHigh := p.mem.Read(uint16(resetVectorAddr + 1))
 	p.Reg.PC = (uint16(resetVecHigh) << 8) | uint16(resetVecLow)

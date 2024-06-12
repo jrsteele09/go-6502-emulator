@@ -3,14 +3,14 @@ package disassembler
 import (
 	"testing"
 
-	"github.com/jrsteele09/go-65xx-emulator/cpu6502"
-	"github.com/jrsteele09/go-65xx-emulator/memory"
+	cpu "github.com/jrsteele09/go-6502-emulator/cpu"
+	"github.com/jrsteele09/go-6502-emulator/memory"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDisassembler(t *testing.T) {
 	m := memory.NewMemory[uint16](64 * 1024)
-	p := cpu6502.NewCpu(m)
+	p := cpu.NewCpu(m)
 	m.Write(0xC000,
 		0x02,
 		0xA9, 0x01,
@@ -29,7 +29,7 @@ func TestDisassembler(t *testing.T) {
 
 	expectedDissassmbledCode := "C000:  02         ???\nC001:  A9 01      LDA #$01\nC003:  A9 80      LDA #$80\nC005:  A9 00      LDA #$00\nC007:  A5 80      LDA $80\nC009:  B5 80      LDA $80,X\nC00B:  AD 80 00   LDA $0080\nC00E:  BD 80 00   LDA $0080,X\nC011:  BD 01 00   LDA $0001,X\nC014:  B9 80 00   LDA $0080,Y\nC017:  B9 01 00   LDA $0001,Y\nC01A:  A1 05      LDA ($05,X)\nC01C:  B1 05      LDA ($05),Y\n"
 
-	dissassembler := NewDissassembler(m, cpu6502.OpCodes(p))
+	dissassembler := NewDissassembler(m, cpu.OpCodes(p))
 
 	dissassembledCode := ""
 
@@ -45,9 +45,9 @@ func TestDisassembler(t *testing.T) {
 
 func TestDisassemblerRelativeAddressingMode(t *testing.T) {
 	m := memory.NewMemory[uint16](64 * 1024)
-	p := cpu6502.NewCpu(m)
+	p := cpu.NewCpu(m)
 	m.Write(0xC000, 0xF0, byte(0xAF))
-	dissassembler := NewDissassembler(m, cpu6502.OpCodes(p))
+	dissassembler := NewDissassembler(m, cpu.OpCodes(p))
 
 	address := uint16(0xC000)
 	dissassembledCode, _ := dissassembler.Disassemble(address)

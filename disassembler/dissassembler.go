@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jrsteele09/go-65xx-emulator/cpu65xxx"
-	"github.com/jrsteele09/go-65xx-emulator/memory"
+	"github.com/jrsteele09/go-6502-emulator/cpu"
+	"github.com/jrsteele09/go-6502-emulator/memory"
 )
 
 const (
@@ -14,10 +14,10 @@ const (
 
 type Disassembler struct {
 	mem     *memory.Memory[uint16]
-	opCodes []*cpu65xxx.OpCodeDef
+	opCodes []*cpu.OpCodeDef
 }
 
-func NewDissassembler(mem *memory.Memory[uint16], opCodes []*cpu65xxx.OpCodeDef) *Disassembler {
+func NewDissassembler(mem *memory.Memory[uint16], opCodes []*cpu.OpCodeDef) *Disassembler {
 	return &Disassembler{
 		mem:     mem,
 		opCodes: opCodes,
@@ -56,20 +56,20 @@ func (d *Disassembler) operandsToByteString(opcode byte, operands []byte, l int)
 	return strings.TrimSpace(bytesStr)
 }
 
-func (d *Disassembler) opCodeToString(opcode cpu65xxx.OpCodeDef, operands []byte, address uint16) string {
+func (d *Disassembler) opCodeToString(opcode cpu.OpCodeDef, operands []byte, address uint16) string {
 	addressingModeString := ""
 
 	switch opcode.AddressingModeType {
-	case cpu65xxx.RelativeModeStr:
+	case cpu.RelativeModeStr:
 		address = uint16(int64(address) + int64(int8(operands[0])))
 		addressingModeString = strings.Replace(fmt.Sprintf("%.2x", address), "0x", "", 1)
 	default:
-		if strings.Contains(string(opcode.AddressingModeType), cpu65xxx.WordAddressing) {
+		if strings.Contains(string(opcode.AddressingModeType), cpu.WordAddressing) {
 			operandString := fmt.Sprintf("$%s%s", operandToHexString(1, operands...), operandToHexString(0, operands...))
-			addressingModeString = strings.Replace(string(opcode.AddressingModeType), cpu65xxx.WordAddressing, operandString, 1)
-		} else if strings.Contains(string(opcode.AddressingModeType), cpu65xxx.ByteAddressing) {
+			addressingModeString = strings.Replace(string(opcode.AddressingModeType), cpu.WordAddressing, operandString, 1)
+		} else if strings.Contains(string(opcode.AddressingModeType), cpu.ByteAddressing) {
 			operandString := fmt.Sprintf("$%s", operandToHexString(0, operands...))
-			addressingModeString = strings.Replace(string(opcode.AddressingModeType), cpu65xxx.ByteAddressing, operandString, 1)
+			addressingModeString = strings.Replace(string(opcode.AddressingModeType), cpu.ByteAddressing, operandString, 1)
 		}
 	}
 
