@@ -1,6 +1,6 @@
-module github.com/jrsteele09/go-65xx-emulator
+module github.com/jrsteele09/go-6502-emulator
 
-go 1.21.0
+go 1.22.0
 
 require github.com/stretchr/testify v1.8.4
 

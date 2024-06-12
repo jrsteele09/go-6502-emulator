@@ -1,4 +1,4 @@
-package cpu65xxx
+package cpu
 
 const (
 	ByteAddressing = "nn"
@@ -11,9 +11,9 @@ type StoreAddress func(b byte) Completed
 type AddressingModeType string
 
 type AddressingMode interface {
-	Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress
-	Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress
-	Address(cpu Cpu) uint16
+	Store(cpu Cpu6502, ignoreExtraCycle bool) StoreAddress
+	Load(cpu Cpu6502, ignoreExtraCycle bool) LoadAddress
+	Address(cpu Cpu6502) uint16
 }
 
 const (
@@ -45,14 +45,14 @@ type IndirectIndexedMode struct{}
 type ImmediateMode struct{}
 type RelativeMode struct{}
 
-func absoluteAddress(cpu Cpu) uint16 {
+func absoluteAddress(cpu Cpu6502) uint16 {
 	operands := cpu.Operands()
 	memAddress := uint16(operands[0])
 	memAddress |= uint16(operands[1]) << 8
 	return memAddress
 }
 
-func absoluteXAddress(cpu Cpu, ignoreExtraCycle bool) (uint16, bool) {
+func absoluteXAddress(cpu Cpu6502, ignoreExtraCycle bool) (uint16, bool) {
 	extraCycle := false
 	operands := cpu.Operands()
 	lsb := uint16(operands[0]) + uint16(cpu.Registers().X)
@@ -63,7 +63,7 @@ func absoluteXAddress(cpu Cpu, ignoreExtraCycle bool) (uint16, bool) {
 	return uint16(address), extraCycle
 }
 
-func absoluteYAddress(cpu Cpu, ignoreExtraCycle bool) (uint16, bool) {
+func absoluteYAddress(cpu Cpu6502, ignoreExtraCycle bool) (uint16, bool) {
 	extraCycle := false
 	operands := cpu.Operands()
 	lsb := uint16(operands[0]) + uint16(cpu.Registers().Y)
@@ -74,15 +74,15 @@ func absoluteYAddress(cpu Cpu, ignoreExtraCycle bool) (uint16, bool) {
 	return uint16(address), extraCycle
 }
 
-func zeropageXAddress(cpu Cpu) uint16 {
+func zeropageXAddress(cpu Cpu6502) uint16 {
 	return (uint16(cpu.Operands()[0]) + uint16(cpu.Registers().X)) & 0xFF
 }
 
-func zeropageYAddress(cpu Cpu) uint16 {
+func zeropageYAddress(cpu Cpu6502) uint16 {
 	return (uint16(cpu.Operands()[0]) + uint16(cpu.Registers().Y)) & 0xFF
 }
 
-func indexedIndirectAddress(cpu Cpu) uint16 {
+func indexedIndirectAddress(cpu Cpu6502) uint16 {
 	mem := cpu.Memory()
 	operands := cpu.Operands()
 
@@ -92,7 +92,7 @@ func indexedIndirectAddress(cpu Cpu) uint16 {
 	return ((uint16(msb) << 8) | uint16(lsb))
 }
 
-func indirectIndexedAddress(cpu Cpu, ignoreExtraCycle bool) (uint16, bool) {
+func indirectIndexedAddress(cpu Cpu6502, ignoreExtraCycle bool) (uint16, bool) {
 	mem := cpu.Memory()
 	zeropageAddress := uint16(cpu.Operands()[0])
 	lsb := mem.Read(zeropageAddress)
@@ -109,15 +109,15 @@ func indirectIndexedAddress(cpu Cpu, ignoreExtraCycle bool) (uint16, bool) {
 }
 
 // AbsoluteIndirectMode
-func (m AbsoluteIndirectMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
+func (m AbsoluteIndirectMode) Store(cpu Cpu6502, ignoreExtraCycle bool) StoreAddress {
 	return func(b byte) Completed { return true }
 }
 
-func (m AbsoluteIndirectMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
+func (m AbsoluteIndirectMode) Load(cpu Cpu6502, ignoreExtraCycle bool) LoadAddress {
 	return func() (byte, Completed) { return 0x00, true }
 }
 
-func (m AbsoluteIndirectMode) Address(cpu Cpu) uint16 {
+func (m AbsoluteIndirectMode) Address(cpu Cpu6502) uint16 {
 	absoluteAddress := absoluteAddress(cpu)
 	mem := cpu.Memory()
 	lsb := mem.Read(absoluteAddress)
@@ -126,7 +126,7 @@ func (m AbsoluteIndirectMode) Address(cpu Cpu) uint16 {
 }
 
 // AbsoluteMode
-func (m AbsoluteMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
+func (m AbsoluteMode) Store(cpu Cpu6502, ignoreExtraCycle bool) StoreAddress {
 	mem := cpu.Memory()
 	return func(b byte) Completed {
 		mem.Write(absoluteAddress(cpu), b)
@@ -134,19 +134,19 @@ func (m AbsoluteMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
 	}
 }
 
-func (m AbsoluteMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
+func (m AbsoluteMode) Load(cpu Cpu6502, ignoreExtraCycle bool) LoadAddress {
 	mem := cpu.Memory()
 	return func() (byte, Completed) { // Load
 		return mem.Read(absoluteAddress(cpu)), true
 	}
 }
 
-func (m AbsoluteMode) Address(cpu Cpu) uint16 {
+func (m AbsoluteMode) Address(cpu Cpu6502) uint16 {
 	return absoluteAddress(cpu)
 }
 
 // AbsoluteXMode
-func (m AbsoluteXMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
+func (m AbsoluteXMode) Store(cpu Cpu6502, ignoreExtraCycle bool) StoreAddress {
 	address := uint16(0x0000)
 	extraCycle := false
 	mem := cpu.Memory()
@@ -164,7 +164,7 @@ func (m AbsoluteXMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
 	}
 }
 
-func (m AbsoluteXMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
+func (m AbsoluteXMode) Load(cpu Cpu6502, ignoreExtraCycle bool) LoadAddress {
 	address := uint16(0x0000)
 	extraCycle := false
 	result := byte(0x00)
@@ -183,13 +183,13 @@ func (m AbsoluteXMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
 	}
 }
 
-func (m AbsoluteXMode) Address(cpu Cpu) uint16 {
+func (m AbsoluteXMode) Address(cpu Cpu6502) uint16 {
 	address, _ := absoluteXAddress(cpu, true)
 	return address
 }
 
 // AbsoluteYMode
-func (m AbsoluteYMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
+func (m AbsoluteYMode) Store(cpu Cpu6502, ignoreExtraCycle bool) StoreAddress {
 	address := uint16(0x0000)
 	extraCycle := false
 	mem := cpu.Memory()
@@ -209,7 +209,7 @@ func (m AbsoluteYMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
 	}
 }
 
-func (m AbsoluteYMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
+func (m AbsoluteYMode) Load(cpu Cpu6502, ignoreExtraCycle bool) LoadAddress {
 	address := uint16(0x0000)
 	extraCycle := false
 	mem := cpu.Memory()
@@ -225,13 +225,13 @@ func (m AbsoluteYMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
 	}
 }
 
-func (m AbsoluteYMode) Address(cpu Cpu) uint16 {
+func (m AbsoluteYMode) Address(cpu Cpu6502) uint16 {
 	address, _ := absoluteYAddress(cpu, true)
 	return address
 }
 
 // AccumulatorMode
-func (m AccumulatorMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
+func (m AccumulatorMode) Store(cpu Cpu6502, ignoreExtraCycle bool) StoreAddress {
 	registers := cpu.Registers()
 
 	return func(b byte) Completed {
@@ -240,16 +240,16 @@ func (m AccumulatorMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
 	}
 }
 
-func (m AccumulatorMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
+func (m AccumulatorMode) Load(cpu Cpu6502, ignoreExtraCycle bool) LoadAddress {
 	return func() (byte, Completed) { return cpu.Registers().A, true }
 }
 
-func (m AccumulatorMode) Address(cpu Cpu) uint16 {
+func (m AccumulatorMode) Address(cpu Cpu6502) uint16 {
 	return 0x0000
 }
 
 // Zeropage
-func (m ZeropageMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
+func (m ZeropageMode) Store(cpu Cpu6502, ignoreExtraCycle bool) StoreAddress {
 	mem := cpu.Memory()
 
 	return func(b byte) Completed {
@@ -258,7 +258,7 @@ func (m ZeropageMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
 	}
 }
 
-func (m ZeropageMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
+func (m ZeropageMode) Load(cpu Cpu6502, ignoreExtraCycle bool) LoadAddress {
 	mem := cpu.Memory()
 
 	return func() (byte, Completed) {
@@ -266,12 +266,12 @@ func (m ZeropageMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
 	}
 }
 
-func (m ZeropageMode) Address(cpu Cpu) uint16 {
+func (m ZeropageMode) Address(cpu Cpu6502) uint16 {
 	return uint16(cpu.Operands()[0])
 }
 
 // ZeropageXMode
-func (m ZeropageXMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
+func (m ZeropageXMode) Store(cpu Cpu6502, ignoreExtraCycle bool) StoreAddress {
 	mem := cpu.Memory()
 	return func(b byte) Completed {
 		mem.Write(zeropageXAddress(cpu), b)
@@ -279,19 +279,19 @@ func (m ZeropageXMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
 	}
 }
 
-func (m ZeropageXMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
+func (m ZeropageXMode) Load(cpu Cpu6502, ignoreExtraCycle bool) LoadAddress {
 	mem := cpu.Memory()
 	return func() (byte, Completed) {
 		return mem.Read(zeropageXAddress(cpu)), true
 	}
 }
 
-func (m ZeropageXMode) Address(cpu Cpu) uint16 {
+func (m ZeropageXMode) Address(cpu Cpu6502) uint16 {
 	return zeropageXAddress(cpu)
 }
 
 // ZeropageYMode
-func (m ZeropageYMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
+func (m ZeropageYMode) Store(cpu Cpu6502, ignoreExtraCycle bool) StoreAddress {
 	mem := cpu.Memory()
 	return func(b byte) Completed {
 		mem.Write(zeropageYAddress(cpu), b)
@@ -299,26 +299,26 @@ func (m ZeropageYMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
 	}
 }
 
-func (m ZeropageYMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
+func (m ZeropageYMode) Load(cpu Cpu6502, ignoreExtraCycle bool) LoadAddress {
 	mem := cpu.Memory()
 	return func() (byte, Completed) {
 		return mem.Read(zeropageYAddress(cpu)), true
 	}
 }
 
-func (m ZeropageYMode) Address(cpu Cpu) uint16 {
+func (m ZeropageYMode) Address(cpu Cpu6502) uint16 {
 	return zeropageYAddress(cpu)
 }
 
 // IndexedIndirectMode
-func (m IndexedIndirectMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
+func (m IndexedIndirectMode) Load(cpu Cpu6502, ignoreExtraCycle bool) LoadAddress {
 	mem := cpu.Memory()
 	return func() (byte, Completed) {
 		return mem.Read(indexedIndirectAddress(cpu)), true
 	}
 }
 
-func (m IndexedIndirectMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
+func (m IndexedIndirectMode) Store(cpu Cpu6502, ignoreExtraCycle bool) StoreAddress {
 	mem := cpu.Memory()
 	return func(b byte) Completed {
 		mem.Write(indexedIndirectAddress(cpu), b)
@@ -326,12 +326,12 @@ func (m IndexedIndirectMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress 
 	}
 }
 
-func (m IndexedIndirectMode) Address(cpu Cpu) uint16 {
+func (m IndexedIndirectMode) Address(cpu Cpu6502) uint16 {
 	return indexedIndirectAddress(cpu)
 }
 
 // IndirectIndexedMode
-func (m IndirectIndexedMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
+func (m IndirectIndexedMode) Load(cpu Cpu6502, ignoreExtraCycle bool) LoadAddress {
 	extraCycle := false
 	address := uint16(0x0000)
 	mem := cpu.Memory()
@@ -347,7 +347,7 @@ func (m IndirectIndexedMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
 	}
 }
 
-func (m IndirectIndexedMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
+func (m IndirectIndexedMode) Store(cpu Cpu6502, ignoreExtraCycle bool) StoreAddress {
 	extraCycle := false
 	address := uint16(0x0000)
 	mem := cpu.Memory()
@@ -365,40 +365,40 @@ func (m IndirectIndexedMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress 
 	}
 }
 
-func (m IndirectIndexedMode) Address(cpu Cpu) uint16 {
+func (m IndirectIndexedMode) Address(cpu Cpu6502) uint16 {
 	address, _ := indirectIndexedAddress(cpu, true)
 	return address
 }
 
 // ImmediateMode
-func (m ImmediateMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
+func (m ImmediateMode) Load(cpu Cpu6502, ignoreExtraCycle bool) LoadAddress {
 	return func() (byte, Completed) {
 		operands := cpu.Operands()
 		return operands[0], true
 	}
 }
 
-func (m ImmediateMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
+func (m ImmediateMode) Store(cpu Cpu6502, ignoreExtraCycle bool) StoreAddress {
 	return func(b byte) Completed { return true }
 }
 
-func (m ImmediateMode) Address(cpu Cpu) uint16 {
+func (m ImmediateMode) Address(cpu Cpu6502) uint16 {
 	return 0x000
 }
 
 // RelativeMode
-func (m RelativeMode) Store(cpu Cpu, ignoreExtraCycle bool) StoreAddress {
+func (m RelativeMode) Store(cpu Cpu6502, ignoreExtraCycle bool) StoreAddress {
 	return func(b byte) Completed { return true }
 }
 
-func (m RelativeMode) Load(cpu Cpu, ignoreExtraCycle bool) LoadAddress {
+func (m RelativeMode) Load(cpu Cpu6502, ignoreExtraCycle bool) LoadAddress {
 	return func() (byte, Completed) {
 		operands := cpu.Operands()
 		return operands[0], true
 	}
 }
 
-func (m RelativeMode) Address(cpu Cpu) uint16 {
+func (m RelativeMode) Address(cpu Cpu6502) uint16 {
 	return 0x000
 }
 

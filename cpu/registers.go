@@ -1,4 +1,4 @@
-package cpu65xxx
+package cpu
 
 type StatusFlag byte
 
