@@ -9,21 +9,25 @@ import (
 )
 
 const (
+	// disassemblyFormat defines the format for disassembly output.
 	disassemblyFormat = "%-6s %-10s %-10s"
 )
 
+// Disassembler is used to convert machine code into human-readable assembly instructions.
 type Disassembler struct {
 	mem     *memory.Memory[uint16]
 	opCodes []*cpu.OpCodeDef
 }
 
-func NewDissassembler(mem *memory.Memory[uint16], opCodes []*cpu.OpCodeDef) *Disassembler {
+// NewDisassembler creates a new Disassembler instance.
+func NewDisassembler(mem *memory.Memory[uint16], opCodes []*cpu.OpCodeDef) *Disassembler {
 	return &Disassembler{
 		mem:     mem,
 		opCodes: opCodes,
 	}
 }
 
+// Disassemble disassembles the machine code at the given address and returns the assembly instruction and its length.
 func (d *Disassembler) Disassemble(address uint16) (string, int) {
 	b := d.mem.Read(address)
 	opCode := d.opCodes[b]
@@ -46,6 +50,7 @@ func (d *Disassembler) Disassemble(address uint16) (string, int) {
 		strings.ToUpper(d.opCodeToString(*opCode, operands, address)))), opCode.Bytes
 }
 
+// operandsToByteString converts the operands to a string of hexadecimal values.
 func (d *Disassembler) operandsToByteString(opcode byte, operands []byte, l int) string {
 	byteArray := []byte{opcode}
 	byteArray = append(byteArray, operands...)
@@ -56,6 +61,7 @@ func (d *Disassembler) operandsToByteString(opcode byte, operands []byte, l int)
 	return strings.TrimSpace(bytesStr)
 }
 
+// opCodeToString converts the opcode and operands to a human-readable string based on the addressing mode.
 func (d *Disassembler) opCodeToString(opcode cpu.OpCodeDef, operands []byte, address uint16) string {
 	addressingModeString := ""
 
@@ -76,6 +82,7 @@ func (d *Disassembler) opCodeToString(opcode cpu.OpCodeDef, operands []byte, add
 	return fmt.Sprintf("%s %s", opcode.Mnemonic, addressingModeString)
 }
 
+// operandToHexString converts a single operand to its hexadecimal string representation.
 func operandToHexString(idx int, operands ...byte) string {
 	if len(operands) == 0 || uint(idx) > uint(len(operands)) {
 		return "??"

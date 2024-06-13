@@ -84,7 +84,7 @@ The library includes a disassembler to interpret 6502 machine code into human-re
 		0xB1, 0x05,
 	) //0xc01d
 
-	dissassembler := NewDissassembler(m, cpu.OpCodes(p))
+	dissassembler := NewDisassembler(m, cpu.OpCodes(p))
 	dissassembledCode := ""
 
 	address := uint16(0xC000)
