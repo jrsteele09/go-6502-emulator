@@ -96,3 +96,11 @@ The library includes a disassembler to interpret 6502 machine code into human-re
 	}
 
 ```
+
+## Contributing
+
+We appreciate any contributions to improve `go-6502-emulator`. Please feel free to file issues or submit pull requests.
+
+## License
+
+MIT License. See [LICENSE](LICENSE.md) for more information.
