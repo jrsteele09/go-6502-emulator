@@ -1,222 +1,223 @@
 package cpu
 
 const (
-	ADC = "ADC"
-	AND = "AND"
-	ASL = "ASL"
-	BCC = "BCC"
-	BCS = "BCS"
-	BEQ = "BEQ"
-	BIT = "BIT"
-	BMI = "BMI"
-	BNE = "BNE"
-	BPL = "BPL"
-	BRK = "BRK"
-	BVC = "BVC"
-	BVS = "BVS"
-	CLC = "CLC"
-	CLD = "CLD"
-	CLI = "CLI"
-	CLV = "CLV"
-	CMP = "CMP"
-	CPX = "CPX"
-	CPY = "CPY"
-	DEC = "DEC"
-	DEX = "DEX"
-	DEY = "DEY"
-	EOR = "EOR"
-	INC = "INC"
-	INX = "INX"
-	INY = "INY"
-	JMP = "JMP"
-	JSR = "JSR"
-	LDA = "LDA"
-	LDX = "LDX"
-	LDY = "LDY"
-	LSR = "LSR"
-	NOP = "NOP"
-	ORA = "ORA"
-	PHA = "PHA"
-	PHP = "PHP"
-	PLA = "PLA"
-	PLP = "PLP"
-	ROL = "ROL"
-	ROR = "ROR"
-	RTI = "RTI"
-	RTS = "RTS"
-	SBC = "SBC"
-	SEC = "SEC"
-	SED = "SED"
-	SEI = "SEI"
-	STA = "STA"
-	STX = "STX"
-	STY = "STY"
-	TAX = "TAX"
-	TAY = "TAY"
-	TSX = "TSX"
-	TXA = "TXA"
-	TXS = "TXS"
-	TYA = "TYA"
+	adcStr = "ADC"
+	andStr = "AND"
+	aslStr = "ASL"
+	bccStr = "BCC"
+	bcsStr = "BCS"
+	beqStr = "BEQ"
+	bitStr = "BIT"
+	bmiStr = "BMI"
+	bneStr = "BNE"
+	bplStr = "BPL"
+	brkStr = "BRK"
+	bvcStr = "BVC"
+	bvsStr = "BVS"
+	clcStr = "CLC"
+	cldStr = "CLD"
+	cliStr = "CLI"
+	clvStr = "CLV"
+	cmpStr = "CMP"
+	cpxStr = "CPX"
+	cpyStr = "CPY"
+	decStr = "DEC"
+	dexStr = "DEX"
+	deyStr = "DEY"
+	eorStr = "EOR"
+	incStr = "INC"
+	inxStr = "INX"
+	inyStr = "INY"
+	jmpStr = "JMP"
+	jsrStr = "JSR"
+	ldaStr = "LDA"
+	ldxStr = "LDX"
+	ldyStr = "LDY"
+	lsrStr = "LSR"
+	nopStr = "NOP"
+	oraStr = "ORA"
+	phaStr = "PHA"
+	phpStr = "PHP"
+	plaStr = "PLA"
+	plpStr = "PLP"
+	rolStr = "ROL"
+	rorStr = "ROR"
+	rtiStr = "RTI"
+	rtsStr = "RTS"
+	sbcStr = "SBC"
+	secStr = "SEC"
+	sedStr = "SED"
+	seiStr = "SEI"
+	staStr = "STA"
+	stxStr = "STX"
+	styStr = "STY"
+	taxStr = "TAX"
+	tayStr = "TAY"
+	tsxStr = "TSX"
+	txaStr = "TXA"
+	txsStr = "TXS"
+	tyaStr = "TYA"
 )
 
-func OpCodes(p *Cpu) []*OpCodeDef {
+// OpCodes returns a map of the actual 6502 opcode numbers to OpCodeDef instances.
+func OpCodes(p *CPU) []*OpCodeDef {
 	opCodes := make([]*OpCodeDef, 0xFF)
-	id := NewInstructionDefinition(GetAddressingMode)
-	opCodes[0x69] = id.Instruction(Mnemonic(ADC, ImmediateModeStr), 2, p.GetAdc)
-	opCodes[0x65] = id.Instruction(Mnemonic(ADC, ZeropageModeStr), 3, p.GetAdc)
-	opCodes[0x75] = id.Instruction(Mnemonic(ADC, ZeropageXModeStr), 4, p.GetAdc)
-	opCodes[0x6D] = id.Instruction(Mnemonic(ADC, AbsoluteModeStr), 4, p.GetAdc)
-	opCodes[0x7D] = id.Instruction(Mnemonic(ADC, AbsoluteIndexedXModeStr), 4, p.GetAdc)
-	opCodes[0x79] = id.Instruction(Mnemonic(ADC, AbsoluteIndexedYModeStr), 4, p.GetAdc)
-	opCodes[0x61] = id.Instruction(Mnemonic(ADC, IndexedIndirectModeStr), 6, p.GetAdc)
-	opCodes[0x71] = id.Instruction(Mnemonic(ADC, IndirectIndexedModeStr), 5, p.GetAdc)
-	opCodes[0x29] = id.Instruction(Mnemonic(AND, ImmediateModeStr), 2, p.GetAnd)
-	opCodes[0x25] = id.Instruction(Mnemonic(AND, ZeropageModeStr), 3, p.GetAnd)
-	opCodes[0x35] = id.Instruction(Mnemonic(AND, ZeropageXModeStr), 4, p.GetAnd)
-	opCodes[0x2D] = id.Instruction(Mnemonic(AND, AbsoluteModeStr), 4, p.GetAnd)
-	opCodes[0x3D] = id.Instruction(Mnemonic(AND, AbsoluteIndexedXModeStr), 4, p.GetAnd)
-	opCodes[0x39] = id.Instruction(Mnemonic(AND, AbsoluteIndexedYModeStr), 4, p.GetAnd)
-	opCodes[0x21] = id.Instruction(Mnemonic(AND, IndexedIndirectModeStr), 6, p.GetAnd)
-	opCodes[0x31] = id.Instruction(Mnemonic(AND, IndirectIndexedModeStr), 5, p.GetAnd)
-	opCodes[0x0A] = id.Instruction(Mnemonic(ASL, AccumulatorModeStr), 2, p.GetAsl)
-	opCodes[0x06] = id.Instruction(Mnemonic(ASL, ZeropageModeStr), 5, p.GetAsl)
-	opCodes[0x16] = id.Instruction(Mnemonic(ASL, ZeropageXModeStr), 6, p.GetAsl)
-	opCodes[0x0E] = id.Instruction(Mnemonic(ASL, AbsoluteModeStr), 6, p.GetAsl)
-	opCodes[0x1E] = id.Instruction(Mnemonic(ASL, AbsoluteIndexedXModeStr), 7, p.GetAsl)
-	opCodes[0x90] = id.Instruction(Mnemonic(BCC, RelativeModeStr), 2, p.GetBcc)
-	opCodes[0xB0] = id.Instruction(Mnemonic(BCS, RelativeModeStr), 2, p.GetBcs)
-	opCodes[0xF0] = id.Instruction(Mnemonic(BEQ, RelativeModeStr), 2, p.GetBeq)
-	opCodes[0x24] = id.Instruction(Mnemonic(BIT, ZeropageModeStr), 3, p.GetBit)
-	opCodes[0x2C] = id.Instruction(Mnemonic(BIT, AbsoluteModeStr), 4, p.GetBit)
-	opCodes[0x30] = id.Instruction(Mnemonic(BMI, RelativeModeStr), 2, p.GetBmi)
-	opCodes[0xD0] = id.Instruction(Mnemonic(BNE, RelativeModeStr), 2, p.GetBne)
-	opCodes[0x10] = id.Instruction(Mnemonic(BPL, RelativeModeStr), 2, p.GetBpl)
-	opCodes[0x00] = id.Instruction(Mnemonic(BRK, ImpliedModeStr), 7, p.GetBrk)
-	opCodes[0x50] = id.Instruction(Mnemonic(BVC, RelativeModeStr), 2, p.GetBvc)
-	opCodes[0x70] = id.Instruction(Mnemonic(BVS, RelativeModeStr), 2, p.GetBvs)
-	opCodes[0x18] = id.Instruction(Mnemonic(CLC, ImpliedModeStr), 2, p.GetClc)
-	opCodes[0xD8] = id.Instruction(Mnemonic(CLD, ImpliedModeStr), 2, p.GetCld)
-	opCodes[0x58] = id.Instruction(Mnemonic(CLI, ImpliedModeStr), 2, p.GetCli)
-	opCodes[0xB8] = id.Instruction(Mnemonic(CLV, ImpliedModeStr), 2, p.GetClv)
-	opCodes[0xC9] = id.Instruction(Mnemonic(CMP, ImmediateModeStr), 2, p.GetCmp)
-	opCodes[0xC5] = id.Instruction(Mnemonic(CMP, ZeropageModeStr), 3, p.GetCmp)
-	opCodes[0xD5] = id.Instruction(Mnemonic(CMP, ZeropageXModeStr), 4, p.GetCmp)
-	opCodes[0xCD] = id.Instruction(Mnemonic(CMP, AbsoluteModeStr), 4, p.GetCmp)
-	opCodes[0xDD] = id.Instruction(Mnemonic(CMP, AbsoluteIndexedXModeStr), 4, p.GetCmp)
-	opCodes[0xD9] = id.Instruction(Mnemonic(CMP, AbsoluteIndexedYModeStr), 4, p.GetCmp)
-	opCodes[0xC1] = id.Instruction(Mnemonic(CMP, IndexedIndirectModeStr), 6, p.GetCmp)
-	opCodes[0xD1] = id.Instruction(Mnemonic(CMP, IndirectIndexedModeStr), 5, p.GetCmp)
-	opCodes[0xE0] = id.Instruction(Mnemonic(CPX, ImmediateModeStr), 2, p.GetCpx)
-	opCodes[0xE4] = id.Instruction(Mnemonic(CPX, ZeropageModeStr), 3, p.GetCpx)
-	opCodes[0xEC] = id.Instruction(Mnemonic(CPX, AbsoluteModeStr), 4, p.GetCpx)
-	opCodes[0xC0] = id.Instruction(Mnemonic(CPY, ImmediateModeStr), 2, p.GetCpy)
-	opCodes[0xC4] = id.Instruction(Mnemonic(CPY, ZeropageModeStr), 3, p.GetCpy)
-	opCodes[0xCC] = id.Instruction(Mnemonic(CPY, AbsoluteModeStr), 4, p.GetCpy)
-	opCodes[0xC6] = id.Instruction(Mnemonic(DEC, ZeropageModeStr), 5, p.GetDec)
-	opCodes[0xD6] = id.Instruction(Mnemonic(DEC, ZeropageXModeStr), 6, p.GetDec)
-	opCodes[0xCE] = id.Instruction(Mnemonic(DEC, AbsoluteModeStr), 6, p.GetDec)
-	opCodes[0xDE] = id.Instruction(Mnemonic(DEC, AbsoluteIndexedXModeStr), 7, p.GetDec)
-	opCodes[0xCA] = id.Instruction(Mnemonic(DEX, ImpliedModeStr), 2, p.GetDex)
-	opCodes[0x88] = id.Instruction(Mnemonic(DEY, ImpliedModeStr), 2, p.GetDey)
-	opCodes[0x49] = id.Instruction(Mnemonic(EOR, ImmediateModeStr), 2, p.GetEor)
-	opCodes[0x45] = id.Instruction(Mnemonic(EOR, ZeropageModeStr), 3, p.GetEor)
-	opCodes[0x55] = id.Instruction(Mnemonic(EOR, ZeropageXModeStr), 4, p.GetEor)
-	opCodes[0x4D] = id.Instruction(Mnemonic(EOR, AbsoluteModeStr), 4, p.GetEor)
-	opCodes[0x5D] = id.Instruction(Mnemonic(EOR, AbsoluteIndexedXModeStr), 4, p.GetEor)
-	opCodes[0x59] = id.Instruction(Mnemonic(EOR, AbsoluteIndexedYModeStr), 4, p.GetEor)
-	opCodes[0x41] = id.Instruction(Mnemonic(EOR, IndexedIndirectModeStr), 6, p.GetEor)
-	opCodes[0x51] = id.Instruction(Mnemonic(EOR, IndirectIndexedModeStr), 5, p.GetEor)
-	opCodes[0xE6] = id.Instruction(Mnemonic(INC, ZeropageModeStr), 5, p.GetInc)
-	opCodes[0xF6] = id.Instruction(Mnemonic(INC, ZeropageXModeStr), 6, p.GetInc)
-	opCodes[0xEE] = id.Instruction(Mnemonic(INC, AbsoluteModeStr), 6, p.GetInc)
-	opCodes[0xFE] = id.Instruction(Mnemonic(INC, AbsoluteIndexedXModeStr), 7, p.GetInc)
-	opCodes[0xE8] = id.Instruction(Mnemonic(INX, ImpliedModeStr), 2, p.GetInx)
-	opCodes[0xC8] = id.Instruction(Mnemonic(INY, ImpliedModeStr), 2, p.GetIny)
-	opCodes[0x4C] = id.Instruction(Mnemonic(JMP, AbsoluteModeStr), 3, p.GetJmp)
-	opCodes[0x6C] = id.Instruction(Mnemonic(JMP, AbsoluteIndirectModeStr), 5, p.GetJmp)
-	opCodes[0x20] = id.Instruction(Mnemonic(JSR, AbsoluteModeStr), 6, p.GetJsr)
-	opCodes[0xA9] = id.Instruction(Mnemonic(LDA, ImmediateModeStr), 2, p.GetLda)
-	opCodes[0xA5] = id.Instruction(Mnemonic(LDA, ZeropageModeStr), 3, p.GetLda)
-	opCodes[0xB5] = id.Instruction(Mnemonic(LDA, ZeropageXModeStr), 4, p.GetLda)
-	opCodes[0xAD] = id.Instruction(Mnemonic(LDA, AbsoluteModeStr), 4, p.GetLda)
-	opCodes[0xBD] = id.Instruction(Mnemonic(LDA, AbsoluteIndexedXModeStr), 4, p.GetLda)
-	opCodes[0xB9] = id.Instruction(Mnemonic(LDA, AbsoluteIndexedYModeStr), 4, p.GetLda)
-	opCodes[0xA1] = id.Instruction(Mnemonic(LDA, IndexedIndirectModeStr), 6, p.GetLda)
-	opCodes[0xB1] = id.Instruction(Mnemonic(LDA, IndirectIndexedModeStr), 5, p.GetLda)
-	opCodes[0xA2] = id.Instruction(Mnemonic(LDX, ImmediateModeStr), 2, p.GetLdx)
-	opCodes[0xA6] = id.Instruction(Mnemonic(LDX, ZeropageModeStr), 3, p.GetLdx)
-	opCodes[0xB6] = id.Instruction(Mnemonic(LDX, ZeropageYModeStr), 4, p.GetLdx)
-	opCodes[0xAE] = id.Instruction(Mnemonic(LDX, AbsoluteModeStr), 4, p.GetLdx)
-	opCodes[0xBE] = id.Instruction(Mnemonic(LDX, AbsoluteIndexedXModeStr), 4, p.GetLdx)
-	opCodes[0xA0] = id.Instruction(Mnemonic(LDY, ImmediateModeStr), 2, p.GetLdy)
-	opCodes[0xA4] = id.Instruction(Mnemonic(LDY, ZeropageModeStr), 3, p.GetLdy)
-	opCodes[0xB4] = id.Instruction(Mnemonic(LDY, ZeropageXModeStr), 4, p.GetLdy)
-	opCodes[0xAC] = id.Instruction(Mnemonic(LDY, AbsoluteModeStr), 4, p.GetLdy)
-	opCodes[0xBC] = id.Instruction(Mnemonic(LDY, AbsoluteIndexedXModeStr), 4, p.GetLdy)
-	opCodes[0x4A] = id.Instruction(Mnemonic(LSR, AccumulatorModeStr), 2, p.GetLsr)
-	opCodes[0x46] = id.Instruction(Mnemonic(LSR, ZeropageModeStr), 5, p.GetLsr)
-	opCodes[0x56] = id.Instruction(Mnemonic(LSR, ZeropageXModeStr), 6, p.GetLsr)
-	opCodes[0x4E] = id.Instruction(Mnemonic(LSR, AbsoluteModeStr), 6, p.GetLsr)
-	opCodes[0x5E] = id.Instruction(Mnemonic(LSR, AbsoluteIndexedXModeStr), 7, p.GetLsr)
-	opCodes[0xEA] = id.Instruction(Mnemonic(NOP, ImpliedModeStr), 2, p.GetNop)
-	opCodes[0x09] = id.Instruction(Mnemonic(ORA, ImmediateModeStr), 2, p.GetOra)
-	opCodes[0x05] = id.Instruction(Mnemonic(ORA, ZeropageModeStr), 3, p.GetOra)
-	opCodes[0x15] = id.Instruction(Mnemonic(ORA, ZeropageXModeStr), 4, p.GetOra)
-	opCodes[0x0D] = id.Instruction(Mnemonic(ORA, AbsoluteModeStr), 4, p.GetOra)
-	opCodes[0x1D] = id.Instruction(Mnemonic(ORA, AbsoluteIndexedXModeStr), 4, p.GetOra)
-	opCodes[0x19] = id.Instruction(Mnemonic(ORA, AbsoluteIndexedYModeStr), 4, p.GetOra)
-	opCodes[0x01] = id.Instruction(Mnemonic(ORA, IndexedIndirectModeStr), 6, p.GetOra)
-	opCodes[0x11] = id.Instruction(Mnemonic(ORA, IndirectIndexedModeStr), 5, p.GetOra)
-	opCodes[0x48] = id.Instruction(Mnemonic(PHA, ImpliedModeStr), 3, p.GetPha)
-	opCodes[0x68] = id.Instruction(Mnemonic(PLA, ImpliedModeStr), 4, p.GetPla)
-	opCodes[0x08] = id.Instruction(Mnemonic(PHP, ImpliedModeStr), 3, p.GetPhp)
-	opCodes[0x28] = id.Instruction(Mnemonic(PLP, ImpliedModeStr), 4, p.GetPlp)
-	opCodes[0x2A] = id.Instruction(Mnemonic(ROL, AccumulatorModeStr), 2, p.GetRol)
-	opCodes[0x26] = id.Instruction(Mnemonic(ROL, ZeropageModeStr), 5, p.GetRol)
-	opCodes[0x36] = id.Instruction(Mnemonic(ROL, ZeropageXModeStr), 6, p.GetRol)
-	opCodes[0x2E] = id.Instruction(Mnemonic(ROL, AbsoluteModeStr), 6, p.GetRol)
-	opCodes[0x3E] = id.Instruction(Mnemonic(ROL, AbsoluteIndexedXModeStr), 7, p.GetRol)
-	opCodes[0x6A] = id.Instruction(Mnemonic(ROR, AccumulatorModeStr), 2, p.GetRor)
-	opCodes[0x66] = id.Instruction(Mnemonic(ROR, ZeropageModeStr), 5, p.GetRor)
-	opCodes[0x76] = id.Instruction(Mnemonic(ROR, ZeropageXModeStr), 6, p.GetRor)
-	opCodes[0x6E] = id.Instruction(Mnemonic(ROR, AbsoluteModeStr), 6, p.GetRor)
-	opCodes[0x7E] = id.Instruction(Mnemonic(ROR, AbsoluteIndexedXModeStr), 7, p.GetRor)
-	opCodes[0x40] = id.Instruction(Mnemonic(RTI, ImpliedModeStr), 6, p.GetRti)
-	opCodes[0x60] = id.Instruction(Mnemonic(RTS, ImpliedModeStr), 6, p.GetRts)
-	opCodes[0xE9] = id.Instruction(Mnemonic(SBC, ImmediateModeStr), 2, p.GetSbc)
-	opCodes[0xE5] = id.Instruction(Mnemonic(SBC, ZeropageModeStr), 3, p.GetSbc)
-	opCodes[0xF5] = id.Instruction(Mnemonic(SBC, ZeropageXModeStr), 4, p.GetSbc)
-	opCodes[0xED] = id.Instruction(Mnemonic(SBC, AbsoluteModeStr), 4, p.GetSbc)
-	opCodes[0xFD] = id.Instruction(Mnemonic(SBC, AbsoluteIndexedXModeStr), 4, p.GetSbc)
-	opCodes[0xF9] = id.Instruction(Mnemonic(SBC, AbsoluteIndexedYModeStr), 4, p.GetSbc)
-	opCodes[0xE1] = id.Instruction(Mnemonic(SBC, IndexedIndirectModeStr), 6, p.GetSbc)
-	opCodes[0xF1] = id.Instruction(Mnemonic(SBC, IndirectIndexedModeStr), 5, p.GetSbc)
-	opCodes[0x38] = id.Instruction(Mnemonic(SEC, IndirectIndexedModeStr), 2, p.GetSec)
-	opCodes[0xF8] = id.Instruction(Mnemonic(SED, IndirectIndexedModeStr), 2, p.GetSed)
-	opCodes[0x78] = id.Instruction(Mnemonic(SEI, IndirectIndexedModeStr), 2, p.GetSei)
-	opCodes[0x85] = id.Instruction(Mnemonic(STA, ZeropageModeStr), 3, p.GetSta)
-	opCodes[0x95] = id.Instruction(Mnemonic(STA, ZeropageXModeStr), 4, p.GetSta)
-	opCodes[0x8D] = id.Instruction(Mnemonic(STA, AbsoluteModeStr), 4, p.GetSta)
-	opCodes[0x9D] = id.Instruction(Mnemonic(STA, AbsoluteIndexedXModeStr), 5, p.GetSta)
-	opCodes[0x99] = id.Instruction(Mnemonic(STA, AbsoluteIndexedYModeStr), 5, p.GetSta)
-	opCodes[0x81] = id.Instruction(Mnemonic(STA, IndexedIndirectModeStr), 6, p.GetSta)
-	opCodes[0x91] = id.Instruction(Mnemonic(STA, IndirectIndexedModeStr), 6, p.GetSta)
-	opCodes[0x86] = id.Instruction(Mnemonic(STX, ZeropageModeStr), 3, p.GetStx)
-	opCodes[0x96] = id.Instruction(Mnemonic(STX, ZeropageYModeStr), 4, p.GetStx)
-	opCodes[0x8E] = id.Instruction(Mnemonic(STX, AbsoluteModeStr), 4, p.GetStx)
-	opCodes[0x84] = id.Instruction(Mnemonic(STY, ZeropageModeStr), 3, p.GetSty)
-	opCodes[0x94] = id.Instruction(Mnemonic(STY, ZeropageXModeStr), 4, p.GetSty)
-	opCodes[0x8C] = id.Instruction(Mnemonic(STY, AbsoluteModeStr), 4, p.GetSty)
-	opCodes[0xAA] = id.Instruction(Mnemonic(TAX, ImpliedModeStr), 2, p.GetTax)
-	opCodes[0xA8] = id.Instruction(Mnemonic(TAY, ImpliedModeStr), 2, p.GetTay)
-	opCodes[0xBA] = id.Instruction(Mnemonic(TSX, ImpliedModeStr), 2, p.GetTsx)
-	opCodes[0x8A] = id.Instruction(Mnemonic(TXA, ImpliedModeStr), 2, p.GetTxa)
-	opCodes[0x9A] = id.Instruction(Mnemonic(TXS, ImpliedModeStr), 2, p.GetTxs)
-	opCodes[0x98] = id.Instruction(Mnemonic(TYA, ImpliedModeStr), 2, p.GetTya)
+	id := NewInstruction(getAddressingMode)
+	opCodes[0x69] = id.Instruction(Mnemonic(adcStr, ImmediateModeStr), 2, p.adc)
+	opCodes[0x65] = id.Instruction(Mnemonic(adcStr, ZeropageModeStr), 3, p.adc)
+	opCodes[0x75] = id.Instruction(Mnemonic(adcStr, ZeropageXModeStr), 4, p.adc)
+	opCodes[0x6D] = id.Instruction(Mnemonic(adcStr, AbsoluteModeStr), 4, p.adc)
+	opCodes[0x7D] = id.Instruction(Mnemonic(adcStr, AbsoluteIndexedXModeStr), 4, p.adc)
+	opCodes[0x79] = id.Instruction(Mnemonic(adcStr, AbsoluteIndexedYModeStr), 4, p.adc)
+	opCodes[0x61] = id.Instruction(Mnemonic(adcStr, IndexedIndirectModeStr), 6, p.adc)
+	opCodes[0x71] = id.Instruction(Mnemonic(adcStr, IndirectIndexedModeStr), 5, p.adc)
+	opCodes[0x29] = id.Instruction(Mnemonic(andStr, ImmediateModeStr), 2, p.and)
+	opCodes[0x25] = id.Instruction(Mnemonic(andStr, ZeropageModeStr), 3, p.and)
+	opCodes[0x35] = id.Instruction(Mnemonic(andStr, ZeropageXModeStr), 4, p.and)
+	opCodes[0x2D] = id.Instruction(Mnemonic(andStr, AbsoluteModeStr), 4, p.and)
+	opCodes[0x3D] = id.Instruction(Mnemonic(andStr, AbsoluteIndexedXModeStr), 4, p.and)
+	opCodes[0x39] = id.Instruction(Mnemonic(andStr, AbsoluteIndexedYModeStr), 4, p.and)
+	opCodes[0x21] = id.Instruction(Mnemonic(andStr, IndexedIndirectModeStr), 6, p.and)
+	opCodes[0x31] = id.Instruction(Mnemonic(andStr, IndirectIndexedModeStr), 5, p.and)
+	opCodes[0x0A] = id.Instruction(Mnemonic(aslStr, AccumulatorModeStr), 2, p.asl)
+	opCodes[0x06] = id.Instruction(Mnemonic(aslStr, ZeropageModeStr), 5, p.asl)
+	opCodes[0x16] = id.Instruction(Mnemonic(aslStr, ZeropageXModeStr), 6, p.asl)
+	opCodes[0x0E] = id.Instruction(Mnemonic(aslStr, AbsoluteModeStr), 6, p.asl)
+	opCodes[0x1E] = id.Instruction(Mnemonic(aslStr, AbsoluteIndexedXModeStr), 7, p.asl)
+	opCodes[0x90] = id.Instruction(Mnemonic(bccStr, RelativeModeStr), 2, p.bcc)
+	opCodes[0xB0] = id.Instruction(Mnemonic(bcsStr, RelativeModeStr), 2, p.bcs)
+	opCodes[0xF0] = id.Instruction(Mnemonic(beqStr, RelativeModeStr), 2, p.beq)
+	opCodes[0x24] = id.Instruction(Mnemonic(bitStr, ZeropageModeStr), 3, p.bit)
+	opCodes[0x2C] = id.Instruction(Mnemonic(bitStr, AbsoluteModeStr), 4, p.bit)
+	opCodes[0x30] = id.Instruction(Mnemonic(bmiStr, RelativeModeStr), 2, p.bmi)
+	opCodes[0xD0] = id.Instruction(Mnemonic(bneStr, RelativeModeStr), 2, p.bne)
+	opCodes[0x10] = id.Instruction(Mnemonic(bplStr, RelativeModeStr), 2, p.bpl)
+	opCodes[0x00] = id.Instruction(Mnemonic(brkStr, ImpliedModeStr), 7, p.brk)
+	opCodes[0x50] = id.Instruction(Mnemonic(bvcStr, RelativeModeStr), 2, p.bvc)
+	opCodes[0x70] = id.Instruction(Mnemonic(bvsStr, RelativeModeStr), 2, p.bvs)
+	opCodes[0x18] = id.Instruction(Mnemonic(clcStr, ImpliedModeStr), 2, p.clc)
+	opCodes[0xD8] = id.Instruction(Mnemonic(cldStr, ImpliedModeStr), 2, p.cld)
+	opCodes[0x58] = id.Instruction(Mnemonic(cliStr, ImpliedModeStr), 2, p.cli)
+	opCodes[0xB8] = id.Instruction(Mnemonic(clvStr, ImpliedModeStr), 2, p.clv)
+	opCodes[0xC9] = id.Instruction(Mnemonic(cmpStr, ImmediateModeStr), 2, p.cmp)
+	opCodes[0xC5] = id.Instruction(Mnemonic(cmpStr, ZeropageModeStr), 3, p.cmp)
+	opCodes[0xD5] = id.Instruction(Mnemonic(cmpStr, ZeropageXModeStr), 4, p.cmp)
+	opCodes[0xCD] = id.Instruction(Mnemonic(cmpStr, AbsoluteModeStr), 4, p.cmp)
+	opCodes[0xDD] = id.Instruction(Mnemonic(cmpStr, AbsoluteIndexedXModeStr), 4, p.cmp)
+	opCodes[0xD9] = id.Instruction(Mnemonic(cmpStr, AbsoluteIndexedYModeStr), 4, p.cmp)
+	opCodes[0xC1] = id.Instruction(Mnemonic(cmpStr, IndexedIndirectModeStr), 6, p.cmp)
+	opCodes[0xD1] = id.Instruction(Mnemonic(cmpStr, IndirectIndexedModeStr), 5, p.cmp)
+	opCodes[0xE0] = id.Instruction(Mnemonic(cpxStr, ImmediateModeStr), 2, p.cpx)
+	opCodes[0xE4] = id.Instruction(Mnemonic(cpxStr, ZeropageModeStr), 3, p.cpx)
+	opCodes[0xEC] = id.Instruction(Mnemonic(cpxStr, AbsoluteModeStr), 4, p.cpx)
+	opCodes[0xC0] = id.Instruction(Mnemonic(cpyStr, ImmediateModeStr), 2, p.cpy)
+	opCodes[0xC4] = id.Instruction(Mnemonic(cpyStr, ZeropageModeStr), 3, p.cpy)
+	opCodes[0xCC] = id.Instruction(Mnemonic(cpyStr, AbsoluteModeStr), 4, p.cpy)
+	opCodes[0xC6] = id.Instruction(Mnemonic(decStr, ZeropageModeStr), 5, p.dec)
+	opCodes[0xD6] = id.Instruction(Mnemonic(decStr, ZeropageXModeStr), 6, p.dec)
+	opCodes[0xCE] = id.Instruction(Mnemonic(decStr, AbsoluteModeStr), 6, p.dec)
+	opCodes[0xDE] = id.Instruction(Mnemonic(decStr, AbsoluteIndexedXModeStr), 7, p.dec)
+	opCodes[0xCA] = id.Instruction(Mnemonic(dexStr, ImpliedModeStr), 2, p.dex)
+	opCodes[0x88] = id.Instruction(Mnemonic(deyStr, ImpliedModeStr), 2, p.dey)
+	opCodes[0x49] = id.Instruction(Mnemonic(eorStr, ImmediateModeStr), 2, p.eor)
+	opCodes[0x45] = id.Instruction(Mnemonic(eorStr, ZeropageModeStr), 3, p.eor)
+	opCodes[0x55] = id.Instruction(Mnemonic(eorStr, ZeropageXModeStr), 4, p.eor)
+	opCodes[0x4D] = id.Instruction(Mnemonic(eorStr, AbsoluteModeStr), 4, p.eor)
+	opCodes[0x5D] = id.Instruction(Mnemonic(eorStr, AbsoluteIndexedXModeStr), 4, p.eor)
+	opCodes[0x59] = id.Instruction(Mnemonic(eorStr, AbsoluteIndexedYModeStr), 4, p.eor)
+	opCodes[0x41] = id.Instruction(Mnemonic(eorStr, IndexedIndirectModeStr), 6, p.eor)
+	opCodes[0x51] = id.Instruction(Mnemonic(eorStr, IndirectIndexedModeStr), 5, p.eor)
+	opCodes[0xE6] = id.Instruction(Mnemonic(incStr, ZeropageModeStr), 5, p.inc)
+	opCodes[0xF6] = id.Instruction(Mnemonic(incStr, ZeropageXModeStr), 6, p.inc)
+	opCodes[0xEE] = id.Instruction(Mnemonic(incStr, AbsoluteModeStr), 6, p.inc)
+	opCodes[0xFE] = id.Instruction(Mnemonic(incStr, AbsoluteIndexedXModeStr), 7, p.inc)
+	opCodes[0xE8] = id.Instruction(Mnemonic(inxStr, ImpliedModeStr), 2, p.inx)
+	opCodes[0xC8] = id.Instruction(Mnemonic(inyStr, ImpliedModeStr), 2, p.iny)
+	opCodes[0x4C] = id.Instruction(Mnemonic(jmpStr, AbsoluteModeStr), 3, p.jmp)
+	opCodes[0x6C] = id.Instruction(Mnemonic(jmpStr, AbsoluteIndirectModeStr), 5, p.jmp)
+	opCodes[0x20] = id.Instruction(Mnemonic(jsrStr, AbsoluteModeStr), 6, p.jsr)
+	opCodes[0xA9] = id.Instruction(Mnemonic(ldaStr, ImmediateModeStr), 2, p.lda)
+	opCodes[0xA5] = id.Instruction(Mnemonic(ldaStr, ZeropageModeStr), 3, p.lda)
+	opCodes[0xB5] = id.Instruction(Mnemonic(ldaStr, ZeropageXModeStr), 4, p.lda)
+	opCodes[0xAD] = id.Instruction(Mnemonic(ldaStr, AbsoluteModeStr), 4, p.lda)
+	opCodes[0xBD] = id.Instruction(Mnemonic(ldaStr, AbsoluteIndexedXModeStr), 4, p.lda)
+	opCodes[0xB9] = id.Instruction(Mnemonic(ldaStr, AbsoluteIndexedYModeStr), 4, p.lda)
+	opCodes[0xA1] = id.Instruction(Mnemonic(ldaStr, IndexedIndirectModeStr), 6, p.lda)
+	opCodes[0xB1] = id.Instruction(Mnemonic(ldaStr, IndirectIndexedModeStr), 5, p.lda)
+	opCodes[0xA2] = id.Instruction(Mnemonic(ldxStr, ImmediateModeStr), 2, p.ldx)
+	opCodes[0xA6] = id.Instruction(Mnemonic(ldxStr, ZeropageModeStr), 3, p.ldx)
+	opCodes[0xB6] = id.Instruction(Mnemonic(ldxStr, ZeropageYModeStr), 4, p.ldx)
+	opCodes[0xAE] = id.Instruction(Mnemonic(ldxStr, AbsoluteModeStr), 4, p.ldx)
+	opCodes[0xBE] = id.Instruction(Mnemonic(ldxStr, AbsoluteIndexedXModeStr), 4, p.ldx)
+	opCodes[0xA0] = id.Instruction(Mnemonic(ldyStr, ImmediateModeStr), 2, p.ldy)
+	opCodes[0xA4] = id.Instruction(Mnemonic(ldyStr, ZeropageModeStr), 3, p.ldy)
+	opCodes[0xB4] = id.Instruction(Mnemonic(ldyStr, ZeropageXModeStr), 4, p.ldy)
+	opCodes[0xAC] = id.Instruction(Mnemonic(ldyStr, AbsoluteModeStr), 4, p.ldy)
+	opCodes[0xBC] = id.Instruction(Mnemonic(ldyStr, AbsoluteIndexedXModeStr), 4, p.ldy)
+	opCodes[0x4A] = id.Instruction(Mnemonic(lsrStr, AccumulatorModeStr), 2, p.lsr)
+	opCodes[0x46] = id.Instruction(Mnemonic(lsrStr, ZeropageModeStr), 5, p.lsr)
+	opCodes[0x56] = id.Instruction(Mnemonic(lsrStr, ZeropageXModeStr), 6, p.lsr)
+	opCodes[0x4E] = id.Instruction(Mnemonic(lsrStr, AbsoluteModeStr), 6, p.lsr)
+	opCodes[0x5E] = id.Instruction(Mnemonic(lsrStr, AbsoluteIndexedXModeStr), 7, p.lsr)
+	opCodes[0xEA] = id.Instruction(Mnemonic(nopStr, ImpliedModeStr), 2, p.nop)
+	opCodes[0x09] = id.Instruction(Mnemonic(oraStr, ImmediateModeStr), 2, p.ora)
+	opCodes[0x05] = id.Instruction(Mnemonic(oraStr, ZeropageModeStr), 3, p.ora)
+	opCodes[0x15] = id.Instruction(Mnemonic(oraStr, ZeropageXModeStr), 4, p.ora)
+	opCodes[0x0D] = id.Instruction(Mnemonic(oraStr, AbsoluteModeStr), 4, p.ora)
+	opCodes[0x1D] = id.Instruction(Mnemonic(oraStr, AbsoluteIndexedXModeStr), 4, p.ora)
+	opCodes[0x19] = id.Instruction(Mnemonic(oraStr, AbsoluteIndexedYModeStr), 4, p.ora)
+	opCodes[0x01] = id.Instruction(Mnemonic(oraStr, IndexedIndirectModeStr), 6, p.ora)
+	opCodes[0x11] = id.Instruction(Mnemonic(oraStr, IndirectIndexedModeStr), 5, p.ora)
+	opCodes[0x48] = id.Instruction(Mnemonic(phaStr, ImpliedModeStr), 3, p.pha)
+	opCodes[0x68] = id.Instruction(Mnemonic(plaStr, ImpliedModeStr), 4, p.pla)
+	opCodes[0x08] = id.Instruction(Mnemonic(phpStr, ImpliedModeStr), 3, p.php)
+	opCodes[0x28] = id.Instruction(Mnemonic(plpStr, ImpliedModeStr), 4, p.plp)
+	opCodes[0x2A] = id.Instruction(Mnemonic(rolStr, AccumulatorModeStr), 2, p.rol)
+	opCodes[0x26] = id.Instruction(Mnemonic(rolStr, ZeropageModeStr), 5, p.rol)
+	opCodes[0x36] = id.Instruction(Mnemonic(rolStr, ZeropageXModeStr), 6, p.rol)
+	opCodes[0x2E] = id.Instruction(Mnemonic(rolStr, AbsoluteModeStr), 6, p.rol)
+	opCodes[0x3E] = id.Instruction(Mnemonic(rolStr, AbsoluteIndexedXModeStr), 7, p.rol)
+	opCodes[0x6A] = id.Instruction(Mnemonic(rorStr, AccumulatorModeStr), 2, p.ror)
+	opCodes[0x66] = id.Instruction(Mnemonic(rorStr, ZeropageModeStr), 5, p.ror)
+	opCodes[0x76] = id.Instruction(Mnemonic(rorStr, ZeropageXModeStr), 6, p.ror)
+	opCodes[0x6E] = id.Instruction(Mnemonic(rorStr, AbsoluteModeStr), 6, p.ror)
+	opCodes[0x7E] = id.Instruction(Mnemonic(rorStr, AbsoluteIndexedXModeStr), 7, p.ror)
+	opCodes[0x40] = id.Instruction(Mnemonic(rtiStr, ImpliedModeStr), 6, p.rti)
+	opCodes[0x60] = id.Instruction(Mnemonic(rtsStr, ImpliedModeStr), 6, p.rts)
+	opCodes[0xE9] = id.Instruction(Mnemonic(sbcStr, ImmediateModeStr), 2, p.sbc)
+	opCodes[0xE5] = id.Instruction(Mnemonic(sbcStr, ZeropageModeStr), 3, p.sbc)
+	opCodes[0xF5] = id.Instruction(Mnemonic(sbcStr, ZeropageXModeStr), 4, p.sbc)
+	opCodes[0xED] = id.Instruction(Mnemonic(sbcStr, AbsoluteModeStr), 4, p.sbc)
+	opCodes[0xFD] = id.Instruction(Mnemonic(sbcStr, AbsoluteIndexedXModeStr), 4, p.sbc)
+	opCodes[0xF9] = id.Instruction(Mnemonic(sbcStr, AbsoluteIndexedYModeStr), 4, p.sbc)
+	opCodes[0xE1] = id.Instruction(Mnemonic(sbcStr, IndexedIndirectModeStr), 6, p.sbc)
+	opCodes[0xF1] = id.Instruction(Mnemonic(sbcStr, IndirectIndexedModeStr), 5, p.sbc)
+	opCodes[0x38] = id.Instruction(Mnemonic(secStr, ImpliedModeStr), 2, p.sec)
+	opCodes[0xF8] = id.Instruction(Mnemonic(sedStr, ImpliedModeStr), 2, p.sed)
+	opCodes[0x78] = id.Instruction(Mnemonic(seiStr, ImpliedModeStr), 2, p.sei)
+	opCodes[0x85] = id.Instruction(Mnemonic(staStr, ZeropageModeStr), 3, p.sta)
+	opCodes[0x95] = id.Instruction(Mnemonic(staStr, ZeropageXModeStr), 4, p.sta)
+	opCodes[0x8D] = id.Instruction(Mnemonic(staStr, AbsoluteModeStr), 4, p.sta)
+	opCodes[0x9D] = id.Instruction(Mnemonic(staStr, AbsoluteIndexedXModeStr), 5, p.sta)
+	opCodes[0x99] = id.Instruction(Mnemonic(staStr, AbsoluteIndexedYModeStr), 5, p.sta)
+	opCodes[0x81] = id.Instruction(Mnemonic(staStr, IndexedIndirectModeStr), 6, p.sta)
+	opCodes[0x91] = id.Instruction(Mnemonic(staStr, IndirectIndexedModeStr), 6, p.sta)
+	opCodes[0x86] = id.Instruction(Mnemonic(stxStr, ZeropageModeStr), 3, p.stx)
+	opCodes[0x96] = id.Instruction(Mnemonic(stxStr, ZeropageYModeStr), 4, p.stx)
+	opCodes[0x8E] = id.Instruction(Mnemonic(stxStr, AbsoluteModeStr), 4, p.stx)
+	opCodes[0x84] = id.Instruction(Mnemonic(styStr, ZeropageModeStr), 3, p.sty)
+	opCodes[0x94] = id.Instruction(Mnemonic(styStr, ZeropageXModeStr), 4, p.sty)
+	opCodes[0x8C] = id.Instruction(Mnemonic(styStr, AbsoluteModeStr), 4, p.sty)
+	opCodes[0xAA] = id.Instruction(Mnemonic(taxStr, ImpliedModeStr), 2, p.tax)
+	opCodes[0xA8] = id.Instruction(Mnemonic(tayStr, ImpliedModeStr), 2, p.tay)
+	opCodes[0xBA] = id.Instruction(Mnemonic(tsxStr, ImpliedModeStr), 2, p.tsx)
+	opCodes[0x8A] = id.Instruction(Mnemonic(txaStr, ImpliedModeStr), 2, p.txa)
+	opCodes[0x9A] = id.Instruction(Mnemonic(txsStr, ImpliedModeStr), 2, p.txs)
+	opCodes[0x98] = id.Instruction(Mnemonic(tyaStr, ImpliedModeStr), 2, p.tya)
 	return opCodes
 }
 
-func (p *Cpu) addPCOffset(b byte) (uint16, bool) {
+func (p *CPU) addPCOffset(b byte) (uint16, bool) {
 	pcLsb := uint16(p.Reg.PC & 0x00FF)
 	offset := int8(b)
 	pcLsb += uint16(offset)
@@ -225,7 +226,7 @@ func (p *Cpu) addPCOffset(b byte) (uint16, bool) {
 	return newPC, carryFlag
 }
 
-func (p *Cpu) GetAdc(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) adc(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, false)
 
 	var adcMode = map[bool]func(b byte){
@@ -280,7 +281,7 @@ func (p *Cpu) GetAdc(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetAnd(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) and(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, false)
 
 	return func() (Completed, error) {
@@ -295,7 +296,7 @@ func (p *Cpu) GetAnd(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetAsl(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) asl(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, true)
 	store := opcode.AddressingMode.Store(p, true)
 	result := byte(0x00)
@@ -311,7 +312,7 @@ func (p *Cpu) GetAsl(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetBranch(opcode OpCodeDef, flag StatusFlag, state bool) InstructionFunc {
+func (p *CPU) branch(opcode OpCodeDef, flag StatusFlag, state bool) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, true)
 	var complete Completed = false
 	readByte := byte(0x00)
@@ -340,19 +341,19 @@ func (p *Cpu) GetBranch(opcode OpCodeDef, flag StatusFlag, state bool) Instructi
 }
 
 // A Branch not taken requires 2 cycles
-func (p *Cpu) GetBcc(opcode OpCodeDef) InstructionFunc {
-	return p.GetBranch(opcode, CarryFlag, false)
+func (p *CPU) bcc(opcode OpCodeDef) InstructionFunc {
+	return p.branch(opcode, CarryFlag, false)
 }
 
-func (p *Cpu) GetBcs(opcode OpCodeDef) InstructionFunc {
-	return p.GetBranch(opcode, CarryFlag, true)
+func (p *CPU) bcs(opcode OpCodeDef) InstructionFunc {
+	return p.branch(opcode, CarryFlag, true)
 }
 
-func (p *Cpu) GetBeq(opcode OpCodeDef) InstructionFunc {
-	return p.GetBranch(opcode, ZeroFlag, true)
+func (p *CPU) beq(opcode OpCodeDef) InstructionFunc {
+	return p.branch(opcode, ZeroFlag, true)
 }
 
-func (p *Cpu) GetBit(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) bit(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, false)
 
 	return func() (Completed, error) {
@@ -370,16 +371,16 @@ func (p *Cpu) GetBit(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetBmi(opcode OpCodeDef) InstructionFunc {
-	return p.GetBranch(opcode, NegativeFlag, true)
+func (p *CPU) bmi(opcode OpCodeDef) InstructionFunc {
+	return p.branch(opcode, NegativeFlag, true)
 }
 
-func (p *Cpu) GetBne(opcode OpCodeDef) InstructionFunc {
-	return p.GetBranch(opcode, ZeroFlag, false)
+func (p *CPU) bne(opcode OpCodeDef) InstructionFunc {
+	return p.branch(opcode, ZeroFlag, false)
 }
 
-func (p *Cpu) GetBpl(opcode OpCodeDef) InstructionFunc {
-	return p.GetBranch(opcode, NegativeFlag, false)
+func (p *CPU) bpl(opcode OpCodeDef) InstructionFunc {
+	return p.branch(opcode, NegativeFlag, false)
 }
 
 // cc	addr	data
@@ -392,7 +393,7 @@ func (p *Cpu) GetBpl(opcode OpCodeDef) InstructionFunc {
 // 6	FFFE	??	;low byte of target address
 // 7	FFFF	??	;high byte of target address
 
-func (p *Cpu) GetBrk(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) brk(_ OpCodeDef) InstructionFunc {
 	//	load, _ := p.immediateMode(false) // This is a bit odd, but BRK actually reads the next byte
 	//	cycle := 1
 	var highPC byte
@@ -410,43 +411,43 @@ func (p *Cpu) GetBrk(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetBvc(opcode OpCodeDef) InstructionFunc {
-	return p.GetBranch(opcode, OverflowFlag, false)
+func (p *CPU) bvc(opcode OpCodeDef) InstructionFunc {
+	return p.branch(opcode, OverflowFlag, false)
 }
 
-func (p *Cpu) GetBvs(opcode OpCodeDef) InstructionFunc {
-	return p.GetBranch(opcode, OverflowFlag, true)
+func (p *CPU) bvs(opcode OpCodeDef) InstructionFunc {
+	return p.branch(opcode, OverflowFlag, true)
 }
 
-func (p *Cpu) GetClc(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) clc(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.SetStatus(CarryFlag, false)
 		return true, nil
 	}
 }
 
-func (p *Cpu) GetCld(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) cld(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.SetStatus(DecimalFlag, false)
 		return true, nil
 	}
 }
 
-func (p *Cpu) GetCli(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) cli(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.SetStatus(InterruptDisableFlag, false)
 		return true, nil
 	}
 }
 
-func (p *Cpu) GetClv(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) clv(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.SetStatus(OverflowFlag, false)
 		return true, nil
 	}
 }
 
-func (p *Cpu) GetCompare(opcode OpCodeDef, regValue uint8) InstructionFunc {
+func (p *CPU) compare(opcode OpCodeDef, regValue uint8) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, false)
 
 	return func() (Completed, error) {
@@ -465,19 +466,19 @@ func (p *Cpu) GetCompare(opcode OpCodeDef, regValue uint8) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetCmp(opcode OpCodeDef) InstructionFunc {
-	return p.GetCompare(opcode, p.Reg.A)
+func (p *CPU) cmp(opcode OpCodeDef) InstructionFunc {
+	return p.compare(opcode, p.Reg.A)
 }
 
-func (p *Cpu) GetCpx(opcode OpCodeDef) InstructionFunc {
-	return p.GetCompare(opcode, p.Reg.X)
+func (p *CPU) cpx(opcode OpCodeDef) InstructionFunc {
+	return p.compare(opcode, p.Reg.X)
 }
 
-func (p *Cpu) GetCpy(opcode OpCodeDef) InstructionFunc {
-	return p.GetCompare(opcode, p.Reg.Y)
+func (p *CPU) cpy(opcode OpCodeDef) InstructionFunc {
+	return p.compare(opcode, p.Reg.Y)
 }
 
-func (p *Cpu) GetDec(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) dec(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, true)
 	store := opcode.AddressingMode.Store(p, true)
 
@@ -493,7 +494,7 @@ func (p *Cpu) GetDec(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetDex(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) dex(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.X--
 		p.Reg.SetNegativeFlag(p.Reg.X)
@@ -502,8 +503,7 @@ func (p *Cpu) GetDex(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetDey(opcode OpCodeDef) InstructionFunc {
-	// LoadAm, _ := am()
+func (p *CPU) dey(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.Y--
 		p.Reg.SetNegativeFlag(p.Reg.Y)
@@ -512,7 +512,7 @@ func (p *Cpu) GetDey(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetEor(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) eor(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, false)
 
 	return func() (Completed, error) {
@@ -527,7 +527,7 @@ func (p *Cpu) GetEor(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetInc(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) inc(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, true)
 	store := opcode.AddressingMode.Store(p, true)
 
@@ -543,7 +543,7 @@ func (p *Cpu) GetInc(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetInx(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) inx(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.X++
 		p.Reg.SetNegativeFlag(p.Reg.X)
@@ -552,7 +552,7 @@ func (p *Cpu) GetInx(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetIny(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) iny(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.Y++
 		p.Reg.SetNegativeFlag(p.Reg.Y)
@@ -561,7 +561,7 @@ func (p *Cpu) GetIny(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetJmp(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) jmp(opcode OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		address := opcode.AddressingMode.Address(p)
 		p.Reg.PC = address
@@ -569,7 +569,7 @@ func (p *Cpu) GetJmp(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetJsr(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) jsr(opcode OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Push(byte((p.Reg.PC & 0xFF00) >> 8))
 		p.Push(byte(p.Reg.PC & 0x00FF))
@@ -579,7 +579,7 @@ func (p *Cpu) GetJsr(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetLda(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) lda(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, false)
 
 	return func() (Completed, error) {
@@ -594,7 +594,7 @@ func (p *Cpu) GetLda(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetLdx(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) ldx(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, false)
 
 	return func() (Completed, error) {
@@ -609,7 +609,7 @@ func (p *Cpu) GetLdx(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetLdy(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) ldy(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, false)
 
 	return func() (Completed, error) {
@@ -624,7 +624,7 @@ func (p *Cpu) GetLdy(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetLsr(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) lsr(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, true)
 	store := opcode.AddressingMode.Store(p, true)
 
@@ -646,13 +646,13 @@ func (p *Cpu) GetLsr(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetNop(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) nop(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		return true, nil
 	}
 }
 
-func (p *Cpu) GetOra(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) ora(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, false)
 
 	return func() (Completed, error) {
@@ -667,36 +667,35 @@ func (p *Cpu) GetOra(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetPha(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) pha(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Push(p.Reg.A)
 		return true, nil
 	}
 }
 
-func (p *Cpu) GetPhp(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) php(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Push(p.Reg.S)
 		return true, nil
 	}
 }
 
-func (p *Cpu) GetPla(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) pla(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.A = p.Pop()
 		return true, nil
 	}
 }
 
-func (p *Cpu) GetPlp(opcode OpCodeDef) InstructionFunc {
-	// LoadAm, _ := am()
+func (p *CPU) plp(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.Status = p.Pop()
 		return true, nil
 	}
 }
 
-func (p *Cpu) GetRol(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) rol(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, true)
 	store := opcode.AddressingMode.Store(p, true)
 
@@ -721,7 +720,7 @@ func (p *Cpu) GetRol(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetRor(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) ror(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, true)
 	store := opcode.AddressingMode.Store(p, true)
 
@@ -746,7 +745,7 @@ func (p *Cpu) GetRor(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetRti(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) rti(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.Status = p.Pop()
 		lowBytePC := p.Pop()
@@ -757,7 +756,7 @@ func (p *Cpu) GetRti(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetRts(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) rts(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		lowBytePC := p.Pop()
 		hiBytePC := p.Pop()
@@ -766,7 +765,7 @@ func (p *Cpu) GetRts(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetSbc(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) sbc(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, false)
 
 	var sbcMode = map[bool]func(b byte){
@@ -835,28 +834,28 @@ func (p *Cpu) GetSbc(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetSec(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) sec(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.SetStatus(CarryFlag, true)
 		return true, nil
 	}
 }
 
-func (p *Cpu) GetSed(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) sed(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.SetStatus(DecimalFlag, true)
 		return true, nil
 	}
 }
 
-func (p *Cpu) GetSei(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) sei(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.SetStatus(InterruptDisableFlag, true)
 		return true, nil
 	}
 }
 
-func (p *Cpu) GetSta(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) sta(opcode OpCodeDef) InstructionFunc {
 	store := opcode.AddressingMode.Store(p, true)
 	return func() (Completed, error) {
 		store(p.Reg.A)
@@ -864,7 +863,7 @@ func (p *Cpu) GetSta(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetStx(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) stx(opcode OpCodeDef) InstructionFunc {
 	store := opcode.AddressingMode.Store(p, true)
 	return func() (Completed, error) {
 		store(p.Reg.X)
@@ -872,7 +871,7 @@ func (p *Cpu) GetStx(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetSty(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) sty(opcode OpCodeDef) InstructionFunc {
 	store := opcode.AddressingMode.Store(p, true)
 	return func() (Completed, error) {
 		store(p.Reg.Y)
@@ -880,7 +879,7 @@ func (p *Cpu) GetSty(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetTax(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) tax(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.X = p.Reg.A
 		p.Reg.SetZeroFlag(p.Reg.X)
@@ -889,7 +888,7 @@ func (p *Cpu) GetTax(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetTay(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) tay(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.Y = p.Reg.A
 		p.Reg.SetZeroFlag(p.Reg.Y)
@@ -898,7 +897,7 @@ func (p *Cpu) GetTay(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetTsx(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) tsx(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.X = p.Reg.S
 		p.Reg.SetZeroFlag(p.Reg.X)
@@ -907,7 +906,7 @@ func (p *Cpu) GetTsx(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetTxa(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) txa(_ OpCodeDef) InstructionFunc {
 	// LoadAm, _ := am()
 	return func() (Completed, error) {
 		p.Reg.A = p.Reg.X
@@ -917,7 +916,7 @@ func (p *Cpu) GetTxa(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetTxs(opcode OpCodeDef) InstructionFunc {
+func (p *CPU) txs(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.S = p.Reg.X
 		p.Reg.SetZeroFlag(p.Reg.S)
@@ -926,8 +925,7 @@ func (p *Cpu) GetTxs(opcode OpCodeDef) InstructionFunc {
 	}
 }
 
-func (p *Cpu) GetTya(opcode OpCodeDef) InstructionFunc {
-	// LoadAm, _ := am()
+func (p *CPU) tya(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.A = p.Reg.Y
 		p.Reg.SetZeroFlag(p.Reg.A)

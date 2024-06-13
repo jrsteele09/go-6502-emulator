@@ -1,3 +1,4 @@
+// Package cpu provides types and functions for emulating the 6502 CPU, including CPU operations and instruction execution.
 package cpu
 
 import (
@@ -6,9 +7,11 @@ import (
 	"github.com/jrsteele09/go-6502-emulator/memory"
 )
 
+// Completed represents whether an instruction has completed execution.
 type Completed bool
 
-type Cpu6502 interface {
+// CPU6502 interface defines the methods required to emulate the 6502 CPU.
+type CPU6502 interface {
 	Stop()
 	Resume()
 	Execute() (Completed, error)
@@ -18,7 +21,7 @@ type Cpu6502 interface {
 	Push(b byte)
 	Pop() byte
 	Registers() *Registers
-	Memory() memory.MemoryFunctions[uint16]
+	Memory() memory.Operations[uint16]
 	Operands() []byte
 }
 
@@ -29,14 +32,16 @@ const (
 	stackPageAddress uint16 = 0x0100
 )
 
+// HaltExecution interface defines methods to stop and resume CPU execution.
 type HaltExecution interface {
 	Stop()
 	Resume()
 }
 
-type Cpu struct {
+// CPU represents the 6502 CPU with registers, memory, and opcode definitions.
+type CPU struct {
 	Reg               *Registers
-	mem               memory.MemoryFunctions[uint16]
+	mem               memory.Operations[uint16]
 	opCodes           []*OpCodeDef
 	cycles            uint64
 	instructionCycles int
@@ -47,10 +52,12 @@ type Cpu struct {
 	halted            bool
 }
 
-var _ Cpu6502 = &Cpu{}
+// Ensure Cpu implements the Cpu6502 interface.
+var _ CPU6502 = &CPU{}
 
-func NewCpu(m memory.MemoryFunctions[uint16]) *Cpu {
-	cpu := &Cpu{mem: m, Reg: NewRegisters()}
+// NewCPU creates a new Cpu instance with the provided memory functions.
+func NewCPU(m memory.Operations[uint16]) *CPU {
+	cpu := &CPU{mem: m, Reg: NewRegisters()}
 	cpu.opCodes = OpCodes(cpu)
 	cpu.Reg.SetStatus(UnusedFlag, true)
 	cpu.Reg.S = 0xff
@@ -60,27 +67,33 @@ func NewCpu(m memory.MemoryFunctions[uint16]) *Cpu {
 	return cpu
 }
 
-func (p *Cpu) Registers() *Registers {
+// Registers returns the CPU's registers.
+func (p *CPU) Registers() *Registers {
 	return p.Reg
 }
 
-func (p *Cpu) Memory() memory.MemoryFunctions[uint16] {
+// Memory returns the memory functions used by the CPU.
+func (p *CPU) Memory() memory.Operations[uint16] {
 	return p.mem
 }
 
-func (p *Cpu) Operands() []byte {
+// Operands returns the operands for the current instruction.
+func (p *CPU) Operands() []byte {
 	return p.operands
 }
 
-func (p *Cpu) Stop() {
+// Stop halts the CPU's execution.
+func (p *CPU) Stop() {
 	p.halted = true
 }
 
-func (p *Cpu) Resume() {
+// Resume resumes the CPU's execution.
+func (p *CPU) Resume() {
 	p.halted = false
 }
 
-func (p *Cpu) Execute() (Completed, error) {
+// Execute executes the current instruction and returns whether it is completed and any error encountered.
+func (p *CPU) Execute() (Completed, error) {
 	if p.halted {
 		return false, nil
 	}
@@ -102,7 +115,7 @@ func (p *Cpu) Execute() (Completed, error) {
 	return completed, err
 }
 
-func (p *Cpu) checkInterrupts() bool {
+func (p *CPU) checkInterrupts() bool {
 	if p.nmi {
 		return true
 	} else if p.irq && !p.Reg.IsSet(InterruptDisableFlag) {
@@ -111,7 +124,7 @@ func (p *Cpu) checkInterrupts() bool {
 	return false
 }
 
-func (p *Cpu) readOpCode() (Completed, error) {
+func (p *CPU) readOpCode() (Completed, error) {
 	opCode := p.NextByte()
 	opCodeDef := p.opCodes[opCode]
 	if opCodeDef == nil {
@@ -127,7 +140,7 @@ func (p *Cpu) readOpCode() (Completed, error) {
 	return false, nil
 }
 
-func (p *Cpu) interruptInstruction() (Completed, error) {
+func (p *CPU) interruptInstruction() (Completed, error) {
 	p.interruptStackPush()
 	p.Reg.SetStatus(InterruptDisableFlag, true)
 	var PCH byte
@@ -146,7 +159,7 @@ func (p *Cpu) interruptInstruction() (Completed, error) {
 	return true, nil
 }
 
-func (p *Cpu) interruptStackPush() {
+func (p *CPU) interruptStackPush() {
 	p.Push(byte(p.Reg.PC >> 8))
 	p.Push(byte(p.Reg.PC & 0xff))
 	p.Reg.SetStatus(BreakFlag, false)
@@ -154,34 +167,40 @@ func (p *Cpu) interruptStackPush() {
 	p.Reg.SetStatus(InterruptDisableFlag, true)
 }
 
-func (p *Cpu) NextByte() byte {
+// NextByte reads the next byte from memory and increments the program counter.
+func (p *CPU) NextByte() byte {
 	b := p.mem.Read(uint16(p.Reg.PC))
 	p.Reg.PC++
 	return b
 }
 
-func (p *Cpu) Push(b byte) {
+// Push pushes a byte onto the stack.
+func (p *CPU) Push(b byte) {
 	a := stackPageAddress + uint16(p.Reg.S)
 	p.mem.Write(uint16(a), b)
 	p.Reg.S--
 }
 
-func (p *Cpu) Pop() byte {
+// Pop pops a byte from the stack.
+func (p *CPU) Pop() byte {
 	a := stackPageAddress + uint16(p.Reg.S)
 	b := p.mem.Read(uint16(a))
 	p.Reg.S++
 	return b
 }
 
-func (p *Cpu) Nmi() {
+// Nmi triggers a non-maskable interrupt.
+func (p *CPU) Nmi() {
 	p.nmi = true
 }
 
-func (p *Cpu) Irq() {
+// Irq triggers an interrupt request.
+func (p *CPU) Irq() {
 	p.irq = !p.Reg.IsSet(InterruptDisableFlag)
 }
 
-func (p *Cpu) Reset() {
+// Reset resets the CPU to its initial state.
+func (p *CPU) Reset() {
 	p.Reg.SetStatus(InterruptDisableFlag, true)
 	resetVecLow := p.mem.Read(uint16(resetVectorAddr))
 	resetVecHigh := p.mem.Read(uint16(resetVectorAddr + 1))
