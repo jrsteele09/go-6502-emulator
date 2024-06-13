@@ -3,7 +3,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/jrsteele09/go-6502-emulator)](https://goreportcard.com/report/github.com/jrsteele09/go-6502-emulator)
 [![GoDoc](https://pkg.go.dev/badge/github.com/jrsteele09/go-6502-emulator)](https://pkg.go.dev/github.com/jrsteele09/go-6502-emulator)
 
-`go-6502-emulator` is a Go library that emulates the 6502 processor, providing memory management, Cycle Exact CPU operations, and a disassembler for interpreting machine code.
+`go-6502-emulator` is a Go library that emulates the 6502 processor, providing memory management, cycle exact CPU operations, and a disassembler for interpreting machine code.
 
 
 ## Table of Contents
