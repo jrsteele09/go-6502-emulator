@@ -1,7 +1,7 @@
 # go-6502-emulator
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/yourusername/go-6502-emulator)](https://goreportcard.com/report/github.com/yourusername/go-6502-emulator)
-[![GoDoc](https://pkg.go.dev/badge/github.com/yourusername/go-6502-emulator)](https://pkg.go.dev/github.com/yourusername/go-6502-emulator)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jrsteele09/go-6502-emulator)](https://goreportcard.com/report/github.com/jrsteele09/go-6502-emulator)
+[![GoDoc](https://pkg.go.dev/badge/github.com/jrsteele09/go-6502-emulator)](https://pkg.go.dev/github.com/jrsteele09/go-6502-emulator)
 
 `go-6502-emulator` is a Go library that emulates the 6502 processor, providing memory management, CPU operations, and a disassembler for interpreting machine code.
 
@@ -19,7 +19,7 @@
 To install the package, run:
 
 ```bash
-go get -u github.com/yourusername/go-6502-emulator
+go get -u github.com/jrsteele09/go-6502-emulator
 ```
 ## Usage
 
