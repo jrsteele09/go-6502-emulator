@@ -58,7 +58,7 @@ const (
 	// ImmediateModeStr is the immediate addressing mode.
 	ImmediateModeStr AddressingModeType = "#nn"
 	// RelativeModeStr is the relative addressing mode.
-	RelativeModeStr AddressingModeType = "+nn"
+	RelativeModeStr AddressingModeType = "*nn"
 )
 
 type absoluteIndirectMode struct{}
