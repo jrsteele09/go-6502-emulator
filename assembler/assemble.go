@@ -3,6 +3,7 @@ package assembler
 import (
 	"fmt"
 	"io"
+	"math"
 	"strings"
 
 	"github.com/jrsteele09/go-6502-emulator/cpu"
@@ -99,14 +100,33 @@ type ParsedInstruction struct {
 	data        []byte
 }
 
-func (a *Assembler) Assemble(r io.Reader) error {
+type AssembledData struct {
+	StartAddress uint16
+	Data         []byte
+}
+
+func (a *Assembler) Assemble(r io.Reader) ([]AssembledData, error) {
+	assembledData := make([]AssembledData, 0)
+	var segment *AssembledData
+	var addressCounter uint16
+
+	insertIntoMemory := func(Opcode byte, operand []byte) {
+		if segment == nil {
+			segment = &AssembledData{StartAddress: addressCounter, Data: make([]byte, 0, math.MaxUint16)}
+		}
+		segment.Data = append(segment.Data, Opcode)
+		segment.Data = append(segment.Data, operand...)
+		addressCounter += uint16(1 + len(operand))
+	}
+
 	tokens, err := lexer.NewLexer(a.lexerConfig).Tokenize(r)
 	if err != nil {
-		return fmt.Errorf("[Assembler assemble] Tokenize [%w]", err)
+		return nil, fmt.Errorf("[Assembler assemble] Tokenize [%w]", err)
 	}
 
 	asmTokens := NewAssemblerTokens(tokens)
-	var parsedInstructions = []ParsedInstruction{}
+	// var parsedInstructions = []ParsedInstruction{}
+
 	for {
 		t := asmTokens.Next()
 		if t == nil || t.ID == lexer.EOFType {
@@ -118,20 +138,17 @@ func (a *Assembler) Assemble(r io.Reader) error {
 			addressingMode, err := a.parseAddressingMode(t.Literal, asmTokens)
 			fmt.Printf("%v\n", addressingMode.AddressingMode)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			instruction, ok := a.instructionSet[t.Literal][addressingMode.AddressingMode]
 			if !ok {
-				return fmt.Errorf("[Assembler Assemble] invalid addressing mode for instruction: %s %s", t.Literal, addressingMode)
+				return nil, fmt.Errorf("[Assembler Assemble] invalid addressing mode for instruction: %s %s", t.Literal, addressingMode)
 			}
 
-			parsedInstructions = append(parsedInstructions, ParsedInstruction{
-				instruction: instruction,
-				data:        addressingMode.Operands,
-			})
+			insertIntoMemory(byte(instruction.Opcode), addressingMode.Operands)
 		}
 	}
-	return nil
+	return assembledData, nil
 }
 
 type AddressingMode struct {

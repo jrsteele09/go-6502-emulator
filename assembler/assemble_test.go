@@ -28,9 +28,9 @@ func TestAssembler(t *testing.T) {
 	// `
 
 	asmCode := `
-	;BNE *-127`
+	BNE *-127`
 
-	err := assembler.Assemble(strings.NewReader(asmCode))
+	dataSegments, err := assembler.Assemble(strings.NewReader(asmCode))
 	require.NoError(t, err)
-
+	require.NotNil(t, dataSegments)
 }
