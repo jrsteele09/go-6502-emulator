@@ -3,8 +3,8 @@ module github.com/jrsteele09/go-6502-emulator
 go 1.22.0
 
 require (
-	github.com/jrsteele09/go-lexer v0.0.0-20240910064341-f87ac4b23693
-	github.com/stretchr/testify v1.8.4
+	github.com/jrsteele09/go-lexer v0.0.0-20240910141600-9543462ac7b8
+	github.com/stretchr/testify v1.9.0
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
 )
 
