@@ -17,10 +17,38 @@ const (
 	PlusToken
 	DivideSymbolToken
 	SemiColonToken
+	ByteDirectiveToken
+	WordDirectiveToken
+	TextDirectiveToken
+	StringDirectiveToken
+	StrDirectiveToken
+	AscDirectiveToken
+	AsciizDirectiveToken
+	OrgDirectiveToken
+	EquDirectiveToken
+	DbDirectiveToken
+	DwDirectiveToken
+	DsDirectiveToken
+	ProgramCounterToken
+	ProgramCounterSetToken
 )
 
 // KeywordTokens defines keyword to token mappings
-var KeywordTokens = map[string]lexer.TokenIdentifier{}
+var KeywordTokens = map[string]lexer.TokenIdentifier{
+	".BYTE":   ByteDirectiveToken,
+	".WORD":   WordDirectiveToken,
+	".TEXT":   TextDirectiveToken,
+	".STRING": StringDirectiveToken,
+	".STR":    StrDirectiveToken,
+	".ASC":    AscDirectiveToken,
+	".ASCIIZ": AsciizDirectiveToken,
+	".ORG":    OrgDirectiveToken,
+	".EQU":    EquDirectiveToken,
+	".DB":     DbDirectiveToken,
+	".DW":     DwDirectiveToken,
+	".DS":     DsDirectiveToken,
+	"*=":      ProgramCounterSetToken,
+}
 
 // Custom tokenizers - On detection of the starting character, jump to a specific tokenizer.
 var customTokenizers = map[string]lexer.TokenizerFunc{
