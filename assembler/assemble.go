@@ -24,7 +24,7 @@ type Instruction struct {
 type Assembler struct {
 	instructionSet map[string]map[cpu.AddressingModeType]Instruction
 	labels         map[string]uint64 // Labels address
-	variables      map[string]interface{}
+	constants      map[string]any
 	lexerConfig    *lexer.LanguageConfig
 	programCounter uint16
 	originAddress  uint16
@@ -53,7 +53,7 @@ func New(opcodes []*cpu.OpCodeDef) *Assembler {
 	assembler := &Assembler{
 		instructionSet: instructionSet,
 		labels:         make(map[string]uint64),
-		variables:      make(map[string]interface{}),
+		constants:      make(map[string]interface{}),
 		programCounter: 0x0000,
 		originAddress:  0x0000,
 	}
@@ -135,38 +135,38 @@ func (a *Assembler) AssembleWithPreprocessor(r io.Reader, fileResolver FileResol
 // reset clears labels and variables for a fresh assembly
 func (a *Assembler) reset() {
 	a.labels = make(map[string]uint64)
-	a.variables = make(map[string]interface{})
+	a.constants = make(map[string]interface{})
 	a.programCounter = 0x0000
 	a.originAddress = 0x0000
 }
 
 func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error) {
-	segments := make([]AssembledData, 0)
-	var currentSegment *AssembledData
+	// Track memory segments that will be needed
+	type SegmentInfo struct {
+		StartAddress uint16
+		Size         int
+	}
+	var segmentInfos []SegmentInfo
+	var currentSegmentStart uint16
 
 	a.programCounter = a.originAddress
-
-	createSegmentIfNeeded := func() {
-		if currentSegment == nil {
-			currentSegment = &AssembledData{
-				StartAddress: a.programCounter,
-				Data:         make([]byte, 0),
-			}
-		}
-	}
+	currentSegmentStart = a.programCounter
+	currentSegmentSize := 0
 
 	finalizeCurrentSegment := func() {
-		if currentSegment != nil && len(currentSegment.Data) > 0 {
-			segments = append(segments, *currentSegment)
+		if currentSegmentSize > 0 {
+			segmentInfos = append(segmentInfos, SegmentInfo{
+				StartAddress: currentSegmentStart,
+				Size:         currentSegmentSize,
+			})
 		}
-		currentSegment = nil
+		// Note: currentSegmentStart will be updated by caller when needed
+		currentSegmentSize = 0
 	}
 
-	reserveBytes := func(size int) {
-		createSegmentIfNeeded()
-		// Reserve space by adding zero bytes
-		currentSegment.Data = append(currentSegment.Data, make([]byte, size)...)
+	advanceProgramCounter := func(size int) {
 		a.programCounter += uint16(size)
+		currentSegmentSize += size
 	}
 
 	asmTokens := NewAssemblerTokens(tokens)
@@ -183,11 +183,21 @@ func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error)
 			if err != nil {
 				return nil, err
 			}
+			// Check if program counter changed (due to *=) and start new segment
+			if a.programCounter != currentSegmentStart+uint16(currentSegmentSize) {
+				currentSegmentStart = a.programCounter
+				currentSegmentSize = 0
+			}
 
 		case PeriodToken:
-			err := a.preprocessDirective(asmTokens, reserveBytes, finalizeCurrentSegment)
+			err := a.preprocessDirective(asmTokens, advanceProgramCounter, finalizeCurrentSegment)
 			if err != nil {
 				return nil, err
+			}
+			// Check if program counter changed (due to .ORG) and start new segment
+			if a.programCounter != currentSegmentStart+uint16(currentSegmentSize) {
+				currentSegmentStart = a.programCounter
+				currentSegmentSize = 0
 			}
 
 		case LabelToken:
@@ -203,11 +213,21 @@ func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error)
 				return nil, err
 			}
 			instructionSize := 1 + len(addressingMode.Operands)
-			reserveBytes(instructionSize)
+			advanceProgramCounter(instructionSize)
 		}
 	}
 
 	finalizeCurrentSegment()
+
+	// Create actual segments with allocated memory
+	segments := make([]AssembledData, len(segmentInfos))
+	for i, info := range segmentInfos {
+		segments[i] = AssembledData{
+			StartAddress: info.StartAddress,
+			Data:         make([]byte, info.Size),
+		}
+	}
+
 	return segments, nil
 }
 
@@ -298,7 +318,7 @@ func (a *Assembler) addressForAsterixOrgDirective(asmTokens *AssemblerTokens, fi
 	return nil
 }
 
-func (a *Assembler) preprocessDirective(asmTokens *AssemblerTokens, reserveBytes func(int), finalizeSegment func()) error {
+func (a *Assembler) preprocessDirective(asmTokens *AssemblerTokens, advanceProgramCounter func(int), finalizeSegment func()) error {
 	// Check if this is a directive (. followed by directive name)
 	nextToken := asmTokens.Peek()
 	if nextToken != nil && nextToken.ID == IdentifierToken {
@@ -313,25 +333,25 @@ func (a *Assembler) preprocessDirective(asmTokens *AssemblerTokens, reserveBytes
 				if err != nil {
 					return err
 				}
-				reserveBytes(size)
+				advanceProgramCounter(size)
 			case WordDirectiveToken, DwDirectiveToken:
 				size, err := a.calculateWordDirectiveSize(asmTokens)
 				if err != nil {
 					return err
 				}
-				reserveBytes(size)
+				advanceProgramCounter(size)
 			case TextDirectiveToken, StringDirectiveToken, StrDirectiveToken, AscDirectiveToken:
 				size, err := a.calculateTextDirectiveSize(asmTokens)
 				if err != nil {
 					return err
 				}
-				reserveBytes(size)
+				advanceProgramCounter(size)
 			case AsciizDirectiveToken:
 				size, err := a.calculateAsciizDirectiveSize(asmTokens)
 				if err != nil {
 					return err
 				}
-				reserveBytes(size)
+				advanceProgramCounter(size)
 			case OrgDirectiveToken:
 				err := a.processOrgDirective(asmTokens, finalizeSegment)
 				if err != nil {
@@ -347,7 +367,7 @@ func (a *Assembler) preprocessDirective(asmTokens *AssemblerTokens, reserveBytes
 				if err != nil {
 					return err
 				}
-				reserveBytes(size)
+				advanceProgramCounter(size)
 			}
 		}
 	}
@@ -363,7 +383,7 @@ func (a *Assembler) recordLabelAddress(t *lexer.Token) error {
 	}
 
 	// Check if this label name conflicts with an existing variable
-	if _, exists := a.variables[labelName]; exists {
+	if _, exists := a.constants[labelName]; exists {
 		return fmt.Errorf("[recordLabelAddress] label '%s' conflicts with existing variable", labelName)
 	}
 
@@ -380,7 +400,7 @@ func (a *Assembler) checkForOrgAsterixDirective(asmTokens *AssemblerTokens, upda
 		// Process program counter change using the same logic as .ORG
 		t := asmTokens.Next()
 		if t != nil {
-			newAddress, err := a.parseAddressValue(t)
+			newAddress, err := a.tokenAddressValue(t)
 			if err != nil {
 				return err
 			}
@@ -446,7 +466,7 @@ func (a *Assembler) generateCodeForOrgDirective(asmTokens *AssemblerTokens, upda
 	// Process program counter change - same as *= but without equals sign
 	t := asmTokens.Next()
 	if t != nil {
-		newAddress, err := a.parseAddressValue(t)
+		newAddress, err := a.tokenAddressValue(t)
 		if err != nil {
 			return err
 		}
@@ -492,7 +512,7 @@ parseLoop:
 		case lexer.EndOfLineType, lexer.EOFType:
 			break parseLoop
 		case lexer.HexLiteral, lexer.IntegerLiteral:
-			operandSizeMask, v, err := a.parseOperandSizeOfValue(false, t.Value)
+			operandSizeMask, v, err := a.operandValueSize(false, t.Value)
 			if err != nil {
 				return AddressingMode{}, err
 			}
@@ -502,9 +522,8 @@ parseLoop:
 		case MinusToken:
 			nextTokenID := utils.Value(asmTokens.Peek()).ID
 			if nextTokenID == lexer.IntegerLiteral || nextTokenID == lexer.HexLiteral {
-				negative := t.ID == MinusToken
 				nt := asmTokens.Next()
-				operandSizeMask, v, err := a.parseOperandSizeOfValue(negative, nt.Value)
+				operandSizeMask, v, err := a.operandValueSize(true, nt.Value)
 				if err != nil {
 					return AddressingMode{}, err
 				}
@@ -516,8 +535,8 @@ parseLoop:
 
 		case IdentifierToken:
 			identifier = t.Literal
-			if value, ok := a.variables[identifier]; ok {
-				operandSizeMask, v, err := a.parseOperandSizeOfValue(false, value)
+			if value, ok := a.constants[identifier]; ok {
+				operandSizeMask, v, err := a.operandValueSize(false, value)
 				if err != nil {
 					return AddressingMode{}, err
 				}
@@ -526,87 +545,41 @@ parseLoop:
 				break
 			}
 			if address, ok := a.labels[identifier]; ok {
-				operandSizeMask, v, err := a.parseOperandSizeOfValue(false, address)
+				operandSizeMask, v, err := a.parseLabelOffset(mnemonic, address)
 				if err != nil {
 					return AddressingMode{}, err
 				}
 				operandValues = append(operandValues, v)
 				parsedAddressingMode += operandSizeMask
-			} else {
-				parsedAddressingMode += a.operandSizeForLabel(mnemonic, fourByteOperand) // Unresolved, assume a four byte label
 			}
-
 		case AsterixSymbolToken:
-			// Program counter reference - check if followed by operator
-			nextToken := asmTokens.Peek()
-			var finalPcValue uint64
+			// Check what comes after the asterisk
+			signToken := asmTokens.Peek()
 
-			if nextToken != nil && (nextToken.ID == PlusToken || nextToken.ID == MinusToken) {
-				// Handle expressions like "* + 5" or "* - 3"
-				operatorToken := asmTokens.Next()
+			if signToken != nil && signToken.ID == PlusToken || signToken.ID == MinusToken {
+				asmTokens.Next() // Get passed the signToken
 				valueToken := asmTokens.Next()
 				if valueToken == nil || (valueToken.ID != lexer.HexLiteral && valueToken.ID != lexer.IntegerLiteral) {
-					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] expected value after %s", operatorToken.Literal)
+					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] expected value after %s", signToken.Literal)
 				}
 
-				pcValue := int64(a.programCounter)
-				var offsetValue uint64
-
-				// Handle different integer types
-				switch v := valueToken.Value.(type) {
-				case uint64:
-					offsetValue = v
-				case int64:
-					offsetValue = uint64(v)
-				case int32:
-					offsetValue = uint64(v)
-				case int16:
-					offsetValue = uint64(v)
-				case int8:
-					offsetValue = uint64(v)
-				case uint32:
-					offsetValue = uint64(v)
-				case uint16:
-					offsetValue = uint64(v)
-				case uint8:
-					offsetValue = uint64(v)
-				default:
-					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] invalid offset value type: %T", valueToken.Value)
+				operandSizeMask, v, err := a.operandValueSize(signToken.ID == MinusToken, valueToken.Value)
+				if err != nil {
+					return AddressingMode{}, err
+				}
+				if len(operandSizeMask) != 2 {
+					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] parsing relative address expected 8 bit signed")
 				}
 
-				if operatorToken.ID == PlusToken {
-					pcValue += int64(offsetValue)
-				} else {
-					pcValue -= int64(offsetValue)
-				}
-
-				// For relative addressing (negative values), handle as signed byte
-				if pcValue < 0 && pcValue >= -128 {
-					// Convert to signed byte representation for relative addressing
-					finalPcValue = uint64(uint8(int8(pcValue)))
-				} else {
-					finalPcValue = uint64(pcValue)
-				}
+				operandValues = append(operandValues, v)
+				parsedAddressingMode += string(cpu.RelativeModeStr)
 			} else {
-				// Simple program counter reference
-				finalPcValue = uint64(a.programCounter)
-			}
-
-			operandSizeMask, v, err := a.parseAddressModeForValue(mnemonic, finalPcValue)
-			if err != nil {
-				return AddressingMode{}, err
-			}
-			operandValues = append(operandValues, v)
-
-			// Check if this instruction supports relative addressing
-			if addressingModeTable, foundMnemonic := a.instructionSet[mnemonic]; foundMnemonic {
-				if _, found := addressingModeTable[cpu.RelativeModeStr]; found {
-					// This is a relative addressing instruction, use relative mode
-					parsedAddressingMode += "*nn"
-				} else {
-					parsedAddressingMode += operandSizeMask
+				operandSizeMask, v, err := a.operandValueSize(false, a.programCounter)
+				if err != nil {
+					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] parsing * addressing mode %w", err)
 				}
-			} else {
+
+				operandValues = append(operandValues, v)
 				parsedAddressingMode += operandSizeMask
 			}
 
@@ -624,20 +597,9 @@ parseLoop:
 				}
 
 				pcValue := int64(a.programCounter)
-				var offsetValue uint64
-				switch v := valueToken.Value.(type) {
-				case uint8:
-					offsetValue = uint64(v)
-				case uint16:
-					offsetValue = uint64(v)
-				case uint64:
-					offsetValue = v
-				case int:
-					offsetValue = uint64(v)
-				case int64:
-					offsetValue = uint64(v)
-				default:
-					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] invalid offset value type: %T", v)
+				offsetValue, err := integerToUint64(valueToken.Value)
+				if err != nil {
+					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] invalid offset value: %w", err)
 				}
 
 				if operatorToken.ID == PlusToken {
@@ -651,7 +613,7 @@ parseLoop:
 				finalPcValue = uint64(a.programCounter)
 			}
 
-			operandSizeMask, v, err := a.parseOperandSizeOfValue(false, finalPcValue)
+			operandSizeMask, v, err := a.operandValueSize(false, finalPcValue)
 			if err != nil {
 				return AddressingMode{}, err
 			}
@@ -680,23 +642,13 @@ parseLoop:
 func (a *Assembler) operandSizeForLabel(mnemonic, currentSizeStr string) string {
 	if addressingModeTable, foundMnemonic := a.instructionSet[mnemonic]; foundMnemonic {
 		if _, found := addressingModeTable[cpu.RelativeModeStr]; found {
-			return twoByteOperand
+			return "*nn"
 		}
 	}
 	return currentSizeStr
 }
 
-func (a *Assembler) parseAddressModeForValue(mnemonic string, value uint64) (string, any, error) {
-	// For certain instructions that require absolute addressing, always use 2 bytes
-	if mnemonic == "JMP" || mnemonic == "JSR" {
-		return fourByteOperand, ReduceBytes(value, 2), nil
-	}
-
-	// For other instructions, use the standard logic
-	return a.parseOperandSizeOfValue(false, value)
-}
-
-func (a *Assembler) parseOperandSizeOfValue(negative bool, value any) (string, any, error) {
+func (a *Assembler) operandValueSize(negative bool, value any) (string, any, error) {
 	switch v := value.(type) {
 	case int8:
 		return parseIntOperand(negative, v)
@@ -719,41 +671,43 @@ func (a *Assembler) parseOperandSizeOfValue(negative bool, value any) (string, a
 	}
 }
 
+func (a *Assembler) parseLabelOffset(mnemonic string, address uint64) (string, any, error) {
+	addressingModes, ok := a.instructionSet[mnemonic]
+	if !ok {
+		return "", nil, fmt.Errorf("[Assembler parseLabelOffset] unknown mnemonic '%s'", mnemonic)
+	}
+	if _, found := addressingModes[cpu.RelativeModeStr]; found {
+		// Calculate relative displacement: target - (PC + 2)
+		delta := int64(address) - int64(a.programCounter+2)
+		if delta < -128 || delta > 127 {
+			return "", nil, fmt.Errorf("[Assembler parseLabelOffset] relative address out of range: %d", delta)
+		}
+		return string(cpu.RelativeModeStr), ReduceBytes(delta, 1), nil
+	}
+
+	return fourByteOperand, ReduceBytes(address, 2), nil
+}
+
+// parseLabelOffset
+
 func parseIntOperand[T constraints.Integer](negative bool, value T) (string, any, error) {
-	var signedValue T
-	if value < 0 {
-		signedValue = value
+	// Apply negative sign if needed
+	finalValue := int64(value)
+	if negative && finalValue > 0 {
+		finalValue = -finalValue
+	}
+
+	// Check 6502 limits: -32768 to 65535
+	if finalValue < -32768 || finalValue > 65535 {
+		return "", nil, fmt.Errorf("[Assembler parseSizeOfValue] number out of range: %d", finalValue)
+	}
+
+	// Choose operand size: 1 byte for -128..255, 2 bytes for everything else
+	if finalValue >= -128 && finalValue <= 255 {
+		return twoByteOperand, ReduceBytes(finalValue, 1), nil // "nn" = 1 byte
 	} else {
-		intValue := int64(value)
-		if negative {
-			intValue *= -1
-		}
-		if int64(T(intValue)) != intValue {
-			return "", value, fmt.Errorf("[Assembler parseSizeOfValue] number too large %v", intValue)
-		}
-		signedValue = T(intValue)
+		return fourByteOperand, ReduceBytes(finalValue, 2), nil // "nnnn" = 2 bytes
 	}
-
-	operandSizeMask := strings.Replace(fmt.Sprintf("%x", signedValue), "-", "", 1)
-
-	if len(operandSizeMask) > 4 {
-		return "", signedValue, fmt.Errorf("[Assembler parseSizeOfValue] number too large %v", signedValue)
-	}
-
-	noOfBytes := 0
-	// For values > 255 OR when this is an address context, always use 2 bytes (word addressing)
-	// The 6502 uses 2-byte addresses for most instructions
-	if uint64(signedValue) > 255 {
-		operandSizeMask = fourByteOperand
-		noOfBytes = 2
-	} else if uint64(signedValue) <= 255 {
-		// Values <= 255 can be either byte or word depending on context
-		// For now, prefer byte addressing for small values
-		operandSizeMask = twoByteOperand
-		noOfBytes = 1
-	}
-
-	return operandSizeMask, ReduceBytes(signedValue, noOfBytes), nil
 }
 
 func (a *Assembler) mnemonicTokenCreator(identifier string) *lexer.Token {
@@ -779,7 +733,7 @@ func (a *Assembler) processOrgDirective(asmTokens *AssemblerTokens, finalizeSegm
 		return fmt.Errorf("[processOrgDirective] expected address after .ORG")
 	}
 
-	address, err := a.parseAddressValue(t)
+	address, err := a.tokenAddressValue(t)
 	if err != nil {
 		return fmt.Errorf("[processOrgDirective] %w", err)
 	}
@@ -790,24 +744,15 @@ func (a *Assembler) processOrgDirective(asmTokens *AssemblerTokens, finalizeSegm
 	return nil
 }
 
-// parseAddressValue extracts an address value from a token
-func (a *Assembler) parseAddressValue(t *lexer.Token) (uint16, error) {
+// tokenAddressValue extracts an address value from a token
+func (a *Assembler) tokenAddressValue(t *lexer.Token) (uint16, error) {
 	switch t.ID {
 	case lexer.HexLiteral, lexer.IntegerLiteral:
-		switch v := t.Value.(type) {
-		case uint8:
-			return uint16(v), nil
-		case uint16:
-			return v, nil
-		case uint64:
-			return uint16(v), nil
-		case int:
-			return uint16(v), nil
-		case int64:
-			return uint16(v), nil
-		default:
-			return 0, fmt.Errorf("invalid address value type: %T", v)
+		value, err := integerToUint64(t.Value)
+		if err != nil {
+			return 0, fmt.Errorf("invalid address value: %w", err)
 		}
+		return uint16(value), nil
 	case ProgramCounterToken:
 		return a.programCounter, nil
 	default:
@@ -874,26 +819,56 @@ func (a *Assembler) calculateAsciizDirectiveSize(asmTokens *AssemblerTokens) (in
 	return len(str) + 1, nil // +1 for null terminator
 }
 
+// integerToUint64 converts various integer types to uint64
+func integerToUint64(value any) (uint64, error) {
+	switch v := value.(type) {
+	case uint64:
+		return v, nil
+	case int64:
+		if v < 0 {
+			return 0, fmt.Errorf("negative value not allowed: %d", v)
+		}
+		return uint64(v), nil
+	case uint32:
+		return uint64(v), nil
+	case int32:
+		if v < 0 {
+			return 0, fmt.Errorf("negative value not allowed: %d", v)
+		}
+		return uint64(v), nil
+	case uint16:
+		return uint64(v), nil
+	case int16:
+		if v < 0 {
+			return 0, fmt.Errorf("negative value not allowed: %d", v)
+		}
+		return uint64(v), nil
+	case uint8:
+		return uint64(v), nil
+	case int8:
+		if v < 0 {
+			return 0, fmt.Errorf("negative value not allowed: %d", v)
+		}
+		return uint64(v), nil
+	case int:
+		if v < 0 {
+			return 0, fmt.Errorf("negative value not allowed: %d", v)
+		}
+		return uint64(v), nil
+	default:
+		return 0, fmt.Errorf("invalid integer type: %T", value)
+	}
+}
+
 func (a *Assembler) calculateDataSpaceDirectiveSize(asmTokens *AssemblerTokens) (int, error) {
 	t := asmTokens.Next()
 	if t == nil {
 		return 0, fmt.Errorf("[calculateDataSpaceDirectiveSize] expected size after .DS")
 	}
 
-	var size uint64
-	switch v := t.Value.(type) {
-	case uint8:
-		size = uint64(v)
-	case uint16:
-		size = uint64(v)
-	case uint64:
-		size = v
-	case int:
-		size = uint64(v)
-	case int64:
-		size = uint64(v)
-	default:
-		return 0, fmt.Errorf("[calculateDataSpaceDirectiveSize] invalid size value type: %T", v)
+	size, err := integerToUint64(t.Value)
+	if err != nil {
+		return 0, fmt.Errorf("[calculateDataSpaceDirectiveSize] %w", err)
 	}
 
 	return int(size), nil
@@ -914,27 +889,16 @@ func (a *Assembler) processByteDirective(asmTokens *AssemblerTokens, insertIntoM
 
 		switch t.ID {
 		case lexer.HexLiteral, lexer.IntegerLiteral:
-			var value uint64
-			switch v := t.Value.(type) {
-			case uint8:
-				value = uint64(v)
-			case uint16:
-				value = uint64(v)
-			case uint64:
-				value = v
-			case int:
-				value = uint64(v)
-			case int64:
-				value = uint64(v)
-			default:
-				return fmt.Errorf("[processByteDirective] invalid byte value type: %T", v)
+			value, err := integerToUint64(t.Value)
+			if err != nil {
+				return fmt.Errorf("[processByteDirective] invalid byte value: %w", err)
 			}
 			if value > 255 {
 				return fmt.Errorf("[processByteDirective] byte value %d exceeds 255", value)
 			}
 			bytes = append(bytes, byte(value))
 		case IdentifierToken:
-			if value, ok := a.variables[t.Literal]; ok {
+			if value, ok := a.constants[t.Literal]; ok {
 				if byteVal, ok := value.(uint8); ok {
 					bytes = append(bytes, byteVal)
 				} else {
@@ -969,20 +933,9 @@ func (a *Assembler) processWordDirective(asmTokens *AssemblerTokens, insertIntoM
 
 		switch t.ID {
 		case lexer.HexLiteral, lexer.IntegerLiteral:
-			var value uint64
-			switch v := t.Value.(type) {
-			case uint8:
-				value = uint64(v)
-			case uint16:
-				value = uint64(v)
-			case uint64:
-				value = v
-			case int:
-				value = uint64(v)
-			case int64:
-				value = uint64(v)
-			default:
-				return fmt.Errorf("[processWordDirective] invalid word value type: %T", v)
+			value, err := integerToUint64(t.Value)
+			if err != nil {
+				return fmt.Errorf("[processWordDirective] invalid word value: %w", err)
 			}
 			if value > 65535 {
 				return fmt.Errorf("[processWordDirective] word value %d exceeds 65535", value)
@@ -993,7 +946,7 @@ func (a *Assembler) processWordDirective(asmTokens *AssemblerTokens, insertIntoM
 			if address, ok := a.labels[t.Literal]; ok {
 				// Store address in little-endian format
 				bytes = append(bytes, byte(address&0xFF), byte((address>>8)&0xFF))
-			} else if value, ok := a.variables[t.Literal]; ok {
+			} else if value, ok := a.constants[t.Literal]; ok {
 				if wordVal, ok := value.(uint16); ok {
 					bytes = append(bytes, byte(wordVal&0xFF), byte((wordVal>>8)&0xFF))
 				} else {
@@ -1057,7 +1010,7 @@ func (a *Assembler) processEquDirective(asmTokens *AssemblerTokens) error {
 	variableName := nameToken.Literal
 
 	// Check for duplicate variable
-	if _, exists := a.variables[variableName]; exists {
+	if _, exists := a.constants[variableName]; exists {
 		return fmt.Errorf("[processEquDirective] duplicate variable '%s' already defined", variableName)
 	}
 
@@ -1080,9 +1033,9 @@ func (a *Assembler) processEquDirective(asmTokens *AssemblerTokens) error {
 
 	switch valueToken.ID {
 	case lexer.HexLiteral, lexer.IntegerLiteral:
-		a.variables[variableName] = valueToken.Value
+		a.constants[variableName] = valueToken.Value
 	case ProgramCounterToken:
-		a.variables[variableName] = uint16(a.programCounter)
+		a.constants[variableName] = uint16(a.programCounter)
 	default:
 		return fmt.Errorf("[processEquDirective] invalid value type for .EQU")
 	}
