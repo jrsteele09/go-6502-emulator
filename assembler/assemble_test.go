@@ -459,7 +459,7 @@ func TestVariableLabelConflict(t *testing.T) {
 		.ORG $1000
 	mySymbol:
 		NOP
-		.EQU mySymbol = $FF  ; Conflicts with label - should error
+		mySymbol = $FF  ; Conflicts with label - should error
 	`
 
 	reader := strings.NewReader(program)
@@ -479,8 +479,8 @@ func TestValidUniqueSymbols(t *testing.T) {
 
 	program := `
 		.ORG $1000
-		.EQU var1 = $FF
-		.EQU var2 = $AA
+		var1 = $FF
+		var2 = $AA
 	label1:
 		NOP
 	label2:
