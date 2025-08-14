@@ -1,9 +1,11 @@
+.include "constants.inc"
+
 .ORG $1000
 
-LDA #$42        ; Load accumulator with hex 42
-STA $D020       ; Store in border color register (C64)
+LDA #TEST_VALUE     ; Load accumulator with test value
+STA BORDER_COLOR    ; Store in border color register
 
-LDX #$10        ; Load X register with 16
+LDX #LOOP_COUNT     ; Load X register with loop count
 LOOP:
     DEX         ; Decrement X register
     BNE LOOP    ; Branch if not equal to zero

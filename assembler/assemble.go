@@ -208,6 +208,14 @@ func (a *Assembler) generateCode(tokens []*lexer.Token, segments []AssembledData
 			}
 
 		case IdentifierToken:
+			// Check if this is a constant assignment (identifier = value)
+			nextToken := asmTokens.Peek()
+			if nextToken != nil && nextToken.ID == EqualsSymbolToken {
+				// Skip constant assignments in second pass, already processed
+				asmTokens.Next() // consume equals
+				asmTokens.Next() // consume value
+				continue
+			}
 			// Check if this identifier would be a valid mnemonic if it were uppercase
 			upperIdent := strings.ToUpper(t.Literal)
 			if _, found := a.instructionSet[upperIdent]; found {
@@ -296,8 +304,6 @@ func (a *Assembler) processAssemblerDirective(asmTokens *AssemblerTokens, insert
 				if err != nil {
 					return err
 				}
-			case EquDirectiveToken:
-				a.skipDirectiveTokens(asmTokens) // Skip in second pass, already processed
 			case DsDirectiveToken:
 				err := a.processDataSpaceDirective(asmTokens, insertIntoMemory)
 				if err != nil {
