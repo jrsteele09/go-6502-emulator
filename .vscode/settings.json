@@ -1,7 +1,0 @@
-{
-    "C_Cpp.copilotHover": "disabled",
-    "github.copilot.chat.agent.autoFix": false,
-    "github.copilot.chat.edits.newNotebook.enabled": false,
-    "github.copilot.chat.edits.suggestRelatedFilesForTests": false,
-    "github.copilot.chat.edits.suggestRelatedFilesFromGitHistory": false
-}
