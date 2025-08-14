@@ -25,7 +25,6 @@ const (
 	AscDirectiveToken
 	AsciizDirectiveToken
 	OrgDirectiveToken
-	EquDirectiveToken
 	DbDirectiveToken
 	DwDirectiveToken
 	DsDirectiveToken

@@ -85,7 +85,16 @@ func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error)
 			advanceProgramCounter(instructionSize)
 
 		case IdentifierToken:
-			return nil, fmt.Errorf("[preprocessor] unexpected identifier '%s'", t.Literal)
+			// Check if this is a constant assignment (identifier = value)
+			nextToken := asmTokens.Peek()
+			if nextToken != nil && nextToken.ID == EqualsSymbolToken {
+				err := a.processConstantAssignment(t, asmTokens)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, fmt.Errorf("[preprocessor] unexpected identifier '%s'", t.Literal)
+			}
 
 		default:
 			// Skip other tokens (comments, whitespace, etc.)
@@ -144,11 +153,6 @@ func (a *Assembler) preprocessDirective(asmTokens *AssemblerTokens, advanceProgr
 				advanceProgramCounter(size)
 			case OrgDirectiveToken:
 				err := a.processOrgDirective(asmTokens, finalizeSegment)
-				if err != nil {
-					return err
-				}
-			case EquDirectiveToken:
-				err := a.processEquDirective(asmTokens)
 				if err != nil {
 					return err
 				}
@@ -266,4 +270,42 @@ func (a *Assembler) preprocessorLabelSizer(mnemonic string) (string, any, error)
 	}
 
 	return fourByteOperand, ReduceBytes(0, 2), nil
+}
+
+// processConstantAssignment handles identifier = value assignments during preprocessing
+func (a *Assembler) processConstantAssignment(identifierToken *lexer.Token, asmTokens *AssemblerTokens) error {
+	variableName := identifierToken.Literal
+
+	// Check for duplicate variable
+	if _, exists := a.constants[variableName]; exists {
+		return fmt.Errorf("[processConstantAssignment] duplicate variable '%s' already defined", variableName)
+	}
+
+	// Check if this variable name conflicts with an existing label
+	if _, exists := a.labels[variableName]; exists {
+		return fmt.Errorf("[processConstantAssignment] variable '%s' conflicts with existing label", variableName)
+	}
+
+	// Consume the equals token
+	equalsToken := asmTokens.Next()
+	if equalsToken == nil || equalsToken.ID != EqualsSymbolToken {
+		return fmt.Errorf("[processConstantAssignment] expected '=' after identifier '%s'", variableName)
+	}
+
+	// Get value
+	valueToken := asmTokens.Next()
+	if valueToken == nil {
+		return fmt.Errorf("[processConstantAssignment] expected value after '='")
+	}
+
+	switch valueToken.ID {
+	case lexer.HexLiteral, lexer.IntegerLiteral:
+		a.constants[variableName] = valueToken.Value
+	case ProgramCounterToken:
+		a.constants[variableName] = uint16(a.programCounter)
+	default:
+		return fmt.Errorf("[processConstantAssignment] invalid value type for constant assignment")
+	}
+
+	return nil
 }
