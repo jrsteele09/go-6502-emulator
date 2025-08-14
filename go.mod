@@ -1,6 +1,6 @@
 module github.com/jrsteele09/go-6502-emulator
 
-go 1.22.0
+go 1.24.0
 
 require (
 	github.com/jrsteele09/go-lexer v0.0.0-20240910141600-9543462ac7b8

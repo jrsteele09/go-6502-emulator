@@ -19,49 +19,31 @@ func NewPRGFormat() *PRGFormat {
 
 // CreateFile creates a Commodore 64 PRG file from assembled segments
 // PRG format: 2-byte load address (little-endian) followed by program data
+// Note: PRG format requires contiguous memory, so all segments must be adjacent
 func (p *PRGFormat) CreateFile(filename string, segments []assembler.AssembledData, verbose bool) error {
 	if len(segments) == 0 {
 		return fmt.Errorf("no segments to write")
 	}
 
-	// Find the lowest start address for the load address
-	loadAddr := segments[0].StartAddress
-	for _, segment := range segments {
-		if segment.StartAddress < loadAddr {
-			loadAddr = segment.StartAddress
-		}
-	}
-
-	// Calculate total size needed
-	maxAddr := uint16(0)
-	for _, segment := range segments {
-		endAddr := segment.StartAddress + uint16(len(segment.Data))
-		if endAddr > maxAddr {
-			maxAddr = endAddr
-		}
+	// Validate segments are contiguous
+	contiguousData, loadAddr, err := p.validateAndMergeContiguousSegments(segments)
+	if err != nil {
+		return fmt.Errorf("PRG format error: %w", err)
 	}
 
 	// Create output buffer: 2 bytes for load address + program data
-	totalSize := int(maxAddr - loadAddr)
-	output := make([]byte, 2+totalSize)
+	output := make([]byte, 2+len(contiguousData))
 
 	// Write load address (little-endian)
 	output[0] = byte(loadAddr & 0xFF)
 	output[1] = byte(loadAddr >> 8)
 
+	// Copy program data
+	copy(output[2:], contiguousData)
+
 	if verbose {
 		fmt.Printf("PRG load address: $%04X\n", loadAddr)
-		fmt.Printf("Program size: %d bytes\n", totalSize)
-	}
-
-	// Copy segment data to appropriate positions
-	for _, segment := range segments {
-		offset := int(segment.StartAddress - loadAddr)
-		copy(output[2+offset:], segment.Data)
-
-		if verbose {
-			fmt.Printf("  Writing segment at $%04X: %d bytes\n", segment.StartAddress, len(segment.Data))
-		}
+		fmt.Printf("Program size: %d bytes\n", len(contiguousData))
 	}
 
 	// Write to file
@@ -79,43 +61,71 @@ func (p *PRGFormat) CreateFile(filename string, segments []assembler.AssembledDa
 	return nil
 }
 
+// validateAndMergeContiguousSegments checks if segments are contiguous and merges them
+// Returns the merged data, load address, and error if segments have gaps
+func (p *PRGFormat) validateAndMergeContiguousSegments(segments []assembler.AssembledData) ([]byte, uint16, error) {
+	if len(segments) == 0 {
+		return nil, 0, fmt.Errorf("no segments provided")
+	}
+
+	// Sort segments by start address to check for contiguity
+	sortedSegments := make([]assembler.AssembledData, len(segments))
+	copy(sortedSegments, segments)
+
+	// Simple bubble sort by start address
+	for i := 0; i < len(sortedSegments); i++ {
+		for j := i + 1; j < len(sortedSegments); j++ {
+			if sortedSegments[i].StartAddress > sortedSegments[j].StartAddress {
+				sortedSegments[i], sortedSegments[j] = sortedSegments[j], sortedSegments[i]
+			}
+		}
+	}
+
+	loadAddr := sortedSegments[0].StartAddress
+	var mergedData []byte
+
+	// Check for contiguity and merge data
+	expectedNextAddr := loadAddr
+	for i, segment := range sortedSegments {
+		if segment.StartAddress != expectedNextAddr {
+			return nil, 0, fmt.Errorf("segments are not contiguous: gap between $%04X and $%04X", expectedNextAddr, segment.StartAddress)
+		}
+
+		// Check for overlapping segments
+		if i > 0 && segment.StartAddress < expectedNextAddr {
+			return nil, 0, fmt.Errorf("segments overlap: segment at $%04X overlaps with previous segment", segment.StartAddress)
+		}
+
+		mergedData = append(mergedData, segment.Data...)
+		expectedNextAddr = segment.StartAddress + uint16(len(segment.Data))
+	}
+
+	return mergedData, loadAddr, nil
+}
+
 // CreateData creates PRG format data in memory from assembled segments
 // Returns the PRG data as a byte slice (2-byte load address + program data)
+// Note: PRG format requires contiguous memory, so all segments must be adjacent
 func (p *PRGFormat) CreateData(segments []assembler.AssembledData) ([]byte, error) {
 	if len(segments) == 0 {
 		return nil, fmt.Errorf("no segments to convert")
 	}
 
-	// Find the lowest start address for the load address
-	loadAddr := segments[0].StartAddress
-	for _, segment := range segments {
-		if segment.StartAddress < loadAddr {
-			loadAddr = segment.StartAddress
-		}
-	}
-
-	// Calculate total size needed
-	maxAddr := uint16(0)
-	for _, segment := range segments {
-		endAddr := segment.StartAddress + uint16(len(segment.Data))
-		if endAddr > maxAddr {
-			maxAddr = endAddr
-		}
+	// Validate segments are contiguous
+	contiguousData, loadAddr, err := p.validateAndMergeContiguousSegments(segments)
+	if err != nil {
+		return nil, fmt.Errorf("PRG format error: %w", err)
 	}
 
 	// Create output buffer: 2 bytes for load address + program data
-	totalSize := int(maxAddr - loadAddr)
-	output := make([]byte, 2+totalSize)
+	output := make([]byte, 2+len(contiguousData))
 
 	// Write load address (little-endian)
 	output[0] = byte(loadAddr & 0xFF)
 	output[1] = byte(loadAddr >> 8)
 
-	// Copy segment data to appropriate positions
-	for _, segment := range segments {
-		offset := int(segment.StartAddress - loadAddr)
-		copy(output[2+offset:], segment.Data)
-	}
+	// Copy program data
+	copy(output[2:], contiguousData)
 
 	return output, nil
 }
@@ -123,6 +133,7 @@ func (p *PRGFormat) CreateData(segments []assembler.AssembledData) ([]byte, erro
 // LoadFile loads a PRG file and returns assembled segments
 func (p *PRGFormat) LoadFile(filename string, verbose bool) ([]assembler.AssembledData, error) {
 	// Read the file
+	fmt.Printf("Loading PRG file: %s\n", filename)
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read PRG file: %w", err)

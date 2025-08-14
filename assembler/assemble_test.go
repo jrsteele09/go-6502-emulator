@@ -547,3 +547,103 @@ func TestStateResetBetweenAssemblies(t *testing.T) {
 		t.Errorf("Expected start address 0x2000, got 0x%X", segments[0].StartAddress)
 	}
 }
+
+func TestAssemble(t *testing.T) {
+	assembler := createTestAssembler()
+
+	program := `
+.ORG $1000
+
+LDA #$42        ; Load accumulator with hex 42
+STA $D020       ; Store in border color register (C64)
+
+LDX #$10        ; Load X register with 16
+LOOP:
+    DEX         ; Decrement X register
+    BNE LOOP    ; Branch if not equal to zero
+
+RTS             ; Return from subroutine
+	`
+
+	reader := strings.NewReader(program)
+	segments, err := assembler.Assemble(reader)
+	if err != nil {
+		t.Fatalf("Expected successful assembly, got error: %v", err)
+	}
+
+	if len(segments) != 1 {
+		t.Errorf("Expected 1 segment, got %d", len(segments))
+	}
+
+	if segments[0].StartAddress != 0x1000 {
+		t.Errorf("Expected start address 0x1000, got 0x%X", segments[0].StartAddress)
+	}
+
+	if len(segments[0].Data) == 0 {
+		t.Error("Expected assembled data, got empty segment")
+	}
+}
+
+func TestBranchingToLabelAhead(t *testing.T) {
+	assembler := createTestAssembler()
+
+	program := `
+.ORG $1000
+NOP
+BEQ END
+RTS
+END:
+    RTS
+	`
+
+	reader := strings.NewReader(program)
+	segments, err := assembler.Assemble(reader)
+	if err != nil {
+		t.Fatalf("Expected successful assembly, got error: %v", err)
+	}
+
+	require.Equal(t, 1, len(segments), "Should have 1 segment")
+	require.Equal(t, uint16(0x1000), segments[0].StartAddress, "Should start at $1000")
+
+	data := segments[0].Data
+	require.Equal(t, 5, len(data), "Should be 5 bytes: NOP + BEQ + RTS + RTS")
+
+	// Expected: EA (NOP) F0 01 (BEQ +1) 60 (RTS) 60 (RTS)
+	require.Equal(t, byte(0xEA), data[0], "First byte should be NOP (0xEA)")
+	require.Equal(t, byte(0xF0), data[1], "Second byte should be BEQ (0xF0)")
+	require.Equal(t, byte(0x01), data[2], "Third byte should be BEQ offset (+1)")
+	require.Equal(t, byte(0x60), data[3], "Fourth byte should be first RTS (0x60)")
+	require.Equal(t, byte(0x60), data[4], "Fifth byte should be second RTS (0x60)")
+
+	t.Logf("Successfully assembled: %d bytes", len(data))
+	for i, b := range data {
+		t.Logf("  [%d]: 0x%02X", i, b)
+	}
+}
+
+func TestSimpleBranchingForward(t *testing.T) {
+	assembler := createTestAssembler()
+
+	program := `
+BEQ END
+RTS
+END:
+    RTS
+	`
+
+	reader := strings.NewReader(program)
+	segments, err := assembler.Assemble(reader)
+	if err != nil {
+		t.Fatalf("Expected successful assembly, got error: %v", err)
+	}
+
+	require.Equal(t, 1, len(segments), "Should have 1 segment")
+
+	data := segments[0].Data
+	require.Equal(t, 4, len(data), "Should be 5 bytes: NOP + BEQ + RTS + RTS")
+
+	t.Logf("Successfully assembled: %d bytes", len(data))
+	for i, b := range data {
+		t.Logf("  [%d]: 0x%02X", i, b)
+	}
+}
