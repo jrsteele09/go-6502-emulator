@@ -1,4 +1,4 @@
-package disassembler
+package debugger
 
 import (
 	"fmt"
@@ -34,7 +34,7 @@ func (d *Disassembler) Disassemble(address uint16) (string, int) {
 
 	if opCode == nil {
 		return strings.TrimSpace(fmt.Sprintf(disassemblyFormat,
-			strings.ToUpper(strings.Replace(fmt.Sprintf("%x:", address), "0x", "", 1)),
+			fmt.Sprintf("$%04X:", address),
 			strings.ToUpper(d.operandsToByteString(b, []byte{}, 1)),
 			"???")), 1
 	}
@@ -45,7 +45,7 @@ func (d *Disassembler) Disassemble(address uint16) (string, int) {
 	}
 
 	return strings.TrimSpace(fmt.Sprintf(disassemblyFormat,
-		strings.ToUpper(strings.Replace(fmt.Sprintf("%x:", address), "0x", "", 1)),
+		fmt.Sprintf("$%04X:", address),
 		strings.ToUpper(d.operandsToByteString(b, operands, opCode.Bytes)),
 		strings.ToUpper(d.opCodeToString(*opCode, operands, address)))), opCode.Bytes
 }
@@ -67,7 +67,9 @@ func (d *Disassembler) opCodeToString(opcode cpu.OpCodeDef, operands []byte, add
 
 	switch opcode.AddressingModeType {
 	case cpu.RelativeModeStr:
-		address = uint16(int64(address) + int64(int8(operands[0])))
+		// Address is the address of the opcode, so to calculate a relative address,
+		// We need to add on two bytes for the opcode and the operand.
+		address = uint16(int64(address) + 2 + int64(int8(operands[0])))
 		addressingModeString = strings.Replace(fmt.Sprintf("%.2x", address), "0x", "", 1)
 	default:
 		if strings.Contains(string(opcode.AddressingModeType), cpu.WordAddressing) {

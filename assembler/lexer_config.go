@@ -43,7 +43,6 @@ var KeywordTokens = map[string]lexer.TokenIdentifier{
 	".ASC":    AscDirectiveToken,
 	".ASCIIZ": AsciizDirectiveToken,
 	".ORG":    OrgDirectiveToken,
-	".EQU":    EquDirectiveToken,
 	".DB":     DbDirectiveToken,
 	".DW":     DwDirectiveToken,
 	".DS":     DsDirectiveToken,

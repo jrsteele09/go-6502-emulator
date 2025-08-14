@@ -1,4 +1,4 @@
-package disassembler
+package debugger
 
 import (
 	"testing"
@@ -27,7 +27,7 @@ func TestDisassembler(t *testing.T) {
 		0xB1, 0x05,
 	) //0xc01d
 
-	expectedDissassmbledCode := "C000:  02         ???\nC001:  A9 01      LDA #$01\nC003:  A9 80      LDA #$80\nC005:  A9 00      LDA #$00\nC007:  A5 80      LDA $80\nC009:  B5 80      LDA $80,X\nC00B:  AD 80 00   LDA $0080\nC00E:  BD 80 00   LDA $0080,X\nC011:  BD 01 00   LDA $0001,X\nC014:  B9 80 00   LDA $0080,Y\nC017:  B9 01 00   LDA $0001,Y\nC01A:  A1 05      LDA ($05,X)\nC01C:  B1 05      LDA ($05),Y\n"
+	expectedDissassmbledCode := "$C000: 02         ???\n$C001: A9 01      LDA #$01\n$C003: A9 80      LDA #$80\n$C005: A9 00      LDA #$00\n$C007: A5 80      LDA $80\n$C009: B5 80      LDA $80,X\n$C00B: AD 80 00   LDA $0080\n$C00E: BD 80 00   LDA $0080,X\n$C011: BD 01 00   LDA $0001,X\n$C014: B9 80 00   LDA $0080,Y\n$C017: B9 01 00   LDA $0001,Y\n$C01A: A1 05      LDA ($05,X)\n$C01C: B1 05      LDA ($05),Y\n"
 
 	dissassembler := NewDisassembler(m, cpu.OpCodes(p))
 
@@ -52,6 +52,6 @@ func TestDisassemblerRelativeAddressingMode(t *testing.T) {
 	address := uint16(0xC000)
 	dissassembledCode, _ := dissassembler.Disassemble(address)
 
-	assert.Equal(t, "C000:  F0 AF      BEQ BFAF", dissassembledCode)
+	assert.Equal(t, "$C000: F0 AF      BEQ BFB1", dissassembledCode)
 
 }

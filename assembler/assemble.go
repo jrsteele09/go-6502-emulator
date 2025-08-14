@@ -8,7 +8,6 @@ import (
 	"github.com/jrsteele09/go-6502-emulator/cpu"
 	"github.com/jrsteele09/go-6502-emulator/utils"
 	"github.com/jrsteele09/go-lexer/lexer"
-	"golang.org/x/exp/constraints"
 )
 
 const (
@@ -140,97 +139,6 @@ func (a *Assembler) reset() {
 	a.originAddress = 0x0000
 }
 
-func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error) {
-	// Track memory segments that will be needed
-	type SegmentInfo struct {
-		StartAddress uint16
-		Size         int
-	}
-	var segmentInfos []SegmentInfo
-	var currentSegmentStart uint16
-
-	a.programCounter = a.originAddress
-	currentSegmentStart = a.programCounter
-	currentSegmentSize := 0
-
-	finalizeCurrentSegment := func() {
-		if currentSegmentSize > 0 {
-			segmentInfos = append(segmentInfos, SegmentInfo{
-				StartAddress: currentSegmentStart,
-				Size:         currentSegmentSize,
-			})
-		}
-		// Note: currentSegmentStart will be updated by caller when needed
-		currentSegmentSize = 0
-	}
-
-	advanceProgramCounter := func(size int) {
-		a.programCounter += uint16(size)
-		currentSegmentSize += size
-	}
-
-	asmTokens := NewAssemblerTokens(tokens)
-
-	for {
-		t := asmTokens.Next()
-		if t == nil || t.ID == lexer.EOFType {
-			break
-		}
-
-		switch t.ID {
-		case AsterixSymbolToken:
-			err := a.addressForAsterixOrgDirective(asmTokens, finalizeCurrentSegment)
-			if err != nil {
-				return nil, err
-			}
-			// Check if program counter changed (due to *=) and start new segment
-			if a.programCounter != currentSegmentStart+uint16(currentSegmentSize) {
-				currentSegmentStart = a.programCounter
-				currentSegmentSize = 0
-			}
-
-		case PeriodToken:
-			err := a.preprocessDirective(asmTokens, advanceProgramCounter, finalizeCurrentSegment)
-			if err != nil {
-				return nil, err
-			}
-			// Check if program counter changed (due to .ORG) and start new segment
-			if a.programCounter != currentSegmentStart+uint16(currentSegmentSize) {
-				currentSegmentStart = a.programCounter
-				currentSegmentSize = 0
-			}
-
-		case LabelToken:
-			err := a.recordLabelAddress(t)
-			if err != nil {
-				return nil, err
-			}
-
-		case MnemonicToken:
-			// Calculate instruction size
-			addressingMode, err := a.parseAddressingMode(t.Literal, asmTokens)
-			if err != nil {
-				return nil, err
-			}
-			instructionSize := 1 + len(addressingMode.Operands)
-			advanceProgramCounter(instructionSize)
-		}
-	}
-
-	finalizeCurrentSegment()
-
-	// Create actual segments with allocated memory
-	segments := make([]AssembledData, len(segmentInfos))
-	for i, info := range segmentInfos {
-		segments[i] = AssembledData{
-			StartAddress: info.StartAddress,
-			Data:         make([]byte, info.Size),
-		}
-	}
-
-	return segments, nil
-}
-
 func (a *Assembler) generateCode(tokens []*lexer.Token, segments []AssembledData) error {
 	// Create a map for quick segment lookup by address -> segment index
 	segmentMap := make(map[uint16]int)
@@ -298,6 +206,18 @@ func (a *Assembler) generateCode(tokens []*lexer.Token, segments []AssembledData
 			if err != nil {
 				return err
 			}
+
+		case IdentifierToken:
+			// Check if this identifier would be a valid mnemonic if it were uppercase
+			upperIdent := strings.ToUpper(t.Literal)
+			if _, found := a.instructionSet[upperIdent]; found {
+				return fmt.Errorf("[generateCode] invalid mnemonic case '%s' (did you mean '%s'?)", t.Literal, upperIdent)
+			}
+			return fmt.Errorf("[generateCode] unknown mnemonic or invalid identifier '%s'", t.Literal)
+
+		default:
+			// Skip other tokens (comments, whitespace, etc.)
+			continue
 		}
 	}
 	return nil
@@ -315,79 +235,6 @@ func (a *Assembler) addressForAsterixOrgDirective(asmTokens *AssemblerTokens, fi
 			return err
 		}
 	}
-	return nil
-}
-
-func (a *Assembler) preprocessDirective(asmTokens *AssemblerTokens, advanceProgramCounter func(int), finalizeSegment func()) error {
-	// Check if this is a directive (. followed by directive name)
-	nextToken := asmTokens.Peek()
-	if nextToken != nil && nextToken.ID == IdentifierToken {
-		directiveName := "." + nextToken.Literal
-		if tokenID, found := KeywordTokens[directiveName]; found {
-			// Consume the directive name token
-			asmTokens.Next()
-			// Process the specific directive based on its token ID
-			switch tokenID {
-			case ByteDirectiveToken, DbDirectiveToken:
-				size, err := a.calculateByteDirectiveSize(asmTokens)
-				if err != nil {
-					return err
-				}
-				advanceProgramCounter(size)
-			case WordDirectiveToken, DwDirectiveToken:
-				size, err := a.calculateWordDirectiveSize(asmTokens)
-				if err != nil {
-					return err
-				}
-				advanceProgramCounter(size)
-			case TextDirectiveToken, StringDirectiveToken, StrDirectiveToken, AscDirectiveToken:
-				size, err := a.calculateTextDirectiveSize(asmTokens)
-				if err != nil {
-					return err
-				}
-				advanceProgramCounter(size)
-			case AsciizDirectiveToken:
-				size, err := a.calculateAsciizDirectiveSize(asmTokens)
-				if err != nil {
-					return err
-				}
-				advanceProgramCounter(size)
-			case OrgDirectiveToken:
-				err := a.processOrgDirective(asmTokens, finalizeSegment)
-				if err != nil {
-					return err
-				}
-			case EquDirectiveToken:
-				err := a.processEquDirective(asmTokens)
-				if err != nil {
-					return err
-				}
-			case DsDirectiveToken:
-				size, err := a.calculateDataSpaceDirectiveSize(asmTokens)
-				if err != nil {
-					return err
-				}
-				advanceProgramCounter(size)
-			}
-		}
-	}
-	return nil
-}
-
-func (a *Assembler) recordLabelAddress(t *lexer.Token) error {
-	labelName := strings.TrimSuffix(t.Literal, ":")
-
-	// Check for duplicate label
-	if _, exists := a.labels[labelName]; exists {
-		return fmt.Errorf("[recordLabelAddress] duplicate label '%s' already defined", labelName)
-	}
-
-	// Check if this label name conflicts with an existing variable
-	if _, exists := a.constants[labelName]; exists {
-		return fmt.Errorf("[recordLabelAddress] label '%s' conflicts with existing variable", labelName)
-	}
-
-	a.labels[labelName] = uint64(a.programCounter)
 	return nil
 }
 
@@ -480,7 +327,7 @@ func (a *Assembler) generateCodeForOrgDirective(asmTokens *AssemblerTokens, upda
 }
 
 func (a *Assembler) generateInstructionCode(t *lexer.Token, asmTokens *AssemblerTokens, insertIntoMemory func([]byte)) error {
-	addressingMode, err := a.parseAddressingMode(t.Literal, asmTokens)
+	addressingMode, err := a.parseAddressingMode(t.Literal, asmTokens, false)
 	if err != nil {
 		return err
 	}
@@ -501,7 +348,7 @@ type AddressingMode struct {
 	Operands       []byte
 }
 
-func (a *Assembler) parseAddressingMode(mnemonic string, asmTokens *AssemblerTokens) (AddressingMode, error) {
+func (a *Assembler) parseAddressingMode(mnemonic string, asmTokens *AssemblerTokens, preprocess bool) (AddressingMode, error) {
 	parsedAddressingMode := ""
 	var operandValues []any
 	var identifier string
@@ -512,7 +359,7 @@ parseLoop:
 		case lexer.EndOfLineType, lexer.EOFType:
 			break parseLoop
 		case lexer.HexLiteral, lexer.IntegerLiteral:
-			operandSizeMask, v, err := a.operandValueSize(false, t.Value)
+			operandSizeMask, v, err := parseOperandSize(false, t.Value)
 			if err != nil {
 				return AddressingMode{}, err
 			}
@@ -523,7 +370,7 @@ parseLoop:
 			nextTokenID := utils.Value(asmTokens.Peek()).ID
 			if nextTokenID == lexer.IntegerLiteral || nextTokenID == lexer.HexLiteral {
 				nt := asmTokens.Next()
-				operandSizeMask, v, err := a.operandValueSize(true, nt.Value)
+				operandSizeMask, v, err := parseOperandSize(true, nt.Value)
 				if err != nil {
 					return AddressingMode{}, err
 				}
@@ -536,7 +383,7 @@ parseLoop:
 		case IdentifierToken:
 			identifier = t.Literal
 			if value, ok := a.constants[identifier]; ok {
-				operandSizeMask, v, err := a.operandValueSize(false, value)
+				operandSizeMask, v, err := parseOperandSize(false, value)
 				if err != nil {
 					return AddressingMode{}, err
 				}
@@ -544,26 +391,41 @@ parseLoop:
 				parsedAddressingMode += a.operandSizeForLabel(mnemonic, operandSizeMask)
 				break
 			}
-			if address, ok := a.labels[identifier]; ok {
+			if address, ok := a.labels[identifier]; ok && !preprocess {
 				operandSizeMask, v, err := a.parseLabelOffset(mnemonic, address)
 				if err != nil {
 					return AddressingMode{}, err
 				}
 				operandValues = append(operandValues, v)
 				parsedAddressingMode += operandSizeMask
+				break
 			}
+			if !preprocess {
+				return AddressingMode{}, fmt.Errorf("[parseAddressingMode] identifier '%s' not found", identifier)
+			}
+			operandSizeMask, v, err := a.preprocessorLabelSizer(mnemonic)
+			if err != nil {
+				return AddressingMode{}, fmt.Errorf("[parseAddressingMode] preprocessor label sizing failed: %w", err)
+			}
+			operandValues = append(operandValues, v)
+			parsedAddressingMode += operandSizeMask
+			// If preprocesing then we need to make an assumption that this is referencing a labal
+			// That hasn't been defined yet, so assumptions about the addressing mode needs to be made
+			// Depending on the mnemonic
+
 		case AsterixSymbolToken:
 			// Check what comes after the asterisk
 			signToken := asmTokens.Peek()
 
 			if signToken != nil && signToken.ID == PlusToken || signToken.ID == MinusToken {
+
 				asmTokens.Next() // Get passed the signToken
 				valueToken := asmTokens.Next()
 				if valueToken == nil || (valueToken.ID != lexer.HexLiteral && valueToken.ID != lexer.IntegerLiteral) {
 					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] expected value after %s", signToken.Literal)
 				}
 
-				operandSizeMask, v, err := a.operandValueSize(signToken.ID == MinusToken, valueToken.Value)
+				operandSizeMask, v, err := parseOperandSize(signToken.ID == MinusToken, valueToken.Value)
 				if err != nil {
 					return AddressingMode{}, err
 				}
@@ -572,9 +434,10 @@ parseLoop:
 				}
 
 				operandValues = append(operandValues, v)
-				parsedAddressingMode += string(cpu.RelativeModeStr)
+				parsedAddressingMode += string(t.Literal)
+				parsedAddressingMode += string(operandSizeMask)
 			} else {
-				operandSizeMask, v, err := a.operandValueSize(false, a.programCounter)
+				operandSizeMask, v, err := parseOperandSize(false, a.programCounter)
 				if err != nil {
 					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] parsing * addressing mode %w", err)
 				}
@@ -597,7 +460,7 @@ parseLoop:
 				}
 
 				pcValue := int64(a.programCounter)
-				offsetValue, err := integerToUint64(valueToken.Value)
+				offsetValue, err := toUint64(valueToken.Value)
 				if err != nil {
 					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] invalid offset value: %w", err)
 				}
@@ -613,7 +476,7 @@ parseLoop:
 				finalPcValue = uint64(a.programCounter)
 			}
 
-			operandSizeMask, v, err := a.operandValueSize(false, finalPcValue)
+			operandSizeMask, v, err := parseOperandSize(false, finalPcValue)
 			if err != nil {
 				return AddressingMode{}, err
 			}
@@ -648,28 +511,9 @@ func (a *Assembler) operandSizeForLabel(mnemonic, currentSizeStr string) string 
 	return currentSizeStr
 }
 
-func (a *Assembler) operandValueSize(negative bool, value any) (string, any, error) {
-	switch v := value.(type) {
-	case int8:
-		return parseIntOperand(negative, v)
-	case uint8:
-		return parseIntOperand(negative, v)
-	case int16:
-		return parseIntOperand(negative, v)
-	case uint16:
-		return parseIntOperand(negative, v)
-	case int32:
-		return parseIntOperand(negative, v)
-	case uint32:
-		return parseIntOperand(negative, v)
-	case int64:
-		return parseIntOperand(negative, v)
-	case uint64:
-		return parseIntOperand(negative, v)
-	default:
-		return "", nil, fmt.Errorf("[Assembler parseSizeOfValue] expected valid operand %v", v)
-	}
-}
+// parseOperandSize converts any integer type to operand size mask and value
+// Returns "nn" for 8-bit values, "nnnn" for 16-bit values, etc.
+// Handles negative flag by promoting to larger size if needed
 
 func (a *Assembler) parseLabelOffset(mnemonic string, address uint64) (string, any, error) {
 	addressingModes, ok := a.instructionSet[mnemonic]
@@ -689,26 +533,6 @@ func (a *Assembler) parseLabelOffset(mnemonic string, address uint64) (string, a
 }
 
 // parseLabelOffset
-
-func parseIntOperand[T constraints.Integer](negative bool, value T) (string, any, error) {
-	// Apply negative sign if needed
-	finalValue := int64(value)
-	if negative && finalValue > 0 {
-		finalValue = -finalValue
-	}
-
-	// Check 6502 limits: -32768 to 65535
-	if finalValue < -32768 || finalValue > 65535 {
-		return "", nil, fmt.Errorf("[Assembler parseSizeOfValue] number out of range: %d", finalValue)
-	}
-
-	// Choose operand size: 1 byte for -128..255, 2 bytes for everything else
-	if finalValue >= -128 && finalValue <= 255 {
-		return twoByteOperand, ReduceBytes(finalValue, 1), nil // "nn" = 1 byte
-	} else {
-		return fourByteOperand, ReduceBytes(finalValue, 2), nil // "nnnn" = 2 bytes
-	}
-}
 
 func (a *Assembler) mnemonicTokenCreator(identifier string) *lexer.Token {
 	identifier = strings.ToUpper(identifier)
@@ -748,7 +572,7 @@ func (a *Assembler) processOrgDirective(asmTokens *AssemblerTokens, finalizeSegm
 func (a *Assembler) tokenAddressValue(t *lexer.Token) (uint16, error) {
 	switch t.ID {
 	case lexer.HexLiteral, lexer.IntegerLiteral:
-		value, err := integerToUint64(t.Value)
+		value, err := toUint64(t.Value)
 		if err != nil {
 			return 0, fmt.Errorf("invalid address value: %w", err)
 		}
@@ -758,120 +582,6 @@ func (a *Assembler) tokenAddressValue(t *lexer.Token) (uint16, error) {
 	default:
 		return 0, fmt.Errorf("expected address value, got %s", t.Literal)
 	}
-}
-
-// Size calculation functions for first pass
-func (a *Assembler) calculateByteDirectiveSize(asmTokens *AssemblerTokens) (int, error) {
-	size := 0
-	for {
-		t := asmTokens.Next()
-		if t == nil || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
-			break
-		}
-		if t.ID == CommaToken {
-			continue
-		}
-		if t.ID == lexer.HexLiteral || t.ID == lexer.IntegerLiteral || t.ID == IdentifierToken {
-			size++
-		}
-	}
-	return size, nil
-}
-
-func (a *Assembler) calculateWordDirectiveSize(asmTokens *AssemblerTokens) (int, error) {
-	size := 0
-	for {
-		t := asmTokens.Next()
-		if t == nil || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
-			break
-		}
-		if t.ID == CommaToken {
-			continue
-		}
-		if t.ID == lexer.HexLiteral || t.ID == lexer.IntegerLiteral || t.ID == IdentifierToken {
-			size += 2 // Words are 2 bytes
-		}
-	}
-	return size, nil
-}
-
-func (a *Assembler) calculateTextDirectiveSize(asmTokens *AssemblerTokens) (int, error) {
-	t := asmTokens.Next()
-	if t == nil || t.ID != lexer.StringLiteral {
-		return 0, fmt.Errorf("[calculateTextDirectiveSize] expected string after .TEXT")
-	}
-	str, ok := t.Value.(string)
-	if !ok {
-		return 0, fmt.Errorf("[calculateTextDirectiveSize] invalid string value")
-	}
-	return len(str), nil
-}
-
-func (a *Assembler) calculateAsciizDirectiveSize(asmTokens *AssemblerTokens) (int, error) {
-	t := asmTokens.Next()
-	if t == nil || t.ID != lexer.StringLiteral {
-		return 0, fmt.Errorf("[calculateAsciizDirectiveSize] expected string after .ASCIIZ")
-	}
-	str, ok := t.Value.(string)
-	if !ok {
-		return 0, fmt.Errorf("[calculateAsciizDirectiveSize] invalid string value")
-	}
-	return len(str) + 1, nil // +1 for null terminator
-}
-
-// integerToUint64 converts various integer types to uint64
-func integerToUint64(value any) (uint64, error) {
-	switch v := value.(type) {
-	case uint64:
-		return v, nil
-	case int64:
-		if v < 0 {
-			return 0, fmt.Errorf("negative value not allowed: %d", v)
-		}
-		return uint64(v), nil
-	case uint32:
-		return uint64(v), nil
-	case int32:
-		if v < 0 {
-			return 0, fmt.Errorf("negative value not allowed: %d", v)
-		}
-		return uint64(v), nil
-	case uint16:
-		return uint64(v), nil
-	case int16:
-		if v < 0 {
-			return 0, fmt.Errorf("negative value not allowed: %d", v)
-		}
-		return uint64(v), nil
-	case uint8:
-		return uint64(v), nil
-	case int8:
-		if v < 0 {
-			return 0, fmt.Errorf("negative value not allowed: %d", v)
-		}
-		return uint64(v), nil
-	case int:
-		if v < 0 {
-			return 0, fmt.Errorf("negative value not allowed: %d", v)
-		}
-		return uint64(v), nil
-	default:
-		return 0, fmt.Errorf("invalid integer type: %T", value)
-	}
-}
-
-func (a *Assembler) calculateDataSpaceDirectiveSize(asmTokens *AssemblerTokens) (int, error) {
-	t := asmTokens.Next()
-	if t == nil {
-		return 0, fmt.Errorf("[calculateDataSpaceDirectiveSize] expected size after .DS")
-	}
-
-	size, err := integerToUint64(t.Value)
-	if err != nil {
-		return 0, fmt.Errorf("[calculateDataSpaceDirectiveSize] %w", err)
-	}
-
-	return int(size), nil
 }
 
 func (a *Assembler) processByteDirective(asmTokens *AssemblerTokens, insertIntoMemory func([]byte)) error {
@@ -889,7 +599,7 @@ func (a *Assembler) processByteDirective(asmTokens *AssemblerTokens, insertIntoM
 
 		switch t.ID {
 		case lexer.HexLiteral, lexer.IntegerLiteral:
-			value, err := integerToUint64(t.Value)
+			value, err := toUint64(t.Value)
 			if err != nil {
 				return fmt.Errorf("[processByteDirective] invalid byte value: %w", err)
 			}
@@ -933,7 +643,7 @@ func (a *Assembler) processWordDirective(asmTokens *AssemblerTokens, insertIntoM
 
 		switch t.ID {
 		case lexer.HexLiteral, lexer.IntegerLiteral:
-			value, err := integerToUint64(t.Value)
+			value, err := toUint64(t.Value)
 			if err != nil {
 				return fmt.Errorf("[processWordDirective] invalid word value: %w", err)
 			}
