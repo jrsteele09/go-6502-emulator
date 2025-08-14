@@ -15,7 +15,7 @@ BEQ end`,
 	}
 
 	resolver := NewMemoryFileResolver(files)
-	preprocessor := NewPreprocessor(resolver)
+	preprocessor := NewIncludePreprocessor(resolver)
 
 	result, err := preprocessor.Process(strings.NewReader(files["main.asm"]))
 	if err != nil {
@@ -48,7 +48,7 @@ BEQ end`,
 	}
 
 	resolver := NewMemoryFileResolver(files)
-	preprocessor := NewPreprocessor(resolver)
+	preprocessor := NewIncludePreprocessor(resolver)
 
 	result, err := preprocessor.Process(strings.NewReader(files["main.asm"]))
 	if err != nil {
@@ -81,7 +81,7 @@ BEQ end`,
 	}
 
 	resolver := NewMemoryFileResolver(files)
-	preprocessor := NewPreprocessor(resolver)
+	preprocessor := NewIncludePreprocessor(resolver)
 
 	result, err := preprocessor.Process(strings.NewReader(files["main.asm"]))
 	if err != nil {
@@ -117,7 +117,7 @@ INY`,
 	}
 
 	resolver := NewMemoryFileResolver(files)
-	preprocessor := NewPreprocessor(resolver)
+	preprocessor := NewIncludePreprocessor(resolver)
 
 	result, err := preprocessor.Process(strings.NewReader(files["main.asm"]))
 	if err != nil {
@@ -153,7 +153,7 @@ BEQ end`,
 	}
 
 	resolver := NewMemoryFileResolver(files)
-	preprocessor := NewPreprocessor(resolver)
+	preprocessor := NewIncludePreprocessor(resolver)
 
 	_, err := preprocessor.Process(strings.NewReader(files["main.asm"]))
 	if err == nil {
@@ -176,7 +176,7 @@ func TestPreprocessor_MaxDepthExceeded(t *testing.T) {
 	}
 
 	resolver := NewMemoryFileResolver(files)
-	preprocessor := NewPreprocessor(resolver)
+	preprocessor := NewIncludePreprocessor(resolver)
 	preprocessor.SetMaxDepth(3) // Set low depth limit
 
 	_, err := preprocessor.Process(strings.NewReader(files["main.asm"]))
@@ -197,7 +197,7 @@ STA $1000`,
 	}
 
 	resolver := NewMemoryFileResolver(files)
-	preprocessor := NewPreprocessor(resolver)
+	preprocessor := NewIncludePreprocessor(resolver)
 
 	_, err := preprocessor.Process(strings.NewReader(files["main.asm"]))
 	if err == nil {
@@ -218,7 +218,7 @@ STA $1000`,
 	}
 
 	resolver := NewMemoryFileResolver(files)
-	preprocessor := NewPreprocessor(resolver)
+	preprocessor := NewIncludePreprocessor(resolver)
 
 	result, err := preprocessor.Process(strings.NewReader(files["main.asm"]))
 	if err != nil {
@@ -249,7 +249,7 @@ STA $1000`,
 	}
 
 	resolver := NewMemoryFileResolver(files)
-	preprocessor := NewPreprocessor(resolver)
+	preprocessor := NewIncludePreprocessor(resolver)
 
 	result, err := preprocessor.Process(strings.NewReader(files["main.asm"]))
 	if err != nil {
@@ -287,7 +287,7 @@ INY`,
 	}
 
 	resolver := NewMemoryFileResolver(files)
-	preprocessor := NewPreprocessor(resolver)
+	preprocessor := NewIncludePreprocessor(resolver)
 
 	result, err := preprocessor.Process(strings.NewReader(files["main.asm"]))
 	if err != nil {
@@ -323,7 +323,7 @@ STA $1000`,
 	}
 
 	resolver := NewMemoryFileResolver(files)
-	preprocessor := NewPreprocessor(resolver)
+	preprocessor := NewIncludePreprocessor(resolver)
 
 	result, err := preprocessor.Process(strings.NewReader(files["main.asm"]))
 	if err != nil {
@@ -353,7 +353,7 @@ STA $1000`,
 	}
 
 	resolver := NewMemoryFileResolver(files)
-	preprocessor := NewPreprocessor(resolver)
+	preprocessor := NewIncludePreprocessor(resolver)
 
 	result, err := preprocessor.Process(strings.NewReader(files["main.asm"]))
 	if err != nil {

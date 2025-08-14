@@ -105,7 +105,7 @@ func (a *Assembler) AssembleWithPreprocessor(r io.Reader, fileResolver FileResol
 	a.reset()
 
 	// Preprocess to handle includes
-	preprocessor := NewPreprocessor(fileResolver)
+	preprocessor := NewIncludePreprocessor(fileResolver)
 	processedInput, err := preprocessor.Process(r)
 	if err != nil {
 		return nil, fmt.Errorf("[Assembler AssembleWithPreprocessor] Preprocess [%w]", err)

@@ -66,16 +66,16 @@ func (r *MemoryFileResolver) Resolve(path string) (io.Reader, error) {
 	return strings.NewReader(content), nil
 }
 
-// Preprocessor handles file inclusion before tokenization
-type Preprocessor struct {
+// IncludePreprocessor handles file inclusion before tokenization
+type IncludePreprocessor struct {
 	resolver      FileResolver
 	maxDepth      int
 	includedFiles map[string]bool // Track included files to prevent circular includes
 }
 
-// NewPreprocessor creates a new preprocessor with the given file resolver
-func NewPreprocessor(resolver FileResolver) *Preprocessor {
-	return &Preprocessor{
+// NewIncludePreprocessor creates a new preprocessor with the given file resolver
+func NewIncludePreprocessor(resolver FileResolver) *IncludePreprocessor {
+	return &IncludePreprocessor{
 		resolver:      resolver,
 		maxDepth:      10, // Reasonable default for include depth
 		includedFiles: make(map[string]bool),
@@ -83,12 +83,12 @@ func NewPreprocessor(resolver FileResolver) *Preprocessor {
 }
 
 // SetMaxDepth sets the maximum include depth to prevent infinite recursion
-func (p *Preprocessor) SetMaxDepth(depth int) {
+func (p *IncludePreprocessor) SetMaxDepth(depth int) {
 	p.maxDepth = depth
 }
 
 // Process processes the input, expanding all include directives
-func (p *Preprocessor) Process(input io.Reader) (io.Reader, error) {
+func (p *IncludePreprocessor) Process(input io.Reader) (io.Reader, error) {
 	// Reset included files for each processing session
 	p.includedFiles = make(map[string]bool)
 
@@ -101,7 +101,7 @@ func (p *Preprocessor) Process(input io.Reader) (io.Reader, error) {
 }
 
 // processReader recursively processes a reader, expanding includes
-func (p *Preprocessor) processReader(input io.Reader, depth int) (string, error) {
+func (p *IncludePreprocessor) processReader(input io.Reader, depth int) (string, error) {
 	if depth > p.maxDepth {
 		return "", fmt.Errorf("maximum include depth (%d) exceeded", p.maxDepth)
 	}
@@ -158,7 +158,7 @@ func (p *Preprocessor) processReader(input io.Reader, depth int) (string, error)
 
 // extractIncludePath extracts the file path from include directives
 // Supports both #include "file.asm" and .include "file.asm" formats
-func (p *Preprocessor) extractIncludePath(line string) string {
+func (p *IncludePreprocessor) extractIncludePath(line string) string {
 	line = strings.TrimSpace(line)
 
 	// Handle #include directive
@@ -180,7 +180,7 @@ func (p *Preprocessor) extractIncludePath(line string) string {
 }
 
 // extractQuotedPath extracts a quoted file path from the remaining part of an include line
-func (p *Preprocessor) extractQuotedPath(remainder string) string {
+func (p *IncludePreprocessor) extractQuotedPath(remainder string) string {
 	remainder = strings.TrimSpace(remainder)
 
 	// Handle both single and double quotes
