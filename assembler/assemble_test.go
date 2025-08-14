@@ -20,7 +20,7 @@ func TestAssembler(t *testing.T) {
 	asmCode := `
 	.ORG $1000
 	
-	.EQU SCREEN_BASE = $0400
+	SCREEN_BASE = $0400
 	
 	start:
 		LDA #$01
@@ -116,8 +116,8 @@ func TestAssemblerComprehensive(t *testing.T) {
 .ORG $1000
 
 ; Define some constants
-.EQU SCREEN_BASE = $0400
-.EQU COLOR_WHITE = $01
+SCREEN_BASE = $0400
+COLOR_WHITE = $01
 
 ; Define some data
 start:
@@ -413,8 +413,8 @@ func TestDuplicateVariables(t *testing.T) {
 
 	program := `
 		.ORG $1000
-		.EQU myVar = $FF
-		.EQU myVar = $AA  ; Duplicate variable - should error
+		myVar = $FF
+		myVar = $AA  ; Duplicate variable - should error
 		NOP
 	`
 
@@ -435,7 +435,7 @@ func TestLabelVariableConflict(t *testing.T) {
 
 	program := `
 		.ORG $1000
-		.EQU mySymbol = $FF
+		mySymbol = $FF
 	mySymbol:  ; Conflicts with variable - should error
 		NOP
 	`
