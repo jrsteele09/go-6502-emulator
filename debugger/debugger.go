@@ -311,16 +311,16 @@ func (d *Debugger) LoadPRG(filename string) string {
 	totalBytes := 0
 	for i, segment := range segments {
 		// Load segment into memory
-		for j, b := range segment.Data {
+		for j, b := range segment.Data.Bytes() {
 			d.memory.Write(segment.StartAddress+uint16(j), b)
 		}
 
-		totalBytes += len(segment.Data)
+		totalBytes += len(segment.Data.Bytes())
 		result += fmt.Sprintf("  Segment %d: %s to %s (%d bytes)\n",
 			i+1,
 			d.FormatAddress(segment.StartAddress),
-			d.FormatAddress(segment.StartAddress+uint16(len(segment.Data))-1),
-			len(segment.Data))
+			d.FormatAddress(segment.StartAddress+uint16(len(segment.Data.Bytes()))-1),
+			len(segment.Data.Bytes()))
 	}
 
 	result += fmt.Sprintf("Total: %d bytes loaded\n", totalBytes)

@@ -13,12 +13,11 @@ func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error)
 	// Track memory segments that will be needed
 	type SegmentInfo struct {
 		StartAddress uint16
-		Size         int
 	}
 	var segmentInfos []SegmentInfo
 	var currentSegmentStart uint16
 
-	a.programCounter = a.originAddress
+	a.programCounter = 0x0000
 	currentSegmentStart = a.programCounter
 	currentSegmentSize := 0
 
@@ -26,10 +25,8 @@ func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error)
 		if currentSegmentSize > 0 {
 			segmentInfos = append(segmentInfos, SegmentInfo{
 				StartAddress: currentSegmentStart,
-				Size:         currentSegmentSize,
 			})
 		}
-		// Note: currentSegmentStart will be updated by caller when needed
 		currentSegmentSize = 0
 	}
 
@@ -40,7 +37,10 @@ func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error)
 
 	asmTokens := NewAssemblerTokens(tokens)
 
+	tokenPosition := 0
+
 	for {
+		tokenPosition++
 		t := asmTokens.Next()
 		if t == nil || t.ID == lexer.EOFType {
 			break
@@ -83,6 +83,7 @@ func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error)
 			}
 			instructionSize := 1 + len(addressingMode.Operands)
 			advanceProgramCounter(instructionSize)
+			tokenPosition = 0
 
 		case IdentifierToken:
 			// Check if this is a constant assignment (identifier = value)
@@ -92,9 +93,16 @@ func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error)
 				if err != nil {
 					return nil, err
 				}
+			} else if tokenPosition == 1 {
+				err := a.recordLabelAddress(t)
+				if err != nil {
+					return nil, err
+				}
 			} else {
 				return nil, fmt.Errorf("[preprocessor] unexpected identifier '%s'", t.Literal)
 			}
+		case lexer.EndOfLineType:
+			tokenPosition = 0 // Reset position on new line
 
 		default:
 			// Skip other tokens (comments, whitespace, etc.)
@@ -104,12 +112,11 @@ func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error)
 
 	finalizeCurrentSegment()
 
-	// Create actual segments with allocated memory
+	// Create segements with start address
 	segments := make([]AssembledData, len(segmentInfos))
 	for i, info := range segmentInfos {
 		segments[i] = AssembledData{
 			StartAddress: info.StartAddress,
-			Data:         make([]byte, info.Size),
 		}
 	}
 
@@ -122,7 +129,7 @@ func (a *Assembler) preprocessDirective(asmTokens *AssemblerTokens, advanceProgr
 	nextToken := asmTokens.Peek()
 	if nextToken != nil && nextToken.ID == IdentifierToken {
 		directiveName := "." + nextToken.Literal
-		if tokenID, found := KeywordTokens[directiveName]; found {
+		if tokenID, found := KeywordTokens[strings.ToUpper(directiveName)]; found {
 			// Consume the directive name token
 			asmTokens.Next()
 			// Process the specific directive based on its token ID
@@ -190,16 +197,16 @@ func (a *Assembler) recordLabelAddress(t *lexer.Token) error {
 func (a *Assembler) calculateByteDirectiveSize(asmTokens *AssemblerTokens) (int, error) {
 	size := 0
 	for {
-		t := asmTokens.Next()
-		if t == nil || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
-			break
-		}
+		t := asmTokens.Peek()
 		if t.ID == CommaToken {
+			asmTokens.Next() // Skip comma
 			continue
 		}
-		if t.ID == lexer.HexLiteral || t.ID == lexer.IntegerLiteral || t.ID == IdentifierToken {
-			size++
+		if t.ID != lexer.HexLiteral && t.ID != lexer.IntegerLiteral && t.ID != IdentifierToken {
+			break
 		}
+		size++
+		asmTokens.Next() // Consume the token
 	}
 	return size, nil
 }
@@ -207,10 +214,11 @@ func (a *Assembler) calculateByteDirectiveSize(asmTokens *AssemblerTokens) (int,
 func (a *Assembler) calculateWordDirectiveSize(asmTokens *AssemblerTokens) (int, error) {
 	size := 0
 	for {
-		t := asmTokens.Next()
+		t := asmTokens.Peek()
 		if t == nil || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
 			break
 		}
+		asmTokens.Next() // Consume the token
 		if t.ID == CommaToken {
 			continue
 		}

@@ -1,10 +1,12 @@
 package bin
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 
 	"github.com/jrsteele09/go-6502-emulator/assembler"
+	"github.com/jrsteele09/go-6502-emulator/utils"
 )
 
 var _ BinaryFormat = (*D64Format)(nil)
@@ -152,7 +154,7 @@ func (d *D64Format) writeSegmentsToD64(diskImage []byte, segments []assembler.As
 	// Calculate total size needed
 	maxAddr := uint16(0)
 	for _, segment := range segments {
-		endAddr := segment.StartAddress + uint16(len(segment.Data))
+		endAddr := segment.StartAddress + uint16(len(segment.Data.Bytes()))
 		if endAddr > maxAddr {
 			maxAddr = endAddr
 		}
@@ -169,7 +171,7 @@ func (d *D64Format) writeSegmentsToD64(diskImage []byte, segments []assembler.As
 	// Copy segment data to appropriate positions
 	for _, segment := range segments {
 		offset := int(segment.StartAddress - loadAddr)
-		copy(prgData[2+offset:], segment.Data)
+		copy(prgData[2+offset:], segment.Data.Bytes())
 	}
 
 	// Write file to disk starting at track 1, sector 0
@@ -404,7 +406,7 @@ func (d *D64Format) LoadFile(filename string, verbose bool) ([]assembler.Assembl
 
 			segment := assembler.AssembledData{
 				StartAddress: loadAddr,
-				Data:         programData,
+				Data:         utils.Value(bytes.NewBuffer(programData)),
 			}
 			segments = append(segments, segment)
 		}

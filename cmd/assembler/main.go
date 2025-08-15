@@ -153,7 +153,7 @@ func main() {
 		fmt.Printf("Assembly completed successfully!\n")
 		fmt.Printf("Generated %d segment(s)\n", len(segments))
 		for i, segment := range segments {
-			fmt.Printf("  Segment %d: %d bytes at $%04X\n", i+1, len(segment.Data), segment.StartAddress)
+			fmt.Printf("  Segment %d: %d bytes at $%04X\n", i+1, len(segment.Data.Bytes()), segment.StartAddress)
 		}
 	} else {
 		fmt.Printf("Assembly successful: %s -> %s\n", *inputFile, *outputFile)
