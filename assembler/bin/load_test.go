@@ -1,11 +1,13 @@
 package bin
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/jrsteele09/go-6502-emulator/assembler"
+	"github.com/jrsteele09/go-6502-emulator/utils"
 )
 
 func TestPRGLoadFile(t *testing.T) {
@@ -13,7 +15,7 @@ func TestPRGLoadFile(t *testing.T) {
 	testData := []assembler.AssembledData{
 		{
 			StartAddress: 0x1000,
-			Data:         []byte{0xA9, 0x42, 0x8D, 0x20, 0xD0, 0x60}, // LDA #$42, STA $D020, RTS
+			Data:         utils.Value(bytes.NewBuffer([]byte{0xA9, 0x42, 0x8D, 0x20, 0xD0, 0x60})), // LDA #$42, STA $D020, RTS
 		},
 	}
 
@@ -48,13 +50,13 @@ func TestPRGLoadFile(t *testing.T) {
 		t.Errorf("Expected start address $%04X, got $%04X", testData[0].StartAddress, segment.StartAddress)
 	}
 
-	if len(segment.Data) != len(testData[0].Data) {
-		t.Errorf("Expected %d bytes, got %d", len(testData[0].Data), len(segment.Data))
+	if len(segment.Data.Bytes()) != len(testData[0].Data.Bytes()) {
+		t.Errorf("Expected %d bytes, got %d", len(testData[0].Data.Bytes()), len(segment.Data.Bytes()))
 	}
 
-	for i, b := range testData[0].Data {
-		if segment.Data[i] != b {
-			t.Errorf("Data mismatch at byte %d: expected $%02X, got $%02X", i, b, segment.Data[i])
+	for i, b := range testData[0].Data.Bytes() {
+		if segment.Data.Bytes()[i] != b {
+			t.Errorf("Data mismatch at byte %d: expected $%02X, got $%02X", i, b, segment.Data.Bytes()[i])
 		}
 	}
 }
@@ -105,7 +107,7 @@ func TestD64LoadFile(t *testing.T) {
 	testData := []assembler.AssembledData{
 		{
 			StartAddress: 0x1000,
-			Data:         []byte{0xA9, 0x42, 0x8D, 0x20, 0xD0, 0x60}, // LDA #$42, STA $D020, RTS
+			Data:         utils.Value(bytes.NewBuffer([]byte{0xA9, 0x42, 0x8D, 0x20, 0xD0, 0x60})), // LDA #$42, STA $D020, RTS
 		},
 	}
 
@@ -140,13 +142,13 @@ func TestD64LoadFile(t *testing.T) {
 		t.Errorf("Expected start address $%04X, got $%04X", testData[0].StartAddress, segment.StartAddress)
 	}
 
-	if len(segment.Data) != len(testData[0].Data) {
-		t.Errorf("Expected %d bytes, got %d", len(testData[0].Data), len(segment.Data))
+	if len(segment.Data.Bytes()) != len(testData[0].Data.Bytes()) {
+		t.Errorf("Expected %d bytes, got %d", len(testData[0].Data.Bytes()), len(segment.Data.Bytes()))
 	}
 
-	for i, b := range testData[0].Data {
-		if segment.Data[i] != b {
-			t.Errorf("Data mismatch at byte %d: expected $%02X, got $%02X", i, b, segment.Data[i])
+	for i, b := range testData[0].Data.Bytes() {
+		if segment.Data.Bytes()[i] != b {
+			t.Errorf("Data mismatch at byte %d: expected $%02X, got $%02X", i, b, segment.Data.Bytes()[i])
 		}
 	}
 }
@@ -156,11 +158,11 @@ func TestD64LoadFileMultipleFiles(t *testing.T) {
 	testData := []assembler.AssembledData{
 		{
 			StartAddress: 0x1000,
-			Data:         []byte{0xA9, 0x42, 0x8D, 0x20, 0xD0, 0x60}, // LDA #$42, STA $D020, RTS
+			Data:         utils.Value(bytes.NewBuffer([]byte{0xA9, 0x42, 0x8D, 0x20, 0xD0, 0x60})), // LDA #$42, STA $D020, RTS
 		},
 		{
 			StartAddress: 0x2000,
-			Data:         []byte{0xA9, 0x00, 0x8D, 0x21, 0xD0, 0x60}, // LDA #$00, STA $D021, RTS
+			Data:         utils.Value(bytes.NewBuffer([]byte{0xA9, 0x00, 0x8D, 0x21, 0xD0, 0x60})), // LDA #$00, STA $D021, RTS
 		},
 	}
 
@@ -199,23 +201,23 @@ func TestD64LoadFileMultipleFiles(t *testing.T) {
 
 	// The combined data should have the first segment at offset 0
 	// and the second segment at offset 0x1000 (0x2000 - 0x1000)
-	expectedSize := 0x1000 + len(testData[1].Data) // gap + second segment
-	if len(segment.Data) != expectedSize {
-		t.Errorf("Expected %d bytes, got %d", expectedSize, len(segment.Data))
+	expectedSize := 0x1000 + len(testData[1].Data.Bytes()) // gap + second segment
+	if len(segment.Data.Bytes()) != expectedSize {
+		t.Errorf("Expected %d bytes, got %d", expectedSize, len(segment.Data.Bytes()))
 	}
 
 	// Check first segment data (at start of combined data)
-	for i, b := range testData[0].Data {
-		if segment.Data[i] != b {
-			t.Errorf("First segment: Data mismatch at byte %d: expected $%02X, got $%02X", i, b, segment.Data[i])
+	for i, b := range testData[0].Data.Bytes() {
+		if segment.Data.Bytes()[i] != b {
+			t.Errorf("First segment: Data mismatch at byte %d: expected $%02X, got $%02X", i, b, segment.Data.Bytes()[i])
 		}
 	}
 
 	// Check second segment data (at offset 0x1000)
 	secondSegmentOffset := 0x1000
-	for i, b := range testData[1].Data {
-		if segment.Data[secondSegmentOffset+i] != b {
-			t.Errorf("Second segment: Data mismatch at byte %d: expected $%02X, got $%02X", i, b, segment.Data[secondSegmentOffset+i])
+	for i, b := range testData[1].Data.Bytes() {
+		if segment.Data.Bytes()[secondSegmentOffset+i] != b {
+			t.Errorf("Second segment: Data mismatch at byte %d: expected $%02X, got $%02X", i, b, segment.Data.Bytes()[secondSegmentOffset+i])
 		}
 	}
 }
@@ -225,7 +227,7 @@ func TestT64LoadFile(t *testing.T) {
 	testData := []assembler.AssembledData{
 		{
 			StartAddress: 0x1000,
-			Data:         []byte{0xA9, 0x42, 0x8D, 0x20, 0xD0, 0x60}, // LDA #$42, STA $D020, RTS
+			Data:         utils.Value(bytes.NewBuffer([]byte{0xA9, 0x42, 0x8D, 0x20, 0xD0, 0x60})), // LDA #$42, STA $D020, RTS
 		},
 	}
 
@@ -260,13 +262,13 @@ func TestT64LoadFile(t *testing.T) {
 		t.Errorf("Expected start address $%04X, got $%04X", testData[0].StartAddress, segment.StartAddress)
 	}
 
-	if len(segment.Data) != len(testData[0].Data) {
-		t.Errorf("Expected %d bytes, got %d", len(testData[0].Data), len(segment.Data))
+	if len(segment.Data.Bytes()) != len(testData[0].Data.Bytes()) {
+		t.Errorf("Expected %d bytes, got %d", len(testData[0].Data.Bytes()), len(segment.Data.Bytes()))
 	}
 
-	for i, b := range testData[0].Data {
-		if segment.Data[i] != b {
-			t.Errorf("Data mismatch at byte %d: expected $%02X, got $%02X", i, b, segment.Data[i])
+	for i, b := range testData[0].Data.Bytes() {
+		if segment.Data.Bytes()[i] != b {
+			t.Errorf("Data mismatch at byte %d: expected $%02X, got $%02X", i, b, segment.Data.Bytes()[i])
 		}
 	}
 }
@@ -276,11 +278,11 @@ func TestT64LoadFileMultipleFiles(t *testing.T) {
 	testData := []assembler.AssembledData{
 		{
 			StartAddress: 0x1000,
-			Data:         []byte{0xA9, 0x42, 0x8D, 0x20, 0xD0, 0x60}, // LDA #$42, STA $D020, RTS
+			Data:         utils.Value(bytes.NewBuffer([]byte{0xA9, 0x42, 0x8D, 0x20, 0xD0, 0x60})), // LDA #$42, STA $D020, RTS
 		},
 		{
 			StartAddress: 0x2000,
-			Data:         []byte{0xA9, 0x00, 0x8D, 0x21, 0xD0, 0x60}, // LDA #$00, STA $D021, RTS
+			Data:         utils.Value(bytes.NewBuffer([]byte{0xA9, 0x00, 0x8D, 0x21, 0xD0, 0x60})), // LDA #$00, STA $D021, RTS
 		},
 	}
 
@@ -319,23 +321,23 @@ func TestT64LoadFileMultipleFiles(t *testing.T) {
 
 	// The combined data should have the first segment at offset 0
 	// and the second segment at offset 0x1000 (0x2000 - 0x1000)
-	expectedSize := 0x1000 + len(testData[1].Data) // gap + second segment
-	if len(segment.Data) != expectedSize {
-		t.Errorf("Expected %d bytes, got %d", expectedSize, len(segment.Data))
+	expectedSize := 0x1000 + len(testData[1].Data.Bytes()) // gap + second segment
+	if len(segment.Data.Bytes()) != expectedSize {
+		t.Errorf("Expected %d bytes, got %d", expectedSize, len(segment.Data.Bytes()))
 	}
 
 	// Check first segment data (at start of combined data)
-	for i, b := range testData[0].Data {
-		if segment.Data[i] != b {
-			t.Errorf("First segment: Data mismatch at byte %d: expected $%02X, got $%02X", i, b, segment.Data[i])
+	for i, b := range testData[0].Data.Bytes() {
+		if segment.Data.Bytes()[i] != b {
+			t.Errorf("First segment: Data mismatch at byte %d: expected $%02X, got $%02X", i, b, segment.Data.Bytes()[i])
 		}
 	}
 
 	// Check second segment data (at offset 0x1000)
 	secondSegmentOffset := 0x1000
-	for i, b := range testData[1].Data {
-		if segment.Data[secondSegmentOffset+i] != b {
-			t.Errorf("Second segment: Data mismatch at byte %d: expected $%02X, got $%02X", i, b, segment.Data[secondSegmentOffset+i])
+	for i, b := range testData[1].Data.Bytes() {
+		if segment.Data.Bytes()[secondSegmentOffset+i] != b {
+			t.Errorf("Second segment: Data mismatch at byte %d: expected $%02X, got $%02X", i, b, segment.Data.Bytes()[secondSegmentOffset+i])
 		}
 	}
 }

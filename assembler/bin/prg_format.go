@@ -1,10 +1,12 @@
 package bin
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 
 	"github.com/jrsteele09/go-6502-emulator/assembler"
+	"github.com/jrsteele09/go-6502-emulator/utils"
 )
 
 var _ BinaryFormat = (*PRGFormat)(nil)
@@ -21,29 +23,16 @@ func NewPRGFormat() *PRGFormat {
 // PRG format: 2-byte load address (little-endian) followed by program data
 // Note: PRG format requires contiguous memory, so all segments must be adjacent
 func (p *PRGFormat) CreateFile(filename string, segments []assembler.AssembledData, verbose bool) error {
-	if len(segments) == 0 {
-		return fmt.Errorf("no segments to write")
-	}
-
-	// Validate segments are contiguous
-	contiguousData, loadAddr, err := p.validateAndMergeContiguousSegments(segments)
+	// Build PRG bytes using CreateData, then write them to disk
+	prgData, err := p.CreateData(segments)
 	if err != nil {
-		return fmt.Errorf("PRG format error: %w", err)
+		return err
 	}
 
-	// Create output buffer: 2 bytes for load address + program data
-	output := make([]byte, 2+len(contiguousData))
-
-	// Write load address (little-endian)
-	output[0] = byte(loadAddr & 0xFF)
-	output[1] = byte(loadAddr >> 8)
-
-	// Copy program data
-	copy(output[2:], contiguousData)
-
-	if verbose {
+	if verbose && len(prgData) >= 2 {
+		loadAddr := uint16(prgData[0]) | (uint16(prgData[1]) << 8)
 		fmt.Printf("PRG load address: $%04X\n", loadAddr)
-		fmt.Printf("Program size: %d bytes\n", len(contiguousData))
+		fmt.Printf("Program size: %d bytes\n", len(prgData)-2)
 	}
 
 	// Write to file
@@ -53,8 +42,7 @@ func (p *PRGFormat) CreateFile(filename string, segments []assembler.AssembledDa
 	}
 	defer file.Close()
 
-	_, err = file.Write(output)
-	if err != nil {
+	if _, err = file.Write(prgData); err != nil {
 		return fmt.Errorf("failed to write PRG data: %w", err)
 	}
 
@@ -84,20 +72,30 @@ func (p *PRGFormat) validateAndMergeContiguousSegments(segments []assembler.Asse
 	loadAddr := sortedSegments[0].StartAddress
 	var mergedData []byte
 
-	// Check for contiguity and merge data
+	// Allow small gaps (filled with zeros) but stop on very large gaps
+	const maxFillGap = 0x100 // 256 bytes
+
 	expectedNextAddr := loadAddr
 	for i, segment := range sortedSegments {
-		if segment.StartAddress != expectedNextAddr {
-			return nil, 0, fmt.Errorf("segments are not contiguous: gap between $%04X and $%04X", expectedNextAddr, segment.StartAddress)
-		}
-
-		// Check for overlapping segments
+		// Overlap check (shouldn't happen due to sort and logic)
 		if i > 0 && segment.StartAddress < expectedNextAddr {
 			return nil, 0, fmt.Errorf("segments overlap: segment at $%04X overlaps with previous segment", segment.StartAddress)
 		}
 
-		mergedData = append(mergedData, segment.Data...)
-		expectedNextAddr = segment.StartAddress + uint16(len(segment.Data))
+		if segment.StartAddress > expectedNextAddr {
+			gap := int(segment.StartAddress - expectedNextAddr)
+			if gap <= maxFillGap {
+				// Fill small gap with zeros
+				mergedData = append(mergedData, make([]byte, gap)...)
+			} else {
+				// Large gap detected: stop merging further segments
+				break
+			}
+		}
+
+		// Append segment data
+		mergedData = append(mergedData, segment.Data.Bytes()...)
+		expectedNextAddr = segment.StartAddress + uint16(len(segment.Data.Bytes()))
 	}
 
 	return mergedData, loadAddr, nil
@@ -109,6 +107,10 @@ func (p *PRGFormat) validateAndMergeContiguousSegments(segments []assembler.Asse
 func (p *PRGFormat) CreateData(segments []assembler.AssembledData) ([]byte, error) {
 	if len(segments) == 0 {
 		return nil, fmt.Errorf("no segments to convert")
+	}
+
+	if len(segments) > 1 {
+		return nil, fmt.Errorf("multiple segments not supported in PRG format")
 	}
 
 	// Validate segments are contiguous
@@ -158,7 +160,7 @@ func (p *PRGFormat) LoadFile(filename string, verbose bool) ([]assembler.Assembl
 	segments := []assembler.AssembledData{
 		{
 			StartAddress: loadAddr,
-			Data:         programData,
+			Data:         utils.Value(bytes.NewBuffer(programData)),
 		},
 	}
 

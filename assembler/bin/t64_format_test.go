@@ -1,11 +1,13 @@
 package bin
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"testing"
 
 	"github.com/jrsteele09/go-6502-emulator/assembler"
+	"github.com/jrsteele09/go-6502-emulator/utils"
 )
 
 func TestT64Format_CreateData(t *testing.T) {
@@ -19,15 +21,15 @@ func TestT64Format_CreateData(t *testing.T) {
 		{
 			name: "single segment",
 			segments: []assembler.AssembledData{
-				{StartAddress: 0x1000, Data: []byte{0xA9, 0x10, 0x60}}, // LDA #$10, RTS
+				{StartAddress: 0x1000, Data: utils.Value(bytes.NewBuffer([]byte{0xA9, 0x10, 0x60}))}, // LDA #$10, RTS
 			},
 			wantErr: false,
 		},
 		{
 			name: "multiple segments",
 			segments: []assembler.AssembledData{
-				{StartAddress: 0x1000, Data: []byte{0xA9, 0x10}}, // LDA #$10
-				{StartAddress: 0x1005, Data: []byte{0x60}},       // RTS
+				{StartAddress: 0x1000, Data: utils.Value(bytes.NewBuffer([]byte{0xA9, 0x10}))}, // LDA #$10
+				{StartAddress: 0x1005, Data: utils.Value(bytes.NewBuffer([]byte{0x60}))},       // RTS
 			},
 			wantErr: false,
 		},
@@ -129,7 +131,7 @@ func TestT64Format_CreateData(t *testing.T) {
 func TestT64Format_CreateFile(t *testing.T) {
 	t64 := NewT64Format("TEST TAPE", 30)
 	segments := []assembler.AssembledData{
-		{StartAddress: 0x1000, Data: []byte{0xA9, 0x10, 0x60}}, // LDA #$10, RTS
+		{StartAddress: 0x1000, Data: utils.Value(bytes.NewBuffer([]byte{0xA9, 0x10, 0x60}))}, // LDA #$10, RTS
 	}
 
 	// Create temporary file
@@ -240,16 +242,15 @@ func TestT64Format_CreatePRGFromSegments(t *testing.T) {
 		{
 			name: "single segment",
 			segments: []assembler.AssembledData{
-				{StartAddress: 0x1000, Data: []byte{0xA9, 0x10}}, // LDA #$10
-			},
+				{StartAddress: 0x1000, Data: utils.Value(bytes.NewBuffer([]byte{0xA9, 0x10}))}}, // LDA #$10
 			expectedLoadAddr: 0x1000,
 			expectedSize:     4, // 2 bytes load address + 2 bytes data
 		},
 		{
 			name: "multiple segments",
 			segments: []assembler.AssembledData{
-				{StartAddress: 0x1000, Data: []byte{0xA9, 0x10}}, // LDA #$10
-				{StartAddress: 0x1005, Data: []byte{0x60}},       // RTS
+				{StartAddress: 0x1000, Data: utils.Value(bytes.NewBuffer([]byte{0xA9, 0x10}))}, // LDA #$10
+				{StartAddress: 0x1005, Data: utils.Value(bytes.NewBuffer([]byte{0x60}))},       // RTS
 			},
 			expectedLoadAddr: 0x1000,
 			expectedSize:     8, // 2 bytes load address + 6 bytes (including gap)
@@ -257,8 +258,8 @@ func TestT64Format_CreatePRGFromSegments(t *testing.T) {
 		{
 			name: "segments out of order",
 			segments: []assembler.AssembledData{
-				{StartAddress: 0x2000, Data: []byte{0x60}},       // RTS
-				{StartAddress: 0x1000, Data: []byte{0xA9, 0x10}}, // LDA #$10
+				{StartAddress: 0x2000, Data: utils.Value(bytes.NewBuffer([]byte{0x60}))},       // RTS
+				{StartAddress: 0x1000, Data: utils.Value(bytes.NewBuffer([]byte{0xA9, 0x10}))}, // LDA #$10
 			},
 			expectedLoadAddr: 0x1000, // Should use lowest address
 			expectedSize:     4099,   // 2 bytes load address + large gap

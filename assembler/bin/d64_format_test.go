@@ -1,11 +1,13 @@
 package bin
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"testing"
 
 	"github.com/jrsteele09/go-6502-emulator/assembler"
+	"github.com/jrsteele09/go-6502-emulator/utils"
 )
 
 func TestD64Format_CreateData(t *testing.T) {
@@ -19,15 +21,15 @@ func TestD64Format_CreateData(t *testing.T) {
 		{
 			name: "single segment",
 			segments: []assembler.AssembledData{
-				{StartAddress: 0x1000, Data: []byte{0xA9, 0x10, 0x60}}, // LDA #$10, RTS
+				{StartAddress: 0x1000, Data: utils.Value(bytes.NewBuffer([]byte{0xA9, 0x10, 0x60}))}, // LDA #$10, RTS
 			},
 			wantErr: false,
 		},
 		{
 			name: "multiple segments",
 			segments: []assembler.AssembledData{
-				{StartAddress: 0x1000, Data: []byte{0xA9, 0x10}}, // LDA #$10
-				{StartAddress: 0x1005, Data: []byte{0x60}},       // RTS
+				{StartAddress: 0x1000, Data: utils.Value(bytes.NewBuffer([]byte{0xA9, 0x10}))}, // LDA #$10
+				{StartAddress: 0x1005, Data: utils.Value(bytes.NewBuffer([]byte{0x60}))},       // RTS
 			},
 			wantErr: false,
 		},
@@ -96,7 +98,7 @@ func TestD64Format_CreateData(t *testing.T) {
 func TestD64Format_CreateFile(t *testing.T) {
 	d64 := NewD64Format("TEST DISK", "01")
 	segments := []assembler.AssembledData{
-		{StartAddress: 0x1000, Data: []byte{0xA9, 0x10, 0x60}}, // LDA #$10, RTS
+		{StartAddress: 0x1000, Data: utils.Value(bytes.NewBuffer([]byte{0xA9, 0x10, 0x60}))}, // LDA #$10, RTS
 	}
 
 	// Create temporary file

@@ -52,28 +52,21 @@ increment:
 	if err != nil {
 		t.Fatalf("Assembly failed: %v", err)
 	}
-
-	// Verify we got assembled data
 	if len(segments) == 0 {
 		t.Fatal("Expected at least one segment, got none")
 	}
-
-	// Verify the assembled code contains the expected instructions
 	firstSegment := segments[0]
-	if len(firstSegment.Data) < 7 {
-		t.Errorf("Expected at least 7 bytes of assembled code, got %d", len(firstSegment.Data))
+	if len(firstSegment.Data.Bytes()) < 7 {
+		t.Errorf("Expected at least 7 bytes of assembled code, got %d", len(firstSegment.Data.Bytes()))
 	}
-
-	// Check that the first instruction is LDA #$10 (0xA9 0x10)
-	if firstSegment.Data[0] != 0xA9 {
-		t.Errorf("Expected first byte to be 0xA9 (LDA immediate), got 0x%02X", firstSegment.Data[0])
+	if firstSegment.Data.Bytes()[0] != 0xA9 {
+		t.Errorf("Expected first byte to be 0xA9 (LDA immediate), got 0x%02X", firstSegment.Data.Bytes()[0])
 	}
-	if firstSegment.Data[1] != 0x10 {
-		t.Errorf("Expected second byte to be 0x10, got 0x%02X", firstSegment.Data[1])
+	if firstSegment.Data.Bytes()[1] != 0x10 {
+		t.Errorf("Expected second byte to be 0x10, got 0x%02X", firstSegment.Data.Bytes()[1])
 	}
-
 	t.Logf("Successfully assembled %d segments with preprocessing", len(segments))
-	t.Logf("First segment: %d bytes at address 0x%04X", len(firstSegment.Data), firstSegment.StartAddress)
+	t.Logf("First segment: %d bytes at address 0x%04X", len(firstSegment.Data.Bytes()), firstSegment.StartAddress)
 }
 
 func TestAssembler_PreprocessorCircularIncludeError(t *testing.T) {
@@ -143,31 +136,25 @@ INY`,
 	if err != nil {
 		t.Fatalf("Assembly failed: %v", err)
 	}
-
-	// Verify we got assembled data
 	if len(segments) == 0 {
 		t.Fatal("Expected at least one segment, got none")
 	}
-
-	// Should have: LDA #$10 (2 bytes), CMP #$20 (2 bytes), INX (1 byte), INY (1 byte) = 6 bytes
 	firstSegment := segments[0]
-	if len(firstSegment.Data) != 6 {
-		t.Errorf("Expected 6 bytes of assembled code, got %d", len(firstSegment.Data))
+	if len(firstSegment.Data.Bytes()) != 6 {
+		t.Errorf("Expected 6 bytes of assembled code, got %d", len(firstSegment.Data.Bytes()))
 	}
-
-	// Verify instruction sequence
 	expected := []byte{0xA9, 0x10, 0xC9, 0x20, 0xE8, 0xC8}
+	actual := firstSegment.Data.Bytes()
 	for i, expectedByte := range expected {
-		if i >= len(firstSegment.Data) {
+		if i >= len(actual) {
 			t.Errorf("Missing byte at position %d", i)
 			continue
 		}
-		if firstSegment.Data[i] != expectedByte {
-			t.Errorf("At position %d: expected 0x%02X, got 0x%02X", i, expectedByte, firstSegment.Data[i])
+		if actual[i] != expectedByte {
+			t.Errorf("At position %d: expected 0x%02X, got 0x%02X", i, expectedByte, actual[i])
 		}
 	}
-
-	t.Logf("Successfully assembled nested includes with %d bytes", len(firstSegment.Data))
+	t.Logf("Successfully assembled nested includes with %d bytes", len(firstSegment.Data.Bytes()))
 }
 
 func TestAssembler_BackwardCompatibility(t *testing.T) {
@@ -181,19 +168,16 @@ func TestAssembler_BackwardCompatibility(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Assembly failed: %v", err)
 	}
-
 	if len(segments) == 0 {
 		t.Fatal("Expected at least one segment, got none")
 	}
-
 	firstSegment := segments[0]
-	if len(firstSegment.Data) != 2 {
-		t.Errorf("Expected 2 bytes, got %d", len(firstSegment.Data))
+	if len(firstSegment.Data.Bytes()) != 2 {
+		t.Errorf("Expected 2 bytes, got %d", len(firstSegment.Data.Bytes()))
 	}
-
-	if firstSegment.Data[0] != 0xA9 || firstSegment.Data[1] != 0x10 {
-		t.Errorf("Expected [0xA9, 0x10], got [0x%02X, 0x%02X]", firstSegment.Data[0], firstSegment.Data[1])
+	actual := firstSegment.Data.Bytes()
+	if actual[0] != 0xA9 || actual[1] != 0x10 {
+		t.Errorf("Expected [0xA9, 0x10], got [0x%02X, 0x%02X]", actual[0], actual[1])
 	}
-
 	t.Log("Backward compatibility confirmed - original Assemble method works")
 }

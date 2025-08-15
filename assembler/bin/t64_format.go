@@ -1,12 +1,14 @@
 package bin
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/jrsteele09/go-6502-emulator/assembler"
+	"github.com/jrsteele09/go-6502-emulator/utils"
 )
 
 var _ BinaryFormat = (*T64Format)(nil)
@@ -128,7 +130,7 @@ func (t *T64Format) createPRGFromSegments(segments []assembler.AssembledData) ([
 	// Calculate total size needed
 	maxAddr := uint16(0)
 	for _, segment := range segments {
-		endAddr := segment.StartAddress + uint16(len(segment.Data))
+		endAddr := segment.StartAddress + uint16(len(segment.Data.Bytes()))
 		if endAddr > maxAddr {
 			maxAddr = endAddr
 		}
@@ -145,7 +147,7 @@ func (t *T64Format) createPRGFromSegments(segments []assembler.AssembledData) ([
 	// Copy segment data to appropriate positions
 	for _, segment := range segments {
 		offset := int(segment.StartAddress - loadAddr)
-		copy(prgData[2+offset:], segment.Data)
+		copy(prgData[2+offset:], segment.Data.Bytes())
 	}
 
 	return prgData, loadAddr, nil
@@ -322,7 +324,7 @@ func (t *T64Format) LoadFile(filename string, verbose bool) ([]assembler.Assembl
 
 		segment := assembler.AssembledData{
 			StartAddress: startAddr,
-			Data:         fileData,
+			Data:         utils.Value(bytes.NewBuffer(fileData)),
 		}
 		segments = append(segments, segment)
 	}
