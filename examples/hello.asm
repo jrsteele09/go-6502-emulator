@@ -1,7 +1,6 @@
 .include "constants.inc"
 
-.ORG $1000
-
+        .ORG $1000
         LDA #TEST_VALUE     ; Load accumulator with test value
         STA BORDER_COLOR    ; Store in border color register
 
