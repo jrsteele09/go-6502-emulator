@@ -29,7 +29,7 @@ func TestDisassembler(t *testing.T) {
 
 	expectedDissassmbledCode := "$C000: 02         ???\n$C001: A9 01      LDA #$01\n$C003: A9 80      LDA #$80\n$C005: A9 00      LDA #$00\n$C007: A5 80      LDA $80\n$C009: B5 80      LDA $80,X\n$C00B: AD 80 00   LDA $0080\n$C00E: BD 80 00   LDA $0080,X\n$C011: BD 01 00   LDA $0001,X\n$C014: B9 80 00   LDA $0080,Y\n$C017: B9 01 00   LDA $0001,Y\n$C01A: A1 05      LDA ($05,X)\n$C01C: B1 05      LDA ($05),Y\n"
 
-	dissassembler := NewDisassembler(m, cpu.OpCodes(p))
+	dissassembler := NewDisassembler(m, p.OpCodes())
 
 	dissassembledCode := ""
 
@@ -47,7 +47,7 @@ func TestDisassemblerRelativeAddressingMode(t *testing.T) {
 	m := memory.NewMemory[uint16](64 * 1024)
 	p := cpu.NewCPU(m)
 	m.Write(0xC000, 0xF0, byte(0xAF))
-	dissassembler := NewDisassembler(m, cpu.OpCodes(p))
+	dissassembler := NewDisassembler(m, p.OpCodes())
 
 	address := uint16(0xC000)
 	dissassembledCode, _ := dissassembler.Disassemble(address)

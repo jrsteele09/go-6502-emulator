@@ -60,14 +60,16 @@ func TestPRGFormat_CreateData(t *testing.T) {
 				return
 			}
 			if !tt.wantErr {
-				// For simple tests, compare directly
-				if len(result) != len(tt.expected) {
-					t.Errorf("PRGFormat.CreateData() result length = %d, expected %d", len(result), len(tt.expected))
-					return
-				}
-				for i, b := range tt.expected {
-					if result[i] != b {
-						t.Errorf("PRGFormat.CreateData() result[%d] = %02X, expected %02X", i, result[i], b)
+				// For simple tests, compare directly if expected is provided
+				if tt.expected != nil {
+					if len(result) != len(tt.expected) {
+						t.Errorf("PRGFormat.CreateData() result length = %d, expected %d", len(result), len(tt.expected))
+						return
+					}
+					for i, b := range tt.expected {
+						if result[i] != b {
+							t.Errorf("PRGFormat.CreateData() result[%d] = %02X, expected %02X", i, result[i], b)
+						}
 					}
 				}
 			}

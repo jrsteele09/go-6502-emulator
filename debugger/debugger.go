@@ -24,7 +24,7 @@ type Debugger struct {
 func NewDebugger() *Debugger {
 	mem := memory.NewMemory[uint16](64 * 1024) // 64KB memory
 	cpuInstance := cpu.NewCPU(mem)
-	opcodes := cpu.OpCodes(cpuInstance)
+	opcodes := cpuInstance.OpCodes()
 	disasm := NewDisassembler(mem, opcodes)
 
 	return &Debugger{

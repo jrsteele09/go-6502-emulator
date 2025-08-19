@@ -12,7 +12,7 @@ import (
 func createTestOpcodes() []*cpu.OpCodeDef {
 	mem := memory.NewMemory[uint16](64 * 1024)
 	testCPU := cpu.NewCPU(mem)
-	return cpu.OpCodes(testCPU)
+	return testCPU.OpCodes()
 }
 
 func TestAssembler_WithPreprocessorIncludes(t *testing.T) {

@@ -18,6 +18,8 @@ type D64Format struct {
 	DiskName string
 	// DiskID is a 2-character disk identifier
 	DiskID string
+	// FileName is the name of the program file (up to 16 characters)
+	FileName string
 	// StartTrack is the track where files start (default: 1)
 	StartTrack uint8
 	// StartSector is the sector where files start (default: 0)
@@ -47,6 +49,30 @@ func NewD64Format(diskName, diskID string) *D64Format {
 	return &D64Format{
 		DiskName:    diskName,
 		DiskID:      diskID,
+		FileName:    "PROGRAM", // Default filename
+		StartTrack:  1,
+		StartSector: 0,
+	}
+}
+
+// NewD64FormatWithFilename creates a new D64 format generator with custom filename
+func NewD64FormatWithFilename(diskName, diskID, fileName string) *D64Format {
+	if len(diskName) > D64MaxDiskName {
+		diskName = diskName[:D64MaxDiskName]
+	}
+	if len(diskID) != D64DiskIDLength {
+		diskID = "01" // Default disk ID
+	}
+	if len(fileName) > D64MaxFilename {
+		fileName = fileName[:D64MaxFilename]
+	}
+	if fileName == "" {
+		fileName = "PROGRAM" // Default filename
+	}
+	return &D64Format{
+		DiskName:    diskName,
+		DiskID:      diskID,
+		FileName:    fileName,
 		StartTrack:  1,
 		StartSector: 0,
 	}
@@ -175,13 +201,13 @@ func (d *D64Format) writeSegmentsToD64(diskImage []byte, segments []assembler.As
 	}
 
 	// Write file to disk starting at track 1, sector 0
-	err := d.writeFileToD64(diskImage, prgData, "PROGRAM", 1, 0)
+	err := d.writeFileToD64(diskImage, prgData, d.FileName, 1, 0)
 	if err != nil {
 		return err
 	}
 
 	// Add directory entry
-	d.addDirectoryEntry(diskImage, "PROGRAM", 1, 0, len(prgData))
+	d.addDirectoryEntry(diskImage, d.FileName, 1, 0, len(prgData))
 
 	return nil
 }

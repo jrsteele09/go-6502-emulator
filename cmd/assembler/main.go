@@ -22,6 +22,7 @@ func main() {
 		inputFile    = flag.String("i", "", "Input assembly file (required)")
 		outputFile   = flag.String("o", "", "Output file (default: input filename with appropriate extension)")
 		outputFormat = flag.String("f", "prg", "Output format: prg, d64, or t64 (default: prg)")
+		programName  = flag.String("n", "", "Program name for D64/T64 formats (default: derived from output filename)")
 		showHelp     = flag.Bool("h", false, "Show help")
 		showVer      = flag.Bool("version", false, "Show version")
 		verbose      = flag.Bool("v", false, "Verbose output")
@@ -41,6 +42,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  %s -i game.asm -f d64             # Output to game.d64\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -i game.asm -o disk.d64 -f d64 # Output to disk.d64\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -i game.asm -f t64 -v          # Output to game.t64 with verbose\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -i game.asm -f d64 -n MYGAME   # D64 with custom program name\n", os.Args[0])
 	}
 
 	flag.Parse()
@@ -133,14 +135,34 @@ func main() {
 		if len(diskName) > 16 {
 			diskName = diskName[:16]
 		}
-		format = bin.NewD64Format(diskName, "01")
+
+		// Determine program name
+		fileName := *programName
+		if fileName == "" {
+			fileName = strings.ToUpper(filepath.Base(strings.TrimSuffix(*inputFile, filepath.Ext(*inputFile))))
+			if len(fileName) > 16 {
+				fileName = fileName[:16]
+			}
+		}
+
+		format = bin.NewD64FormatWithFilename(diskName, "01", fileName)
 	case "t64":
 		// Extract base name for tape name
 		tapeName := strings.ToUpper(filepath.Base(strings.TrimSuffix(*outputFile, filepath.Ext(*outputFile))))
 		if len(tapeName) > 24 {
 			tapeName = tapeName[:24]
 		}
-		format = bin.NewT64Format(tapeName, 30)
+
+		// Determine program name
+		fileName := *programName
+		if fileName == "" {
+			fileName = strings.ToUpper(filepath.Base(strings.TrimSuffix(*inputFile, filepath.Ext(*inputFile))))
+			if len(fileName) > 16 {
+				fileName = fileName[:16]
+			}
+		}
+
+		format = bin.NewT64FormatWithFilename(tapeName, fileName, 30)
 	}
 
 	err = format.CreateFile(*outputFile, segments, *verbose)
@@ -164,5 +186,5 @@ func main() {
 func createOpcodes() []*cpu.OpCodeDef {
 	mem := memory.NewMemory[uint16](64 * 1024)
 	testCPU := cpu.NewCPU(mem)
-	return cpu.OpCodes(testCPU)
+	return testCPU.OpCodes()
 }

@@ -18,6 +18,8 @@ var _ BinaryFormat = (*T64Format)(nil)
 type T64Format struct {
 	// TapeName is the name of the tape (up to 24 characters)
 	TapeName string
+	// FileName is the name of the program file (up to 16 characters)
+	FileName string
 	// MaxEntries is the maximum number of entries in the tape
 	MaxEntries uint16
 	// UsedEntries is the number of used entries
@@ -44,6 +46,29 @@ func NewT64Format(tapeName string, maxEntries uint16) *T64Format {
 	}
 	return &T64Format{
 		TapeName:    tapeName,
+		FileName:    "PROGRAM", // Default filename
+		MaxEntries:  maxEntries,
+		UsedEntries: 0,
+	}
+}
+
+// NewT64FormatWithFilename creates a new T64 format generator with custom filename
+func NewT64FormatWithFilename(tapeName, fileName string, maxEntries uint16) *T64Format {
+	if len(tapeName) > T64MaxTapeName {
+		tapeName = tapeName[:T64MaxTapeName]
+	}
+	if len(fileName) > T64MaxFilename {
+		fileName = fileName[:T64MaxFilename]
+	}
+	if fileName == "" {
+		fileName = "PROGRAM" // Default filename
+	}
+	if maxEntries == 0 {
+		maxEntries = 30 // Default max entries
+	}
+	return &T64Format{
+		TapeName:    tapeName,
+		FileName:    fileName,
 		MaxEntries:  maxEntries,
 		UsedEntries: 0,
 	}
@@ -102,7 +127,7 @@ func (t *T64Format) CreateData(segments []assembler.AssembledData) ([]byte, erro
 	t.writeHeader(archive)
 
 	// Write directory entry
-	t.writeDirectoryEntry(archive, "PROGRAM", loadAddr, uint16(len(prgData)), headerSize+directorySize)
+	t.writeDirectoryEntry(archive, t.FileName, loadAddr, uint16(len(prgData)), headerSize+directorySize)
 
 	// Write program data
 	copy(archive[headerSize+directorySize:], prgData)
@@ -193,7 +218,11 @@ func (t *T64Format) writeDirectoryEntry(archive []byte, filename string, loadAdd
 	archive[entryOffset+3] = byte(loadAddr >> 8)
 
 	// End address (2 bytes, little-endian)
-	endAddr := loadAddr + fileSize - 2 // -2 because load address is included in file size
+	// In T64 format, end address is the last byte address (inclusive)
+	// File size includes the 2-byte load address, so actual program size is fileSize - 2
+	// Some emulators expect end address to be exclusive (last address + 1)
+	// We use the standard inclusive format: endAddr = startAddr + programSize - 1
+	endAddr := loadAddr + (fileSize - 2) - 1 // -1 because end address is inclusive
 	archive[entryOffset+4] = byte(endAddr & 0xFF)
 	archive[entryOffset+5] = byte(endAddr >> 8)
 
@@ -291,10 +320,10 @@ func (t *T64Format) LoadFile(filename string, verbose bool) ([]assembler.Assembl
 		// Read file data
 		// In T64 format:
 		// - startAddr is the load address where program will be placed
-		// - endAddr is the last address of the loaded program
+		// - endAddr is the last address of the loaded program (inclusive)
 		// - File data = load address (2 bytes) + program data
-		// - Program data size = endAddr - startAddr (NOT +1, because endAddr is inclusive)
-		programDataSize := endAddr - startAddr
+		// - Program data size = endAddr - startAddr + 1 (because endAddr is inclusive)
+		programDataSize := endAddr - startAddr + 1
 
 		// Total file size is load address (2 bytes) + program data
 		totalFileSize := programDataSize + 2
@@ -314,6 +343,14 @@ func (t *T64Format) LoadFile(filename string, verbose bool) ([]assembler.Assembl
 				fmt.Printf("  Error: file too small to contain load address\n")
 			}
 			continue
+		}
+
+		// Verify that the load address in the file matches the directory entry
+		fileLoadAddr := uint16(fullFileData[0]) | (uint16(fullFileData[1]) << 8)
+		if fileLoadAddr != startAddr {
+			if verbose {
+				fmt.Printf("  Warning: file load address $%04X doesn't match directory start address $%04X\n", fileLoadAddr, startAddr)
+			}
 		}
 
 		fileData := fullFileData[2:] // Skip load address bytes
