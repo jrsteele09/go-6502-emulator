@@ -383,7 +383,8 @@ func TestT64Format_WriteDirectoryEntry(t *testing.T) {
 	}
 
 	// Verify end address
-	expectedEndAddr := loadAddr + fileSize - 2
+	// End address should be: loadAddr + (fileSize - 2) - 1 = 0x1000 + 48 - 1 = 0x102F
+	expectedEndAddr := loadAddr + (fileSize - 2) - 1
 	endAddr := uint16(archive[entryOffset+4]) | (uint16(archive[entryOffset+5]) << 8)
 	if endAddr != expectedEndAddr {
 		t.Errorf("writeDirectoryEntry() end address = 0x%04X, expected 0x%04X", endAddr, expectedEndAddr)

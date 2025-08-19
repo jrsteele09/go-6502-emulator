@@ -16,7 +16,7 @@ func TestAssembler(t *testing.T) {
 	m := memory.NewMemory[uint16](64 * 1024)
 	c := cpu.NewCPU(m)
 
-	assembler := assembler.New(cpu.OpCodes(c))
+	assembler := assembler.New(c.OpCodes())
 
 	asmCode := `
 	.ORG $1000
@@ -60,7 +60,7 @@ func TestAssemblerBasic(t *testing.T) {
 	m := memory.NewMemory[uint16](64 * 1024)
 	c := cpu.NewCPU(m)
 
-	assembler := assembler.New(cpu.OpCodes(c))
+	assembler := assembler.New(c.OpCodes())
 
 	asmCode := `BNE *-125`
 
@@ -74,7 +74,7 @@ func TestAssemblerBneWithLabel(t *testing.T) {
 	m := memory.NewMemory[uint16](64 * 1024)
 	c := cpu.NewCPU(m)
 
-	assembler := assembler.New(cpu.OpCodes(c))
+	assembler := assembler.New(c.OpCodes())
 
 	asmCode := `
 	LOOP DEX    ; Decrement X register
@@ -91,7 +91,7 @@ func TestAssemblerBneWithLabelOutOfRange(t *testing.T) {
 	m := memory.NewMemory[uint16](64 * 1024)
 	c := cpu.NewCPU(m)
 
-	assembler := assembler.New(cpu.OpCodes(c))
+	assembler := assembler.New(c.OpCodes())
 
 	asmCode := `
 	LOOP:
@@ -109,7 +109,7 @@ func TestAssemblerComprehensive(t *testing.T) {
 	m := memory.NewMemory[uint16](64 * 1024)
 	c := cpu.NewCPU(m)
 
-	assembler := assembler.New(cpu.OpCodes(c))
+	assembler := assembler.New(c.OpCodes())
 
 	// Test program that exercises all enhanced assembler features
 	asmCode := `; Test program for enhanced 6502 assembler
@@ -196,7 +196,7 @@ func TestAssemblerProgramCounterSet(t *testing.T) {
 	m := memory.NewMemory[uint16](64 * 1024)
 	c := cpu.NewCPU(m)
 
-	assembler := assembler.New(cpu.OpCodes(c))
+	assembler := assembler.New(c.OpCodes())
 
 	// Test that *= works the same as .ORG
 	asmCode := `*= $2000
@@ -246,7 +246,7 @@ func TestAssemblerProgramCounterSetVsOrg(t *testing.T) {
 	m := memory.NewMemory[uint16](64 * 1024)
 	c := cpu.NewCPU(m)
 
-	assembler := assembler.New(cpu.OpCodes(c))
+	assembler := assembler.New(c.OpCodes())
 
 	// Test program using .ORG
 	asmCodeOrg := `.ORG $3000
@@ -319,7 +319,7 @@ func TestAssemblerStringDirectives(t *testing.T) {
 	m := memory.NewMemory[uint16](64 * 1024)
 	c := cpu.NewCPU(m)
 
-	assembler := assembler.New(cpu.OpCodes(c))
+	assembler := assembler.New(c.OpCodes())
 
 	// Test all string directive variants
 	asmCode := `*= $4000
@@ -382,7 +382,7 @@ asciiz_data:
 func createTestAssembler() *assembler.Assembler {
 	m := memory.NewMemory[uint16](64 * 1024)
 	c := cpu.NewCPU(m)
-	return assembler.New(cpu.OpCodes(c))
+	return assembler.New(c.OpCodes())
 }
 
 func TestDuplicateLabels(t *testing.T) {

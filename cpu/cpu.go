@@ -23,6 +23,7 @@ type CPU6502 interface {
 	Registers() *Registers
 	Memory() memory.Operations[uint16]
 	Operands() []byte
+	OpCodes() []*OpCodeDef
 }
 
 const (
@@ -58,13 +59,17 @@ var _ CPU6502 = &CPU{}
 // NewCPU creates a new Cpu instance with the provided memory functions.
 func NewCPU(m memory.Operations[uint16]) *CPU {
 	cpu := &CPU{mem: m, Reg: NewRegisters()}
-	cpu.opCodes = OpCodes(cpu)
+	cpu.opCodes = createOpCodes(cpu)
 	cpu.Reg.SetStatus(UnusedFlag, true)
 	cpu.Reg.S = 0xff
 	cpu.irq = false
 	cpu.nmi = false
 	cpu.Reset()
 	return cpu
+}
+
+func (p *CPU) OpCodes() []*OpCodeDef {
+	return p.opCodes
 }
 
 // Registers returns the CPU's registers.

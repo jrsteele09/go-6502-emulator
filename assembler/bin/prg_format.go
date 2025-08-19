@@ -72,9 +72,7 @@ func (p *PRGFormat) validateAndMergeContiguousSegments(segments []assembler.Asse
 	loadAddr := sortedSegments[0].StartAddress
 	var mergedData []byte
 
-	// Allow small gaps (filled with zeros) but stop on very large gaps
-	const maxFillGap = 0x100 // 256 bytes
-
+	// Merge all segments, filling any gaps with zeros. Overlaps are errors.
 	expectedNextAddr := loadAddr
 	for i, segment := range sortedSegments {
 		// Overlap check (shouldn't happen due to sort and logic)
@@ -84,18 +82,14 @@ func (p *PRGFormat) validateAndMergeContiguousSegments(segments []assembler.Asse
 
 		if segment.StartAddress > expectedNextAddr {
 			gap := int(segment.StartAddress - expectedNextAddr)
-			if gap <= maxFillGap {
-				// Fill small gap with zeros
-				mergedData = append(mergedData, make([]byte, gap)...)
-			} else {
-				// Large gap detected: stop merging further segments
-				break
-			}
+			// Fill gap with zeros
+			mergedData = append(mergedData, make([]byte, gap)...)
 		}
 
 		// Append segment data
-		mergedData = append(mergedData, segment.Data.Bytes()...)
-		expectedNextAddr = segment.StartAddress + uint16(len(segment.Data.Bytes()))
+		segBytes := segment.Data.Bytes()
+		mergedData = append(mergedData, segBytes...)
+		expectedNextAddr = segment.StartAddress + uint16(len(segBytes))
 	}
 
 	return mergedData, loadAddr, nil
@@ -135,7 +129,9 @@ func (p *PRGFormat) CreateData(segments []assembler.AssembledData) ([]byte, erro
 // LoadFile loads a PRG file and returns assembled segments
 func (p *PRGFormat) LoadFile(filename string, verbose bool) ([]assembler.AssembledData, error) {
 	// Read the file
-	fmt.Printf("Loading PRG file: %s\n", filename)
+	if verbose {
+		fmt.Printf("Loading PRG file: %s\n", filename)
+	}
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read PRG file: %w", err)
