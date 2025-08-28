@@ -214,8 +214,6 @@ func createOpCodes(p *CPU) []*OpCodeDef {
 	opCodes[0x8A] = id.Instruction(Mnemonic(txaStr, ImpliedModeStr), 2, p.txa)
 	opCodes[0x9A] = id.Instruction(Mnemonic(txsStr, ImpliedModeStr), 2, p.txs)
 	opCodes[0x98] = id.Instruction(Mnemonic(tyaStr, ImpliedModeStr), 2, p.tya)
-	// Attach undocumented/illegal opcodes used by C64 software
-	addIllegalOpCodes(p, opCodes)
 	return opCodes
 }
 
