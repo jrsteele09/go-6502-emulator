@@ -60,6 +60,9 @@ var _ CPU6502 = &CPU{}
 func NewCPU(m memory.Operations[uint16]) *CPU {
 	cpu := &CPU{mem: m, Reg: NewRegisters()}
 	cpu.opCodes = createOpCodes(cpu)
+	// Attach undocumented/illegal opcodes used by C64 software
+	addIllegalOpCodes(cpu)
+
 	cpu.Reg.SetStatus(UnusedFlag, true)
 	cpu.Reg.S = 0xff
 	cpu.irq = false
