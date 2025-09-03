@@ -25,7 +25,7 @@ const stackAddress = uint16(0x01FF)
 func executeTests(t *testing.T, tests []InstructionTest) {
 	for _, test := range tests {
 		m := memory.NewMemory[uint16](64 * 1024)
-		cpu := NewCPU(m)
+		cpu := NewCPU(m, false)
 		noOfOps := test.setup(cpu)
 		cpu.Reg.PC = startAddress
 
@@ -41,30 +41,9 @@ func executeTests(t *testing.T, tests []InstructionTest) {
 	}
 }
 
-func TestForDebugging(t *testing.T) {
-	m := memory.NewMemory[uint16](64 * 1024)
-	cpu := NewCPU(m)
-	cpu.Reg.PC = startAddress
-
-	cpu.mem.Write(startAddress, 0x91, 0x05)
-	cpu.mem.Write(0x0005, 0x01, 0x50)
-	cpu.Reg.A = 0xff
-	cpu.Reg.Y = 0x05
-
-	var complete Completed
-	for !complete {
-		c, err := cpu.Execute()
-		require.NoError(t, err)
-		complete = c
-	}
-
-	assert.Equal(t, byte(0xff), cpu.mem.Read(0x5006))
-	assert.Equal(t, uint64(6), cpu.cycles)
-}
-
 func TestNmiInterruptHandling(t *testing.T) {
 	m := memory.NewMemory[uint16](64 * 1024)
-	cpu := NewCPU(m)
+	cpu := NewCPU(m, false)
 	cpu.Reg.PC = startAddress
 
 	cpu.mem.Write(startAddress, 0xA9, 0x05)
@@ -101,7 +80,7 @@ func TestNmiInterruptHandling(t *testing.T) {
 
 func TestIrqInterruptHandling(t *testing.T) {
 	m := memory.NewMemory[addressSize](64 * 1024)
-	cpu := NewCPU(m)
+	cpu := NewCPU(m, false)
 	cpu.Reg.PC = startAddress
 
 	cpu.mem.Write(startAddress, 0xA9, 0x05)

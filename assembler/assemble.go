@@ -115,19 +115,18 @@ func (a *Assembler) Assemble(r io.Reader) ([]AssembledData, error) {
 	return segments, nil
 }
 
-// AssembleWithPreprocessor assembles source code with include directive support
-func (a *Assembler) AssembleWithPreprocessor(r io.Reader, fileResolver FileResolver) ([]AssembledData, error) {
+// AssembleFile assembles source code with include directive support
+func (a *Assembler) AssembleFile(mainFile string, fileResolver utils.FileResolver) ([]AssembledData, error) {
 	// Reset assembler state for each assembly
 	a.reset()
 
-	// Preprocess to handle includes
-	preprocessor := NewIncludePreprocessor(fileResolver)
-	processedInput, err := preprocessor.Process(r)
+	reader, err := fileResolver.Resolve(mainFile)
 	if err != nil {
-		return nil, fmt.Errorf("[Assembler AssembleWithPreprocessor] Preprocess [%w]", err)
+		return nil, fmt.Errorf("[Assembler AssembleWithPreprocessor] Resolve [%w]", err)
 	}
 
-	tokens, err := lexer.NewLexer(a.lexerConfig).Tokenize(processedInput)
+	asmLexer := NewAssemblerLexer(fileResolver)
+	tokens, err := asmLexer.Tokens(a.lexerConfig, reader)
 	if err != nil {
 		return nil, fmt.Errorf("[Assembler AssembleWithPreprocessor] Tokenize [%w]", err)
 	}
@@ -398,6 +397,11 @@ parseLoop:
 				parsedAddressingMode += t.Literal
 			}
 
+		// case GreaterThanToken, LessThanToken:
+		// 	upperByte := t.ID == GreaterThanToken
+		// 	if asmTokens.Peek().ID == IdentifierToken {
+		// 	}
+
 		case IdentifierToken:
 			identifier = t.Literal
 			if _, found := a.addressingModeLiterals[strings.ToUpper(identifier)]; found {
@@ -432,22 +436,21 @@ parseLoop:
 			operandValues = append(operandValues, v)
 			parsedAddressingMode += operandSizeMask
 			// If preprocesing then we need to make an assumption that this is referencing a labal
-			// That hasn't been defined yet, so assumptions about the addressing mode needs to be made
+			// that hasn't been defined yet, so assumptions about the addressing mode needs to be made
 			// Depending on the mnemonic
 
 		case AsterixSymbolToken:
 			// Check what comes after the asterisk
-			signToken := asmTokens.Peek()
+			nextToken := asmTokens.Peek()
 
-			if signToken != nil && signToken.ID == PlusToken || signToken.ID == MinusToken {
-
+			if nextToken != nil && nextToken.ID == PlusToken || nextToken.ID == MinusToken {
 				asmTokens.Next() // Get passed the signToken
 				valueToken := asmTokens.Next()
 				if valueToken == nil || (valueToken.ID != lexer.HexLiteral && valueToken.ID != lexer.IntegerLiteral) {
-					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] expected value after %s", signToken.Literal)
+					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] expected value after %s", nextToken.Literal)
 				}
 
-				operandSizeMask, v, err := parseOperandSize(signToken.ID == MinusToken, valueToken.Value)
+				operandSizeMask, v, err := parseOperandSize(nextToken.ID == MinusToken, valueToken.Value)
 				if err != nil {
 					return AddressingMode{}, err
 				}
@@ -459,51 +462,13 @@ parseLoop:
 				parsedAddressingMode += string(t.Literal)
 				parsedAddressingMode += string(operandSizeMask)
 			} else {
-				operandSizeMask, v, err := parseOperandSize(false, a.programCounter)
+				operandSizeMask, v, err := a.parseLabelOffset(mnemonic, uint64(a.programCounter))
 				if err != nil {
-					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] parsing * addressing mode %w", err)
+					return AddressingMode{}, err
 				}
-
 				operandValues = append(operandValues, v)
 				parsedAddressingMode += operandSizeMask
 			}
-
-		case ProgramCounterToken:
-			// Program counter reference - check if followed by operator
-			nextToken := asmTokens.Peek()
-			var finalPcValue uint64
-
-			if nextToken != nil && (nextToken.ID == PlusToken || nextToken.ID == MinusToken) {
-				// Handle expressions like "* + 5" or "* - 3"
-				operatorToken := asmTokens.Next()
-				valueToken := asmTokens.Next()
-				if valueToken == nil || (valueToken.ID != lexer.HexLiteral && valueToken.ID != lexer.IntegerLiteral) {
-					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] expected value after %s", operatorToken.Literal)
-				}
-
-				pcValue := int64(a.programCounter)
-				offsetValue, err := toUint64(valueToken.Value)
-				if err != nil {
-					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] invalid offset value: %w", err)
-				}
-
-				if operatorToken.ID == PlusToken {
-					pcValue += int64(offsetValue)
-				} else {
-					pcValue -= int64(offsetValue)
-				}
-				finalPcValue = uint64(pcValue)
-			} else {
-				// Simple program counter reference
-				finalPcValue = uint64(a.programCounter)
-			}
-
-			operandSizeMask, v, err := parseOperandSize(false, finalPcValue)
-			if err != nil {
-				return AddressingMode{}, err
-			}
-			operandValues = append(operandValues, v)
-			parsedAddressingMode += operandSizeMask
 
 		default:
 			parsedAddressingMode += t.Literal
@@ -599,8 +564,8 @@ func (a *Assembler) tokenAddressValue(t *lexer.Token) (uint16, error) {
 			return 0, fmt.Errorf("invalid address value: %w", err)
 		}
 		return uint16(value), nil
-	case ProgramCounterToken:
-		return a.programCounter, nil
+	// case ProgramCounterToken:
+	// 	return a.programCounter, nil
 	default:
 		return 0, fmt.Errorf("expected address value, got %s", t.Literal)
 	}
@@ -766,8 +731,8 @@ func (a *Assembler) processEquDirective(asmTokens *AssemblerTokens) error {
 	switch valueToken.ID {
 	case lexer.HexLiteral, lexer.IntegerLiteral:
 		a.constants[variableName] = valueToken.Value
-	case ProgramCounterToken:
-		a.constants[variableName] = uint16(a.programCounter)
+	// case ProgramCounterToken:
+	// 	a.constants[variableName] = uint16(a.programCounter)
 	default:
 		return fmt.Errorf("[processEquDirective] invalid value type for .EQU")
 	}
@@ -815,9 +780,9 @@ func (a *Assembler) skipDirectiveTokens(asmTokens *AssemblerTokens) {
 
 func (a *Assembler) identifierTokenCreator(identifier string) *lexer.Token {
 	// Program Counter
-	if identifier == "*" {
-		return lexer.NewToken(ProgramCounterToken, identifier, 0)
-	}
+	// if identifier == "*" {
+	// 	return lexer.NewToken(ProgramCounterToken, identifier, 0)
+	// }
 
 	// Label
 	if strings.HasSuffix(identifier, ":") {

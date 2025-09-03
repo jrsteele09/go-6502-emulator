@@ -3,9 +3,9 @@ module github.com/jrsteele09/go-6502-emulator
 go 1.24.0
 
 require (
-	github.com/jrsteele09/go-lexer v0.0.0-20240910141600-9543462ac7b8
-	github.com/stretchr/testify v1.9.0
-	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
+	github.com/jrsteele09/go-lexer v0.0.0-20250829091909-efc6fdb3c392
+	github.com/stretchr/testify v1.11.1
+	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b
 )
 
 require (

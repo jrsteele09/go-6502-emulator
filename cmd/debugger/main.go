@@ -38,6 +38,10 @@ func NewDebuggerRepl() *DebuggerRepl {
 
 func main() {
 	repl := NewDebuggerRepl()
+	// Auto-load any files passed on the command line
+	if len(os.Args) > 1 {
+		repl.AutoLoad(os.Args[1:])
+	}
 	repl.Run()
 }
 
@@ -70,6 +74,14 @@ func (r *DebuggerRepl) Run() {
 	}
 
 	fmt.Printf("%sQuitting...%s\n", Yellow, Reset)
+}
+
+// AutoLoad loads a list of PRG files on startup before entering the REPL
+func (r *DebuggerRepl) AutoLoad(files []string) {
+	for _, f := range files {
+		out := r.debugger.LoadPRG(f)
+		fmt.Print(colorizeOutput(out))
+	}
 }
 
 // printBanner displays the debugger banner

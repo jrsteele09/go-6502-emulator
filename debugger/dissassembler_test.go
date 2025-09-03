@@ -10,7 +10,7 @@ import (
 
 func TestDisassembler(t *testing.T) {
 	m := memory.NewMemory[uint16](64 * 1024)
-	p := cpu.NewCPU(m)
+	p := cpu.NewCPU(m, false)
 	m.Write(0xC000,
 		0x02,
 		0xA9, 0x01,
@@ -45,7 +45,7 @@ func TestDisassembler(t *testing.T) {
 
 func TestDisassemblerRelativeAddressingMode(t *testing.T) {
 	m := memory.NewMemory[uint16](64 * 1024)
-	p := cpu.NewCPU(m)
+	p := cpu.NewCPU(m, false)
 	m.Write(0xC000, 0xF0, byte(0xAF))
 	dissassembler := NewDisassembler(m, p.OpCodes())
 

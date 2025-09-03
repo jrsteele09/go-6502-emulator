@@ -309,8 +309,8 @@ func (a *Assembler) processConstantAssignment(identifierToken *lexer.Token, asmT
 	switch valueToken.ID {
 	case lexer.HexLiteral, lexer.IntegerLiteral:
 		a.constants[variableName] = valueToken.Value
-	case ProgramCounterToken:
-		a.constants[variableName] = uint16(a.programCounter)
+	// case ProgramCounterToken:
+	// 	a.constants[variableName] = uint16(a.programCounter)
 	default:
 		return fmt.Errorf("[processConstantAssignment] invalid value type for constant assignment")
 	}

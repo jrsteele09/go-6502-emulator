@@ -23,7 +23,7 @@ type Debugger struct {
 // NewDebugger creates a new 6502 debugger instance
 func NewDebugger() *Debugger {
 	mem := memory.NewMemory[uint16](64 * 1024) // 64KB memory
-	cpuInstance := cpu.NewCPU(mem)
+	cpuInstance := cpu.NewCPU(mem, false)
 	opcodes := cpuInstance.OpCodes()
 	disasm := NewDisassembler(mem, opcodes)
 
@@ -70,6 +70,22 @@ func (d *Debugger) GetLastDisasmAddr() uint16 {
 // SetLastDisasmAddr sets the last disassembly address
 func (d *Debugger) SetLastDisasmAddr(addr uint16) {
 	d.lastDisasmAddr = addr
+}
+
+// AutoLoadPRGs attempts to load each provided file as a PRG in order, returning a combined log.
+func (d *Debugger) AutoLoadPRGs(files []string) string {
+	if len(files) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("Auto-loading files:\n")
+	for _, f := range files {
+		b.WriteString(d.LoadPRG(f))
+		if !strings.HasSuffix(f, "\n") {
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
 }
 
 // parseAddress parses an address string (hex or decimal)

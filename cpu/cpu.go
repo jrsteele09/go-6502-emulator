@@ -57,11 +57,14 @@ type CPU struct {
 var _ CPU6502 = &CPU{}
 
 // NewCPU creates a new Cpu instance with the provided memory functions.
-func NewCPU(m memory.Operations[uint16]) *CPU {
+func NewCPU(m memory.Operations[uint16], useIllegalOpCodes bool) *CPU {
 	cpu := &CPU{mem: m, Reg: NewRegisters()}
 	cpu.opCodes = createOpCodes(cpu)
-	// Attach undocumented/illegal opcodes used by C64 software
-	addIllegalOpCodes(cpu)
+
+	if useIllegalOpCodes {
+		// Attach undocumented/illegal opcodes
+		addIllegalOpCodes(cpu)
+	}
 
 	cpu.Reg.SetStatus(UnusedFlag, true)
 	cpu.Reg.S = 0xff

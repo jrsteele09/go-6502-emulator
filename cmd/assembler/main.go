@@ -11,6 +11,7 @@ import (
 	"github.com/jrsteele09/go-6502-emulator/assembler/bin"
 	"github.com/jrsteele09/go-6502-emulator/cpu"
 	"github.com/jrsteele09/go-6502-emulator/memory"
+	"github.com/jrsteele09/go-6502-emulator/utils"
 )
 
 const (
@@ -96,24 +97,16 @@ func main() {
 	opcodes := createOpcodes()
 	asm := assembler.New(opcodes)
 
-	// Open input file
-	file, err := os.Open(*inputFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Failed to open input file: %v\n", err)
-		os.Exit(1)
-	}
-	defer file.Close()
-
 	// Set up file resolver for includes
 	baseDir := filepath.Dir(*inputFile)
-	resolver := assembler.NewOSFileResolver(baseDir)
+	resolver := utils.NewOSFileResolver(baseDir)
 
 	if *verbose {
 		fmt.Println("Assembling...")
 	}
 
 	// Assemble with preprocessor support for includes
-	segments, err := asm.AssembleWithPreprocessor(file, resolver)
+	segments, err := asm.AssembleFile(*inputFile, resolver)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Assembly failed: %v\n", err)
 		os.Exit(1)
@@ -185,6 +178,6 @@ func main() {
 // createOpcodes creates the full 6502 instruction set
 func createOpcodes() []*cpu.OpCodeDef {
 	mem := memory.NewMemory[uint16](64 * 1024)
-	testCPU := cpu.NewCPU(mem)
+	testCPU := cpu.NewCPU(mem, true)
 	return testCPU.OpCodes()
 }

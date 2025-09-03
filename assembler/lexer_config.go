@@ -28,8 +28,10 @@ const (
 	DbDirectiveToken
 	DwDirectiveToken
 	DsDirectiveToken
-	ProgramCounterToken
-	ProgramCounterSetToken
+	GreaterThanToken
+	LessThanToken
+	// ProgramCounterToken
+	// ProgramCounterSetToken
 )
 
 // KeywordTokens defines keyword to token mappings
@@ -45,7 +47,7 @@ var KeywordTokens = map[string]lexer.TokenIdentifier{
 	".DB":     DbDirectiveToken,
 	".DW":     DwDirectiveToken,
 	".DS":     DsDirectiveToken,
-	"*=":      ProgramCounterSetToken,
+	// "*=":      ProgramCounterSetToken,
 }
 
 // Custom tokenizers - On detection of the starting character, jump to a specific tokenizer.
@@ -68,7 +70,8 @@ var SymbolTokens = map[rune]lexer.TokenIdentifier{
 	'-': MinusToken,
 	'+': PlusToken,
 	'/': DivideSymbolToken,
-	';': SemiColonToken,
+	'>': GreaterThanToken,
+	'<': LessThanToken,
 }
 
 // comments defines comment syntax mappings
