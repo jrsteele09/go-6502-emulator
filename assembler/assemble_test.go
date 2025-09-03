@@ -1,688 +1,163 @@
 package assembler_test
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/jrsteele09/go-6502-emulator/assembler"
 	"github.com/jrsteele09/go-6502-emulator/cpu"
+	"github.com/jrsteele09/go-6502-emulator/debugger"
 	"github.com/jrsteele09/go-6502-emulator/memory"
+	"github.com/jrsteele09/go-6502-emulator/utils"
 	"github.com/stretchr/testify/require"
 )
 
-func TestAssembler(t *testing.T) {
+const (
+	createExpectedResults = false
+	expectedResultsFolder = "./testasm/expected_results"
+)
 
-	m := memory.NewMemory[uint16](64 * 1024)
-	c := cpu.NewCPU(m)
+func createHardware() (*memory.Memory[uint16], *cpu.CPU) {
+	mem := memory.NewMemory[uint16](64 * 1024) // 64KB memory
+	cpu := cpu.NewCPU(mem, false)
+	return mem, cpu
+}
 
-	assembler := assembler.New(c.OpCodes())
+func TestAssemble_TestIncludeFile(t *testing.T) {
+	// SETUP
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	resolver := utils.NewOSFileResolver("./testasm/TestIncludeFile")
 
-	asmCode := `
-	.ORG $1000
-	
-	SCREEN_BASE = $0400
-	
-	start:
-		LDA #$01
-		STA SCREEN_BASE
-		JMP *
-		
-	data:
-		.BYTE $48, $45, $4C
-		.WORD start
-	`
+	// ASSEMBLE
+	segments, err := asm.AssembleFile("testinclude.asm", resolver)
 
-	dataSegments, err := assembler.Assemble(strings.NewReader(asmCode))
-	require.NoError(t, err)
-	require.NotNil(t, dataSegments)
-	require.GreaterOrEqual(t, len(dataSegments), 1)
+	// ASSERT ASSEMBLED RESULTS
+	require.NoError(t, err, "AssembleFile failed")
+	require.Len(t, segments, 1, "Expected exactly one segment")
+	require.Equal(t, uint16(0xC000), segments[0].StartAddress, "Expected start address $C000")
 
-	// Debug: print all segments
-	for i, seg := range dataSegments {
-		t.Logf("Segment %d: StartAddress=0x%04x, DataLen=%d", i, seg.StartAddress, len(seg.Data.Bytes()))
+	// ASSERT DISSASSEMBLY
+	disassembleAndCompare(t, segments)
+}
+
+func TestAssemble_Snake(t *testing.T) {
+	// SETUP
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	resolver := utils.NewOSFileResolver("./testasm/TestSnakeAssembly")
+
+	// ASSEMBLE
+	segments, err := asm.AssembleFile("snake.asm", resolver)
+
+	// ASSERT ASSEMBLED RESULTS
+	require.NoError(t, err, "AssembleFile failed")
+	require.Len(t, segments, 1, "Expected exactly one segment")
+	require.Equal(t, uint16(0x4000), segments[0].StartAddress, "Expected start address $C000")
+
+	// ASSERT DISSASSEMBLY
+	disassembleAndCompare(t, segments)
+}
+
+func TestAssemble_TestBorderFlashLoop(t *testing.T) {
+	// SETUP
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	resolver := utils.NewOSFileResolver("./testasm/TestBorderFlashLoop")
+
+	// ASSEMBLE
+	segments, err := asm.AssembleFile("screen.asm", resolver)
+
+	// ASSERT ASSEMBLED RESULTS
+	require.NoError(t, err, "AssembleFile failed")
+	require.Len(t, segments, 1, "Expected exactly one segment")
+	require.Equal(t, uint16(0xC000), segments[0].StartAddress, "Expected start address $C000")
+
+	// ASSERT DISASSEMBLY
+	disassembleAndCompare(t, segments)
+}
+
+func TestAssemble_MultiSegmentAssembly(t *testing.T) {
+	// SETUP
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	resolver := utils.NewOSFileResolver("./testasm/TestMultiSegmentAssembly")
+
+	// ASSEMBLE
+	segments, err := asm.AssembleFile("main.asm", resolver)
+
+	// ASSERT ASSEMBLED RESULTS
+	require.NoError(t, err, "AssembleFile failed")
+	require.Len(t, segments, 2, "Expected exactly one segment")
+
+	// ASSERT DISASSEMBLY
+	disassembleAndCompare(t, segments)
+}
+
+func TestAssemble_OpenTheBorder(t *testing.T) {
+	// SETUP
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	resolver := utils.NewOSFileResolver("./testasm/TestOpenTheBorderAssembly")
+
+	// ASSEMBLE
+	segments, err := asm.AssembleFile("temp.asm", resolver)
+
+	// ASSERT ASSEMBLED RESULTS
+	require.NoError(t, err, "AssembleFile failed")
+	require.Len(t, segments, 1, "Expected exactly one segment")
+
+	// ASSERT DISASSEMBLY
+	disassembleAndCompare(t, segments)
+}
+
+func disassembleAndCompare(t *testing.T, segments []assembler.AssembledData) {
+	mem, cpu := createHardware()
+	writeSegmentsToMemory(mem, segments)
+	dbg := debugger.NewDisassembler(mem, cpu.OpCodes())
+
+	for i, segment := range segments {
+		testFile := fmt.Sprintf("%s/%s.%d.txt", expectedResultsFolder, t.Name(), i)
+		start := segment.StartAddress
+		end := segment.StartAddress + uint16(len(segment.Data.Bytes())) - 1
+		output := disassembleFromAddress(dbg, start, end)
+		if createExpectedResults {
+			os.WriteFile(testFile, []byte(output), 0644)
+		}
+		expectedResults, err := os.ReadFile(testFile)
+		require.NoError(t, err, "Failed to read expected results file")
+		compareDisassembly(t, string(expectedResults), output)
 	}
+}
 
-	// Find the segment that starts at $1000
-	var targetSegmentIndex = -1
-	for i, seg := range dataSegments {
-		if seg.StartAddress == 0x1000 {
-			targetSegmentIndex = i
+func writeSegmentsToMemory(mem *memory.Memory[uint16], segments []assembler.AssembledData) {
+	for _, segment := range segments {
+		for i, b := range segment.Data.Bytes() {
+			mem.Write(segment.StartAddress+uint16(i), b)
+		}
+	}
+}
+
+func disassembleFromAddress(dbg *debugger.Disassembler, startAddr uint16, endAddr uint16) string {
+	var strBuffer strings.Builder
+	address := startAddr
+	for {
+		output, b := dbg.Disassemble(address)
+		strBuffer.WriteString(fmt.Sprintf("%s\n", output))
+		address += uint16(b)
+		if address > endAddr {
 			break
 		}
 	}
-	require.NotEqual(t, -1, targetSegmentIndex, "Should have a segment starting at $1000")
-	require.Greater(t, len(dataSegments[targetSegmentIndex].Data.Bytes()), 0)
+	return strBuffer.String()
 }
 
-func TestAssemblerBasic(t *testing.T) {
-
-	m := memory.NewMemory[uint16](64 * 1024)
-	c := cpu.NewCPU(m)
-
-	assembler := assembler.New(c.OpCodes())
-
-	asmCode := `BNE *-125`
-
-	dataSegments, err := assembler.Assemble(strings.NewReader(asmCode))
-	require.NoError(t, err)
-	require.NotNil(t, dataSegments)
-}
-
-func TestAssemblerBneWithLabel(t *testing.T) {
-
-	m := memory.NewMemory[uint16](64 * 1024)
-	c := cpu.NewCPU(m)
-
-	assembler := assembler.New(c.OpCodes())
-
-	asmCode := `
-	LOOP DEX    ; Decrement X register
-    BNE LOOP    ; Branch if not equal to zero
-	`
-
-	dataSegments, err := assembler.Assemble(strings.NewReader(asmCode))
-	require.NoError(t, err)
-	require.NotNil(t, dataSegments)
-}
-
-func TestAssemblerBneWithLabelOutOfRange(t *testing.T) {
-
-	m := memory.NewMemory[uint16](64 * 1024)
-	c := cpu.NewCPU(m)
-
-	assembler := assembler.New(c.OpCodes())
-
-	asmCode := `
-	LOOP:
-    DEX   
-	*=$c000
-    BNE LOOP    ; Branch if not equal to zero
-	`
-
-	dataSegments, err := assembler.Assemble(strings.NewReader(asmCode))
-	require.Error(t, err)
-	require.Nil(t, dataSegments)
-}
-
-func TestAssemblerComprehensive(t *testing.T) {
-	m := memory.NewMemory[uint16](64 * 1024)
-	c := cpu.NewCPU(m)
-
-	assembler := assembler.New(c.OpCodes())
-
-	// Test program that exercises all enhanced assembler features
-	asmCode := `; Test program for enhanced 6502 assembler
-.ORG $1000
-
-; Define some constants
-SCREEN_BASE = $0400
-COLOR_WHITE = $01
-
-; Define some data
-start:
-    .BYTE $01, $02, $03
-    .TEXT "HELLO WORLD"
-
-; Some code
-main:
-    LDA #COLOR_WHITE
-    STA SCREEN_BASE
-    LDX #$00
-    LDA #$48
-    STA SCREEN_BASE
-    JMP *       ; Infinite loop (jump to current address)
-
-data:
-    .BYTE $48, $45, $4C  ; "HEL" in ASCII
-    
-end:
-    ; Reserve 16 bytes of space
-    .DS 16
-    .WORD start, end     ; Put WORD directive after labels are defined
-`
-
-	dataSegments, err := assembler.Assemble(strings.NewReader(asmCode))
-	require.NoError(t, err)
-	require.NotNil(t, dataSegments)
-	require.GreaterOrEqual(t, len(dataSegments), 1)
-
-	// Debug: print all segments
-	for i, seg := range dataSegments {
-		t.Logf("Segment %d: StartAddress=0x%04x, DataLen=%d", i, seg.StartAddress, len(seg.Data.Bytes()))
+func compareDisassembly(t *testing.T, expected, actual string) {
+	expectedArray := strings.Split(strings.TrimSpace(expected), "\n")
+	actualArray := strings.Split(strings.TrimSpace(actual), "\n")
+	for i := range expectedArray {
+		require.Equal(t, expectedArray[i], actualArray[i], "Mismatch at line %d: expected %q, got %q", i+1, expectedArray[i], actualArray[i])
 	}
-
-	// Find the segment that starts at $1000
-	var targetSegmentIndex = -1
-	for i, seg := range dataSegments {
-		if seg.StartAddress == 0x1000 {
-			targetSegmentIndex = i
-			break
-		}
-	}
-	require.NotEqual(t, -1, targetSegmentIndex, "Should have a segment starting at $1000")
-
-	segment := dataSegments[targetSegmentIndex]
-	require.Greater(t, len(segment.Data.Bytes()), 0)
-
-	// Test that the assembled code contains expected data
-	data := segment.Data.Bytes()
-
-	// Verify .BYTE $01, $02, $03 at the start
-	require.GreaterOrEqual(t, len(data), 3, "Should have at least 3 bytes for initial .BYTE directive")
-	require.Equal(t, uint8(0x01), data[0], "First byte should be 0x01")
-	require.Equal(t, uint8(0x02), data[1], "Second byte should be 0x02")
-	require.Equal(t, uint8(0x03), data[2], "Third byte should be 0x03")
-
-	// Verify .TEXT "HELLO WORLD" is present
-	// The text should start after the initial bytes
-	expectedText := "HELLO WORLD"
-	textStartIndex := 3 // After 3 bytes
-	require.GreaterOrEqual(t, len(data), textStartIndex+len(expectedText), "Should have enough data for text")
-
-	actualText := string(data[textStartIndex : textStartIndex+len(expectedText)])
-	require.Equal(t, expectedText, actualText, "Text should match 'HELLO WORLD'")
-
-	t.Logf("Successfully assembled program with %d bytes of data", len(data))
-	t.Logf("Program starts at address 0x%04x", segment.StartAddress)
-
-	// Verify that instructions and additional data are present
-	// The program should have: 3 bytes + 11 chars + instructions + 3 data bytes + 16 reserved bytes + 4 word bytes
-	expectedMinSize := 3 + len(expectedText) + 10 // Minimum expected with some instructions
-	require.Greater(t, len(data), expectedMinSize, "Should have instructions and additional data")
-}
-
-func TestAssemblerProgramCounterSet(t *testing.T) {
-	m := memory.NewMemory[uint16](64 * 1024)
-	c := cpu.NewCPU(m)
-
-	assembler := assembler.New(c.OpCodes())
-
-	// Test that *= works the same as .ORG
-	asmCode := `*= $2000
-
-start:
-    LDA #$42
-    STA $0400
-    JMP *
-    
-data:
-    .BYTE $01, $02, $03
-`
-
-	dataSegments, err := assembler.Assemble(strings.NewReader(asmCode))
-	require.NoError(t, err)
-	require.NotNil(t, dataSegments)
-	require.GreaterOrEqual(t, len(dataSegments), 1)
-
-	// Debug: print all segments
-	for i, seg := range dataSegments {
-		t.Logf("Segment %d: StartAddress=0x%04x, DataLen=%d", i, seg.StartAddress, len(seg.Data.Bytes()))
-	}
-
-	// Find the segment that starts at $2000
-	var targetSegmentIndex = -1
-	for i, seg := range dataSegments {
-		if seg.StartAddress == 0x2000 {
-			targetSegmentIndex = i
-			break
-		}
-	}
-	require.NotEqual(t, -1, targetSegmentIndex, "Should have a segment starting at $2000")
-
-	segment := dataSegments[targetSegmentIndex]
-	require.Greater(t, len(segment.Data.Bytes()), 0)
-
-	// Test that the assembled code contains expected data
-	data := segment.Data.Bytes()
-
-	// Should have instructions and data
-	require.Greater(t, len(data), 5, "Should have instructions and data")
-
-	t.Logf("Successfully assembled program with *= directive: %d bytes at address 0x%04x", len(data), segment.StartAddress)
-}
-
-func TestAssemblerProgramCounterSetVsOrg(t *testing.T) {
-	m := memory.NewMemory[uint16](64 * 1024)
-	c := cpu.NewCPU(m)
-
-	assembler := assembler.New(c.OpCodes())
-
-	// Test program using .ORG
-	asmCodeOrg := `.ORG $3000
-
-start:
-    LDA #$42
-    STA $0400
-    JMP start
-    
-    .BYTE $01, $02, $03
-`
-
-	// Test program using *=
-	asmCodeStar := `*= $3000
-
-start:
-    LDA #$42
-    STA $0400
-    JMP start
-    
-    .BYTE $01, $02, $03
-`
-
-	// Assemble both versions
-	dataSegmentsOrg, err := assembler.Assemble(strings.NewReader(asmCodeOrg))
-	require.NoError(t, err)
-	require.NotNil(t, dataSegmentsOrg)
-	require.GreaterOrEqual(t, len(dataSegmentsOrg), 1)
-
-	dataSegmentsStar, err := assembler.Assemble(strings.NewReader(asmCodeStar))
-	require.NoError(t, err)
-	require.NotNil(t, dataSegmentsStar)
-	require.GreaterOrEqual(t, len(dataSegmentsStar), 1)
-
-	// Both should produce identical results
-	require.Equal(t, len(dataSegmentsOrg), len(dataSegmentsStar), "Should have same number of segments")
-
-	// Find the segments that start at $3000
-	var orgSegmentIndex, starSegmentIndex = -1, -1
-	for i, seg := range dataSegmentsOrg {
-		if seg.StartAddress == 0x3000 {
-			orgSegmentIndex = i
-			break
-		}
-	}
-	for i, seg := range dataSegmentsStar {
-		if seg.StartAddress == 0x3000 {
-			starSegmentIndex = i
-			break
-		}
-	}
-
-	require.NotEqual(t, -1, orgSegmentIndex, "Should have .ORG segment at $3000")
-	require.NotEqual(t, -1, starSegmentIndex, "Should have *= segment at $3000")
-
-	orgSegment := dataSegmentsOrg[orgSegmentIndex]
-	starSegment := dataSegmentsStar[starSegmentIndex]
-
-	// Compare the assembled data
-	require.Equal(t, orgSegment.StartAddress, starSegment.StartAddress, "Start addresses should be identical")
-	require.Equal(t, len(orgSegment.Data.Bytes()), len(starSegment.Data.Bytes()), "Data lengths should be identical")
-	require.Equal(t, orgSegment.Data.Bytes(), starSegment.Data.Bytes(), "Assembled data should be identical")
-
-	t.Logf(".ORG assembled %d bytes at 0x%04x", len(orgSegment.Data.Bytes()), orgSegment.StartAddress)
-	t.Logf("*= assembled %d bytes at 0x%04x", len(starSegment.Data.Bytes()), starSegment.StartAddress)
-	t.Log("Both .ORG and *= produce identical results")
-}
-
-func TestAssemblerStringDirectives(t *testing.T) {
-	m := memory.NewMemory[uint16](64 * 1024)
-	c := cpu.NewCPU(m)
-
-	assembler := assembler.New(c.OpCodes())
-
-	// Test all string directive variants
-	asmCode := `*= $4000
-
-text_data:
-    .TEXT "Hello"
-    
-string_data:
-    .STRING "World"
-    
-str_data:
-    .STR "Test"
-    
-asc_data:
-    .ASC "ASCII"
-    
-asciiz_data:
-    .ASCIIZ "NullTerm"
-`
-
-	dataSegments, err := assembler.Assemble(strings.NewReader(asmCode))
-	require.NoError(t, err)
-	require.NotNil(t, dataSegments)
-	require.GreaterOrEqual(t, len(dataSegments), 1)
-
-	// Find the segment that starts at $4000
-	var targetSegmentIndex = -1
-	for i, seg := range dataSegments {
-		if seg.StartAddress == 0x4000 {
-			targetSegmentIndex = i
-			break
-		}
-	}
-	require.NotEqual(t, -1, targetSegmentIndex, "Should have a segment starting at $4000")
-
-	segment := dataSegments[targetSegmentIndex]
-	data := segment.Data.Bytes()
-
-	// Expected data: "Hello" + "World" + "Test" + "ASCII" + "NullTerm" + null terminator
-	expectedStrings := []string{"Hello", "World", "Test", "ASCII", "NullTerm"}
-	expectedSize := len("Hello") + len("World") + len("Test") + len("ASCII") + len("NullTerm") + 1 // +1 for null terminator
-
-	require.Equal(t, expectedSize, len(data), "Should contain all string data")
-
-	// Verify the strings are concatenated correctly
-	offset := 0
-	for i, expectedStr := range expectedStrings {
-		actualStr := string(data[offset : offset+len(expectedStr)])
-		require.Equal(t, expectedStr, actualStr, "String %d should match", i)
-		offset += len(expectedStr)
-	}
-
-	// Verify null terminator for .ASCIIZ
-	require.Equal(t, byte(0), data[len(data)-1], "Should end with null terminator from .ASCIIZ")
-
-	t.Logf("Successfully assembled string directives: %d bytes at address 0x%04x", len(data), segment.StartAddress)
-	t.Logf("String data: %v", data)
-}
-
-func createTestAssembler() *assembler.Assembler {
-	m := memory.NewMemory[uint16](64 * 1024)
-	c := cpu.NewCPU(m)
-	return assembler.New(c.OpCodes())
-}
-
-func TestDuplicateLabels(t *testing.T) {
-	assembler := createTestAssembler()
-
-	program := `
-		.ORG $1000
-	start:
-		NOP
-	start:  ; Duplicate label - should error
-		LDA #$FF
-	`
-
-	reader := strings.NewReader(program)
-	_, err := assembler.Assemble(reader)
-
-	if err == nil {
-		t.Fatal("Expected error for duplicate label, but got none")
-	} else if !strings.Contains(err.Error(), "duplicate label 'start'") {
-		t.Errorf("Expected duplicate label error, got: %v", err)
-	}
-}
-
-func TestDuplicateVariables(t *testing.T) {
-	assembler := createTestAssembler()
-
-	program := `
-		.ORG $1000
-		myVar = $FF
-		myVar = $AA  ; Duplicate variable - should error
-		NOP
-	`
-
-	reader := strings.NewReader(program)
-	_, err := assembler.Assemble(reader)
-
-	if err == nil {
-		t.Fatal("Expected error for duplicate variable, but got none")
-	} else if !strings.Contains(err.Error(), "duplicate variable 'myVar'") {
-		t.Errorf("Expected duplicate variable error, got: %v", err)
-	}
-}
-
-func TestLabelVariableConflict(t *testing.T) {
-	assembler := createTestAssembler()
-
-	program := `
-		.ORG $1000
-		mySymbol = $FF
-	mySymbol:  ; Conflicts with variable - should error
-		NOP
-	`
-
-	reader := strings.NewReader(program)
-	_, err := assembler.Assemble(reader)
-
-	if err == nil {
-		t.Fatal("Expected error for label/variable conflict, but got none")
-	} else if !strings.Contains(err.Error(), "conflicts with existing variable") {
-		t.Errorf("Expected label/variable conflict error, got: %v", err)
-	}
-}
-
-func TestVariableLabelConflict(t *testing.T) {
-	assembler := createTestAssembler()
-
-	program := `
-		.ORG $1000
-	mySymbol:
-		NOP
-		mySymbol = $FF  ; Conflicts with label - should error
-	`
-
-	reader := strings.NewReader(program)
-	_, err := assembler.Assemble(reader)
-
-	if err == nil {
-		t.Fatal("Expected error for variable/label conflict, but got none")
-	} else if !strings.Contains(err.Error(), "conflicts with existing label") {
-		t.Errorf("Expected variable/label conflict error, got: %v", err)
-	}
-}
-
-func TestValidUniqueSymbols(t *testing.T) {
-	assembler := createTestAssembler()
-
-	program := `
-		.ORG $1000
-		var1 = $FF
-		var2 = $AA
-	label1:
-		NOP
-	label2:
-		LDA var1
-		LDX var2
-		JMP label1
-	`
-
-	reader := strings.NewReader(program)
-	segments, err := assembler.Assemble(reader)
-
-	if err != nil {
-		t.Fatalf("Expected successful assembly with unique symbols, got error: %v", err)
-	}
-	if len(segments) != 1 {
-		t.Errorf("Expected 1 segment, got %d", len(segments))
-	}
-	if segments[0].StartAddress != 0x1000 {
-		t.Errorf("Expected start address 0x1000, got 0x%X", segments[0].StartAddress)
-	}
-	if len(segments[0].Data.Bytes()) == 0 {
-		t.Error("Expected assembled data, got empty segment")
-	}
-}
-
-func TestStateResetBetweenAssemblies(t *testing.T) {
-	assembler := createTestAssembler()
-
-	// First assembly with a label
-	program1 := `
-		.ORG $1000
-	testLabel:
-		NOP
-	`
-
-	reader1 := strings.NewReader(program1)
-	_, err := assembler.Assemble(reader1)
-	if err != nil {
-		t.Fatalf("First assembly failed: %v", err)
-	}
-
-	// Second assembly should not conflict with first (state should be reset)
-	program2 := `
-		.ORG $2000
-	testLabel:  ; Same label name - should be OK due to state reset
-		LDA #$FF
-	`
-
-	reader2 := strings.NewReader(program2)
-	segments, err := assembler.Assemble(reader2)
-	if err != nil {
-		t.Fatalf("Second assembly failed - state not properly reset: %v", err)
-	}
-	if len(segments) != 1 {
-		t.Errorf("Expected 1 segment, got %d", len(segments))
-	}
-	if segments[0].StartAddress != 0x2000 {
-		t.Errorf("Expected start address 0x2000, got 0x%X", segments[0].StartAddress)
-	}
-}
-
-func TestAssemble(t *testing.T) {
-	assembler := createTestAssembler()
-
-	program := `
-.ORG $1000
-
-LDA #$42        ; Load accumulator with hex 42
-STA $D020       ; Store in border color register (C64)
-
-LDX #$10        ; Load X register with 16
-LOOP:
-    DEX         ; Decrement X register
-    BNE LOOP    ; Branch if not equal to zero
-
-RTS             ; Return from subroutine
-	`
-
-	reader := strings.NewReader(program)
-	segments, err := assembler.Assemble(reader)
-	if err != nil {
-		t.Fatalf("Expected successful assembly, got error: %v", err)
-	}
-	if len(segments) != 1 {
-		t.Errorf("Expected 1 segment, got %d", len(segments))
-	}
-	if segments[0].StartAddress != 0x1000 {
-		t.Errorf("Expected start address 0x1000, got 0x%X", segments[0].StartAddress)
-	}
-	if len(segments[0].Data.Bytes()) == 0 {
-		t.Error("Expected assembled data, got empty segment")
-	}
-}
-
-func TestBranchingToLabelAhead(t *testing.T) {
-	assembler := createTestAssembler()
-
-	program := `
-.ORG $1000
-NOP
-BEQ END
-RTS
-END:
-    RTS
-	`
-
-	reader := strings.NewReader(program)
-	segments, err := assembler.Assemble(reader)
-	if err != nil {
-		t.Fatalf("Expected successful assembly, got error: %v", err)
-	}
-	if len(segments) != 1 {
-		t.Errorf("Should have 1 segment, got %d", len(segments))
-	}
-	if segments[0].StartAddress != 0x1000 {
-		t.Errorf("Should start at $1000, got 0x%X", segments[0].StartAddress)
-	}
-	data := segments[0].Data.Bytes()
-	if len(data) != 5 {
-		t.Errorf("Should be 5 bytes: NOP + BEQ + RTS + RTS, got %d", len(data))
-	}
-	if data[0] != 0xEA {
-		t.Errorf("First byte should be NOP (0xEA), got 0x%02X", data[0])
-	}
-	if data[1] != 0xF0 {
-		t.Errorf("Second byte should be BEQ (0xF0), got 0x%02X", data[1])
-	}
-	if data[2] != 0x01 {
-		t.Errorf("Third byte should be BEQ offset (+1), got 0x%02X", data[2])
-	}
-	if data[3] != 0x60 {
-		t.Errorf("Fourth byte should be first RTS (0x60), got 0x%02X", data[3])
-	}
-	if data[4] != 0x60 {
-		t.Errorf("Fifth byte should be second RTS (0x60), got 0x%02X", data[4])
-	}
-	t.Logf("Successfully assembled: %d bytes", len(data))
-	for i, b := range data {
-		t.Logf("  [%d]: 0x%02X", i, b)
-	}
-}
-
-func TestSimpleBranchingForward(t *testing.T) {
-	assembler := createTestAssembler()
-
-	program := `
-BEQ END
-RTS
-END:
-    RTS
-	`
-
-	reader := strings.NewReader(program)
-	segments, err := assembler.Assemble(reader)
-	if err != nil {
-		t.Fatalf("Expected successful assembly, got error: %v", err)
-	}
-	if len(segments) != 1 {
-		t.Errorf("Should have 1 segment, got %d", len(segments))
-	}
-	data := segments[0].Data.Bytes()
-	if len(data) != 4 {
-		t.Errorf("Should be 4 bytes: BEQ + RTS + RTS, got %d", len(data))
-	}
-	t.Logf("Successfully assembled: %d bytes", len(data))
-	for i, b := range data {
-		t.Logf("  [%d]: 0x%02X", i, b)
-	}
-}
-
-func TestTemp(t *testing.T) {
-	code := `
-spr0            .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-                .byte $FF, $FF, $FF
-
-				`
-
-	assembler := createTestAssembler()
-	reader := strings.NewReader(code)
-	assembledData, err := assembler.Assemble(reader)
-
-	require.NoError(t, err, "Assemble should not return an error")
-	require.NotNil(t, assembledData, "Assembled data should not be nil")
-}
-
-func TestSnakeAssembly(t *testing.T) {
-	asm := createTestAssembler()
-	file, err := os.Open("../examples/snake/snake copy.asm")
-	require.NoError(t, err, "Failed to open snake.asm")
-	fr := assembler.NewOSFileResolver("../examples/snake")
-	assembledCode, err := asm.AssembleWithPreprocessor(file, fr)
-	require.NoError(t, err, "Assemble should not return an error")
-	require.Equal(t, 2, len(assembledCode), "Should have exactly two segments")
 }

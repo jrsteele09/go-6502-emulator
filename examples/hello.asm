@@ -10,3 +10,4 @@ LOOP    DEX         ; Decrement X register
         BEQ END
         RTS         ; Return from subroutine
 END:    RTS
+        JMP *
