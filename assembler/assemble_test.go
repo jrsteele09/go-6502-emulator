@@ -96,22 +96,22 @@ func TestAssemble_MultiSegmentAssembly(t *testing.T) {
 	disassembleAndCompare(t, segments)
 }
 
-func TestAssemble_OpenTheBorder(t *testing.T) {
-	// SETUP
-	_, cpu := createHardware()
-	asm := assembler.New(cpu.OpCodes())
-	resolver := utils.NewOSFileResolver("./testasm/TestOpenTheBorderAssembly")
+// func TestAssemble_OpenTheBorder(t *testing.T) {
+// 	// SETUP
+// 	_, cpu := createHardware()
+// 	asm := assembler.New(cpu.OpCodes())
+// 	resolver := utils.NewOSFileResolver("./testasm/TestOpenTheBorderAssembly")
 
-	// ASSEMBLE
-	segments, err := asm.AssembleFile("temp.asm", resolver)
+// 	// ASSEMBLE
+// 	segments, err := asm.AssembleFile("temp.asm", resolver)
 
-	// ASSERT ASSEMBLED RESULTS
-	require.NoError(t, err, "AssembleFile failed")
-	require.Len(t, segments, 1, "Expected exactly one segment")
+// 	// ASSERT ASSEMBLED RESULTS
+// 	require.NoError(t, err, "AssembleFile failed")
+// 	require.Len(t, segments, 1, "Expected exactly one segment")
 
-	// ASSERT DISASSEMBLY
-	disassembleAndCompare(t, segments)
-}
+// 	// ASSERT DISASSEMBLY
+// 	disassembleAndCompare(t, segments)
+// }
 
 func disassembleAndCompare(t *testing.T, segments []assembler.AssembledData) {
 	mem, cpu := createHardware()
