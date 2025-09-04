@@ -22,12 +22,12 @@ type Instruction struct {
 }
 
 type Assembler struct {
-	instructionSet         map[string]map[cpu.AddressingModeType]Instruction
-	labels                 map[string]uint64 // Labels address
-	constants              map[string]any
-	addressingModeLiterals map[string]struct{}
-	lexerConfig            *lexer.LanguageConfig
-	programCounter         uint16
+	instructionSet        map[string]map[cpu.AddressingModeType]Instruction
+	labels                map[string]uint64 // Labels address
+	constants             map[string]any
+	addressingModeSymbols map[string]struct{}
+	lexerConfig           *lexer.LanguageConfig
+	programCounter        uint16
 	// originAddress          uint16
 }
 
@@ -53,7 +53,7 @@ func New(opcodes []*cpu.OpCodeDef) *Assembler {
 
 	// While parsing addressing modes, we need to recognize certain literals
 	// And not try and make them part of a constant or label
-	addressingModeLiterals := map[string]struct{}{
+	addressingModeSymbols := map[string]struct{}{
 		"(": {},
 		")": {},
 		",": {},
@@ -65,11 +65,11 @@ func New(opcodes []*cpu.OpCodeDef) *Assembler {
 	}
 
 	assembler := &Assembler{
-		instructionSet:         instructionSet,
-		labels:                 make(map[string]uint64),
-		constants:              make(map[string]interface{}),
-		addressingModeLiterals: addressingModeLiterals,
-		programCounter:         0x0000,
+		instructionSet:        instructionSet,
+		labels:                make(map[string]uint64),
+		constants:             make(map[string]interface{}),
+		addressingModeSymbols: addressingModeSymbols,
+		programCounter:        0x0000,
 		// originAddress:          0x0000,
 	}
 
@@ -91,11 +91,11 @@ type AssembledData struct {
 	Data         bytes.Buffer
 }
 
-func (a *Assembler) Assemble(r io.Reader) ([]AssembledData, error) {
+func (a *Assembler) Assemble(r io.Reader, filename string) ([]AssembledData, error) {
 	// Reset assembler state for each assembly
 	a.reset()
 
-	tokens, err := lexer.NewLexer(a.lexerConfig).Tokenize(r)
+	tokens, err := lexer.NewLexer(a.lexerConfig).Tokenize(r, filename)
 	if err != nil {
 		return nil, fmt.Errorf("[Assembler assemble] Tokenize [%w]", err)
 	}
@@ -126,7 +126,7 @@ func (a *Assembler) AssembleFile(mainFile string, fileResolver utils.FileResolve
 	}
 
 	asmLexer := NewAssemblerLexer(fileResolver)
-	tokens, err := asmLexer.Tokens(a.lexerConfig, reader)
+	tokens, err := asmLexer.Tokens(a.lexerConfig, reader, mainFile)
 	if err != nil {
 		return nil, fmt.Errorf("[Assembler AssembleWithPreprocessor] Tokenize [%w]", err)
 	}
@@ -404,26 +404,17 @@ parseLoop:
 
 		case IdentifierToken:
 			identifier = t.Literal
-			if _, found := a.addressingModeLiterals[strings.ToUpper(identifier)]; found {
+			if _, found := a.addressingModeSymbols[strings.ToUpper(identifier)]; found {
 				parsedAddressingMode += strings.ToUpper(identifier)
 				break
 			}
-			if value, ok := a.constants[identifier]; ok {
-				operandSizeMask, v, err := parseOperandSize(false, value)
-				if err != nil {
-					return AddressingMode{}, err
-				}
-				operandValues = append(operandValues, v)
-				parsedAddressingMode += a.operandSizeForLabel(mnemonic, operandSizeMask)
-				break
+			operandSizeMask, value, err := a.LabelOrConstantIdentifier(mnemonic, identifier, preprocess)
+			if err != nil {
+				return AddressingMode{}, err
 			}
-			if address, ok := a.labels[identifier]; ok && !preprocess {
-				operandSizeMask, v, err := a.parseLabelOffset(mnemonic, address)
-				if err != nil {
-					return AddressingMode{}, err
-				}
-				operandValues = append(operandValues, v)
-				parsedAddressingMode += operandSizeMask
+			if value != nil && operandSizeMask != "" {
+				operandValues = append(operandValues, value)
+				parsedAddressingMode += a.operandSizeForLabel(mnemonic, operandSizeMask)
 				break
 			}
 			if !preprocess {
@@ -496,6 +487,24 @@ func (a *Assembler) operandSizeForLabel(mnemonic, currentSizeStr string) string 
 		}
 	}
 	return currentSizeStr
+}
+
+func (a *Assembler) LabelOrConstantIdentifier(mnemonic, identifier string, preprocess bool) (sizeMask string, value any, err error) {
+	if value, ok := a.constants[identifier]; ok {
+		operandSizeMask, v, err := parseOperandSize(false, value)
+		if err != nil {
+			return "", nil, err
+		}
+		return operandSizeMask, v, nil
+	}
+	if address, ok := a.labels[identifier]; ok {
+		operandSizeMask, v, err := a.parseLabelOffset(mnemonic, address)
+		if err != nil {
+			return "", nil, err
+		}
+		return operandSizeMask, v, nil
+	}
+	return "", nil, nil
 }
 
 // parseOperandSize converts any integer type to operand size mask and value

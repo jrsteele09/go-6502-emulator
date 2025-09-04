@@ -29,11 +29,11 @@ func NewAssemblerLexer(resolver utils.FileResolver) *AssemblerLexer {
 // Tokens tokenizes the input while expanding include directives, preserving
 // SourceLine and SourceColumn as they appear in their original files.
 // It tokenizes line-by-line so that line numbers remain accurate in the produced tokens.
-func (p *AssemblerLexer) Tokens(cfg *lexer.LanguageConfig, input io.Reader) ([]*lexer.Token, error) {
+func (p *AssemblerLexer) Tokens(cfg *lexer.LanguageConfig, input io.Reader, filename string) ([]*lexer.Token, error) {
 	// Reset included files for each processing session
 	p.includedFiles = make(map[string]bool)
 
-	tokens, err := p.readerTokens(cfg, input, 0)
+	tokens, err := p.readerTokens(cfg, input, filename, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (p *AssemblerLexer) Tokens(cfg *lexer.LanguageConfig, input io.Reader) ([]*
 }
 
 // readerTokens recursively processes a reader, expanding includes and returning tokens
-func (p *AssemblerLexer) readerTokens(cfg *lexer.LanguageConfig, input io.Reader, depth int) ([]*lexer.Token, error) {
+func (p *AssemblerLexer) readerTokens(cfg *lexer.LanguageConfig, input io.Reader, filename string, depth int) ([]*lexer.Token, error) {
 	if depth > p.MaxIncludeDepth {
 		return nil, fmt.Errorf("maximum include depth (%d) exceeded", p.MaxIncludeDepth)
 	}
@@ -52,12 +52,12 @@ func (p *AssemblerLexer) readerTokens(cfg *lexer.LanguageConfig, input io.Reader
 	var sourceCode strings.Builder
 	sourceLine := 1
 
-	tokenizeSource := func() error {
+	tokenizeSource := func(filename string) error {
 		if sourceCode.Len() == 0 {
 			return nil
 		}
 		lex := lexer.NewLexer(cfg)
-		toks, err := lex.Tokenize(strings.NewReader(sourceCode.String()))
+		toks, err := lex.Tokenize(strings.NewReader(sourceCode.String()), filename)
 		if err != nil {
 			return fmt.Errorf("tokenize error around line %d: %w", sourceLine, err)
 		}
@@ -87,7 +87,7 @@ func (p *AssemblerLexer) readerTokens(cfg *lexer.LanguageConfig, input io.Reader
 		includeFilePath := p.extractIncludePath(trimmedLine)
 		if includeFilePath != "" {
 			// Flush any accumulated non-include lines before processing include
-			if err := tokenizeSource(); err != nil {
+			if err := tokenizeSource(includeFilePath); err != nil {
 				return nil, err
 			}
 
@@ -103,7 +103,7 @@ func (p *AssemblerLexer) readerTokens(cfg *lexer.LanguageConfig, input io.Reader
 				return nil, fmt.Errorf("line %d: %w", lineNum, err)
 			}
 
-			includedTokens, err := p.readerTokens(cfg, includeFileReader, depth+1)
+			includedTokens, err := p.readerTokens(cfg, includeFileReader, includeFilePath, depth+1)
 			if err != nil {
 				return nil, fmt.Errorf("in file '%s': %w", includeFilePath, err)
 			}
@@ -121,7 +121,7 @@ func (p *AssemblerLexer) readerTokens(cfg *lexer.LanguageConfig, input io.Reader
 	}
 
 	// Flush any remaining chunk
-	if err := tokenizeSource(); err != nil {
+	if err := tokenizeSource(filename); err != nil {
 		return nil, err
 	}
 
