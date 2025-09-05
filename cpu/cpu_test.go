@@ -25,7 +25,7 @@ const stackAddress = uint16(0x01FF)
 func executeTests(t *testing.T, tests []InstructionTest) {
 	for _, test := range tests {
 		m := memory.NewMemory[uint16](64 * 1024)
-		cpu := NewCPU(m, false)
+		cpu := NewCPU(m, true)
 		noOfOps := test.setup(cpu)
 		cpu.Reg.PC = startAddress
 

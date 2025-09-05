@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jrsteele09/go-6502-emulator/assembler/bin"
+	"github.com/jrsteele09/go-6502-emulator/assembler/output"
 	"github.com/jrsteele09/go-6502-emulator/cpu"
 	"github.com/jrsteele09/go-6502-emulator/memory"
 )
@@ -312,7 +312,7 @@ func (d *Debugger) HexDump(args []string) string {
 // LoadPRG loads a PRG file into memory
 func (d *Debugger) LoadPRG(filename string) string {
 	// Use the PRG format loader
-	prgFormat := bin.NewPRGFormat()
+	prgFormat := output.NewPRGFormat()
 	segments, err := prgFormat.LoadFile(filename, false)
 	if err != nil {
 		return fmt.Sprintf("Error loading PRG file: %v\n", err)

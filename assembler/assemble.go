@@ -15,6 +15,20 @@ const (
 	oneByteOperand = "nn"
 	twoByteOperand = "nnnn"
 )
+const (
+	ByteDirective = iota + 1
+	WordDirective
+	TextDirective
+	DbDirective
+	DwDirective
+	DsDirective
+	StringDirective
+	StrDirective
+	AscDirective
+	AsciizDirective
+	OrgDirective
+	VarDirective
+)
 
 type Instruction struct {
 	Opcode     int
@@ -26,9 +40,9 @@ type Assembler struct {
 	labels                map[string]uint64 // Labels address
 	constants             map[string]any
 	addressingModeSymbols map[string]struct{}
+	directives            map[string]int
 	lexerConfig           *lexer.LanguageConfig
 	programCounter        uint16
-	// originAddress          uint16
 }
 
 type Directive struct {
@@ -64,13 +78,28 @@ func New(opcodes []*cpu.OpCodeDef) *Assembler {
 		"*": {},
 	}
 
+	directives := map[string]int{
+		".BYTE":   ByteDirective,
+		".WORD":   WordDirective,
+		".TEXT":   TextDirective,
+		".STRING": StringDirective,
+		".STR":    StrDirective,
+		".ASC":    AscDirective,
+		".ASCIIZ": AsciizDirective,
+		".ORG":    OrgDirective,
+		".DB":     DbDirective,
+		".DW":     DwDirective,
+		".DS":     DsDirective,
+		".VAR":    VarDirective,
+	}
+
 	assembler := &Assembler{
 		instructionSet:        instructionSet,
 		labels:                make(map[string]uint64),
 		constants:             make(map[string]interface{}),
 		addressingModeSymbols: addressingModeSymbols,
+		directives:            directives,
 		programCounter:        0x0000,
-		// originAddress:          0x0000,
 	}
 
 	assembler.lexerConfig = lexer.NewLexerLanguage(
@@ -122,25 +151,25 @@ func (a *Assembler) AssembleFile(mainFile string, fileResolver utils.FileResolve
 
 	reader, err := fileResolver.Resolve(mainFile)
 	if err != nil {
-		return nil, fmt.Errorf("[Assembler AssembleWithPreprocessor] Resolve [%w]", err)
+		return nil, fmt.Errorf("[Assembler AssembleFile] Resolve [%w]", err)
 	}
 
 	asmLexer := NewAssemblerLexer(fileResolver)
 	tokens, err := asmLexer.Tokens(a.lexerConfig, reader, mainFile)
 	if err != nil {
-		return nil, fmt.Errorf("[Assembler AssembleWithPreprocessor] Tokenize [%w]", err)
+		return nil, fmt.Errorf("[Assembler AssembleFile] Tokenize [%w]", err)
 	}
 
 	// First pass: calculate memory layout and collect labels
 	segments, err := a.preprocessor(tokens)
 	if err != nil {
-		return nil, fmt.Errorf("[Assembler AssembleWithPreprocessor] preprocessor [%w]", err)
+		return nil, fmt.Errorf("[Assembler AssembleFile] preprocessor [%w]", err)
 	}
 
 	// Second pass: generate machine code
 	err = a.generateCode(tokens, segments)
 	if err != nil {
-		return nil, fmt.Errorf("[Assembler AssembleWithPreprocessor] generateCode [%w]", err)
+		return nil, fmt.Errorf("[Assembler AssembleFile] generateCode [%w]", err)
 	}
 
 	return segments, nil
@@ -244,7 +273,7 @@ func (a *Assembler) generateCode(tokens []*lexer.Token, segments []AssembledData
 	return nil
 }
 
-func (a *Assembler) addressForAsterixOrgDirective(asmTokens *AssemblerTokens, finalizeSegment func()) error {
+func (a *Assembler) addressForAsterixOrgDirective(asmTokens *Tokens, finalizeSegment func()) error {
 	// Check if this is "*=" (program counter set)
 	nextToken := asmTokens.Peek()
 	if nextToken != nil && nextToken.ID == EqualsSymbolToken {
@@ -259,7 +288,7 @@ func (a *Assembler) addressForAsterixOrgDirective(asmTokens *AssemblerTokens, fi
 	return nil
 }
 
-func (a *Assembler) checkForOrgAsterixDirective(asmTokens *AssemblerTokens, updateCurrentSegment func()) error {
+func (a *Assembler) checkForOrgAsterixDirective(asmTokens *Tokens, updateCurrentSegment func()) error {
 	// Check if this is "*=" (program counter set)
 	nextToken := asmTokens.Peek()
 	if nextToken != nil && nextToken.ID == EqualsSymbolToken {
@@ -280,53 +309,57 @@ func (a *Assembler) checkForOrgAsterixDirective(asmTokens *AssemblerTokens, upda
 	return nil
 }
 
-func (a *Assembler) processAssemblerDirective(asmTokens *AssemblerTokens, insertIntoMemory func([]byte), updateCurrentSegment func()) error {
+func (a *Assembler) processAssemblerDirective(asmTokens *Tokens, insertIntoMemory func([]byte), updateCurrentSegment func()) error {
 	// Check if this is a directive (. followed by directive name)
 	nextToken := asmTokens.Peek()
 	if nextToken != nil && nextToken.ID == IdentifierToken {
 		directiveName := "." + nextToken.Literal
-		if tokenID, found := KeywordTokens[strings.ToUpper(directiveName)]; found {
+		if directiveID, found := a.directives[strings.ToUpper(directiveName)]; found {
 			// Consume the directive name token
 			asmTokens.Next()
 			// Process the specific directive based on its token ID (second pass)
-			switch tokenID {
-			case ByteDirectiveToken, DbDirectiveToken:
+			switch directiveID {
+			case ByteDirective, DbDirective:
 				err := a.processByteDirective(asmTokens, insertIntoMemory)
 				if err != nil {
 					return err
 				}
-			case WordDirectiveToken, DwDirectiveToken:
+			case WordDirective, DwDirective:
 				err := a.processWordDirective(asmTokens, insertIntoMemory)
 				if err != nil {
 					return err
 				}
-			case TextDirectiveToken, StringDirectiveToken, StrDirectiveToken, AscDirectiveToken:
+			case TextDirective, StringDirective, StrDirective, AscDirective:
 				err := a.processTextDirective(asmTokens, insertIntoMemory)
 				if err != nil {
 					return err
 				}
-			case AsciizDirectiveToken:
+			case AsciizDirective:
 				err := a.processAsciizDirective(asmTokens, insertIntoMemory)
 				if err != nil {
 					return err
 				}
-			case OrgDirectiveToken:
+			case OrgDirective:
 				err := a.generateCodeForOrgDirective(asmTokens, updateCurrentSegment)
 				if err != nil {
 					return err
 				}
-			case DsDirectiveToken:
+			case DsDirective:
 				err := a.processDataSpaceDirective(asmTokens, insertIntoMemory)
 				if err != nil {
 					return err
 				}
+			case VarDirective: // Leave this to the preprocessor
+				a.skipDirectiveTokens(asmTokens)
+			default:
+				return fmt.Errorf("[Assembler processAssemblerDirective] Unknown Directive %s", directiveName)
 			}
 		}
 	}
 	return nil
 }
 
-func (a *Assembler) generateCodeForOrgDirective(asmTokens *AssemblerTokens, updateCurrentSegment func()) error {
+func (a *Assembler) generateCodeForOrgDirective(asmTokens *Tokens, updateCurrentSegment func()) error {
 	// Process program counter change - same as *= but without equals sign
 	t := asmTokens.Next()
 	if t != nil {
@@ -341,7 +374,7 @@ func (a *Assembler) generateCodeForOrgDirective(asmTokens *AssemblerTokens, upda
 	return nil
 }
 
-func (a *Assembler) generateInstructionCode(t *lexer.Token, asmTokens *AssemblerTokens, insertIntoMemory func([]byte)) error {
+func (a *Assembler) generateInstructionCode(t *lexer.Token, asmTokens *Tokens, insertIntoMemory func([]byte)) error {
 	addressingMode, err := a.parseAddressingMode(t.Literal, asmTokens, false)
 	if err != nil {
 		return err
@@ -363,7 +396,7 @@ type AddressingMode struct {
 	Operands       []byte
 }
 
-func (a *Assembler) parseAddressingMode(mnemonic string, asmTokens *AssemblerTokens, preprocess bool) (AddressingMode, error) {
+func (a *Assembler) parseAddressingMode(mnemonic string, asmTokens *Tokens, preprocess bool) (AddressingMode, error) {
 	parsedAddressingMode := ""
 	var operandValues []any
 	var identifier string
@@ -374,7 +407,7 @@ parseLoop:
 		case lexer.EndOfLineType, lexer.EOFType:
 			break parseLoop
 		case lexer.HexLiteral, lexer.IntegerLiteral, MinusToken:
-			evaluatedValue, err := a.EvaluateExpressionBytes(asmTokens, mnemonic, preprocess)
+			evaluatedValue, err := a.EvaluateExpression(asmTokens, mnemonic, preprocess)
 			if err != nil {
 				return AddressingMode{}, err
 			}
@@ -387,7 +420,7 @@ parseLoop:
 
 		case GreaterThanToken, LessThanToken:
 			asmTokens.Next() // Consume the > or < token
-			v, err := a.EvaluateExpressionBytes(asmTokens, mnemonic, preprocess)
+			v, err := a.EvaluateExpression(asmTokens, mnemonic, preprocess)
 			if err != nil {
 				return AddressingMode{}, err
 			}
@@ -409,7 +442,7 @@ parseLoop:
 				break
 			}
 
-			evaluatedValue, err := a.EvaluateExpressionBytes(asmTokens, mnemonic, preprocess)
+			evaluatedValue, err := a.EvaluateExpression(asmTokens, mnemonic, preprocess)
 			if err != nil {
 				return AddressingMode{}, err
 			}
@@ -507,7 +540,7 @@ func (a *Assembler) LabelOrConstantIdentifier(mnemonic, identifier string, prepr
 	return "", nil, nil
 }
 
-func (a *Assembler) EvaluateExpressionBytes(asmTokens *AssemblerTokens, mnemonic string, preprocess bool) (int64, error) {
+func (a *Assembler) EvaluateExpression(asmTokens *Tokens, mnemonic string, preprocess bool) (int64, error) {
 	// Parse the expression using Pratt parser
 	result, err := a.parseCurrentExpression(asmTokens, mnemonic, 0, preprocess)
 	if err != nil {
@@ -551,7 +584,7 @@ func labelTokenCreator(identifier string) *lexer.Token {
 	return lexer.NewToken(LabelToken, identifier, 0)
 }
 
-func (a *Assembler) processOrgDirective(asmTokens *AssemblerTokens, finalizeSegment func()) error {
+func (a *Assembler) processOrgDirective(asmTokens *Tokens, finalizeSegment func()) error {
 	finalizeSegment() // Close current segment
 
 	t := asmTokens.Next()
@@ -586,7 +619,7 @@ func (a *Assembler) tokenAddressValue(t *lexer.Token) (uint16, error) {
 	}
 }
 
-func (a *Assembler) processByteDirective(asmTokens *AssemblerTokens, insertIntoMemory func([]byte)) error {
+func (a *Assembler) processByteDirective(asmTokens *Tokens, insertIntoMemory func([]byte)) error {
 	var bytes []byte
 
 	for {
@@ -630,7 +663,7 @@ func (a *Assembler) processByteDirective(asmTokens *AssemblerTokens, insertIntoM
 	return nil
 }
 
-func (a *Assembler) processWordDirective(asmTokens *AssemblerTokens, insertIntoMemory func([]byte)) error {
+func (a *Assembler) processWordDirective(asmTokens *Tokens, insertIntoMemory func([]byte)) error {
 	var bytes []byte
 
 	for {
@@ -678,7 +711,7 @@ func (a *Assembler) processWordDirective(asmTokens *AssemblerTokens, insertIntoM
 	return nil
 }
 
-func (a *Assembler) processTextDirective(asmTokens *AssemblerTokens, insertIntoMemory func([]byte)) error {
+func (a *Assembler) processTextDirective(asmTokens *Tokens, insertIntoMemory func([]byte)) error {
 	t := asmTokens.Next()
 	if t == nil || t.ID != lexer.StringLiteral {
 		return fmt.Errorf("[processTextDirective] expected string after .TEXT")
@@ -694,7 +727,7 @@ func (a *Assembler) processTextDirective(asmTokens *AssemblerTokens, insertIntoM
 	return nil
 }
 
-func (a *Assembler) processAsciizDirective(asmTokens *AssemblerTokens, insertIntoMemory func([]byte)) error {
+func (a *Assembler) processAsciizDirective(asmTokens *Tokens, insertIntoMemory func([]byte)) error {
 	t := asmTokens.Next()
 	if t == nil || t.ID != lexer.StringLiteral {
 		return fmt.Errorf("[processAsciizDirective] expected string after .ASCIIZ")
@@ -712,7 +745,7 @@ func (a *Assembler) processAsciizDirective(asmTokens *AssemblerTokens, insertInt
 	return nil
 }
 
-func (a *Assembler) processEquDirective(asmTokens *AssemblerTokens) error {
+func (a *Assembler) processEquDirective(asmTokens *Tokens) error {
 	// Get variable name
 	nameToken := asmTokens.Next()
 	if nameToken == nil || nameToken.ID != IdentifierToken {
@@ -755,7 +788,7 @@ func (a *Assembler) processEquDirective(asmTokens *AssemblerTokens) error {
 	return nil
 }
 
-func (a *Assembler) processDataSpaceDirective(asmTokens *AssemblerTokens, insertIntoMemory func([]byte)) error {
+func (a *Assembler) processDataSpaceDirective(asmTokens *Tokens, insertIntoMemory func([]byte)) error {
 	t := asmTokens.Next()
 	if t == nil {
 		return fmt.Errorf("[processDataSpaceDirective] expected size after .DS")
@@ -783,7 +816,7 @@ func (a *Assembler) processDataSpaceDirective(asmTokens *AssemblerTokens, insert
 	return nil
 }
 
-func (a *Assembler) skipDirectiveTokens(asmTokens *AssemblerTokens) {
+func (a *Assembler) skipDirectiveTokens(asmTokens *Tokens) {
 	// Skip tokens until end of line
 	for {
 		t := asmTokens.Next()
@@ -791,6 +824,23 @@ func (a *Assembler) skipDirectiveTokens(asmTokens *AssemblerTokens) {
 			break
 		}
 	}
+}
+
+func (a *Assembler) processVarDirective(asmTokens *Tokens) error {
+	t := asmTokens.Next()
+	if t.ID != IdentifierToken {
+		return fmt.Errorf("[Assembler processVarDirective] expected identifier")
+	}
+	nextToken := asmTokens.Peek()
+
+	if nextToken != nil && nextToken.ID == EqualsSymbolToken {
+		err := a.processConstantAssignment(t, asmTokens)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return fmt.Errorf("[Assembler] Invalid Format for Var %s", t.Literal)
 }
 
 func (a *Assembler) identifierTokenCreator(identifier string) *lexer.Token {
