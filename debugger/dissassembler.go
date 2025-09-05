@@ -70,7 +70,7 @@ func (d *Disassembler) opCodeToString(opcode cpu.OpCodeDef, operands []byte, add
 		// Address is the address of the opcode, so to calculate a relative address,
 		// We need to add on two bytes for the opcode and the operand.
 		address = uint16(int64(address) + 2 + int64(int8(operands[0])))
-		addressingModeString = strings.Replace(fmt.Sprintf("%.2x", address), "0x", "", 1)
+		addressingModeString = strings.Replace(fmt.Sprintf("$%.4x", address), "0x", "", 1)
 	default:
 		if strings.Contains(string(opcode.AddressingModeType), cpu.WordAddressing) {
 			operandString := fmt.Sprintf("$%s%s", operandToHexString(1, operands...), operandToHexString(0, operands...))

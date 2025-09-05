@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	twoByteOperand  = "nn"
-	fourByteOperand = "nnnn"
+	oneByteOperand = "nn"
+	twoByteOperand = "nnnn"
 )
 
 type Instruction struct {
@@ -163,12 +163,10 @@ func (a *Assembler) generateCode(tokens []*lexer.Token, segments []AssembledData
 
 	a.programCounter = 0x00
 	currentSegmentIndex := -1
-	// segmentOffset := 0
 
 	// Find the initial segment
 	if segmentIdx, exists := segmentMap[a.programCounter]; exists {
 		currentSegmentIndex = segmentIdx
-		// segmentOffset = 0
 	}
 
 	appendToMemory := func(data []byte) {
@@ -375,32 +373,34 @@ parseLoop:
 		switch t.ID {
 		case lexer.EndOfLineType, lexer.EOFType:
 			break parseLoop
-		case lexer.HexLiteral, lexer.IntegerLiteral:
-			operandSizeMask, v, err := parseOperandSize(false, t.Value)
+		case lexer.HexLiteral, lexer.IntegerLiteral, MinusToken:
+			evaluatedValue, err := a.EvaluateExpressionBytes(asmTokens, mnemonic, preprocess)
+			if err != nil {
+				return AddressingMode{}, err
+			}
+			operandSizeMask, v, err := minimumOperandSize(false, evaluatedValue)
 			if err != nil {
 				return AddressingMode{}, err
 			}
 			operandValues = append(operandValues, v)
 			parsedAddressingMode += operandSizeMask
 
-		case MinusToken:
-			nextTokenID := utils.Value(asmTokens.Peek()).ID
-			if nextTokenID == lexer.IntegerLiteral || nextTokenID == lexer.HexLiteral {
-				nt := asmTokens.Next()
-				operandSizeMask, v, err := parseOperandSize(true, nt.Value)
-				if err != nil {
-					return AddressingMode{}, err
-				}
-				operandValues = append(operandValues, v)
-				parsedAddressingMode += operandSizeMask
-			} else {
-				parsedAddressingMode += t.Literal
+		case GreaterThanToken, LessThanToken:
+			asmTokens.Next() // Consume the > or < token
+			v, err := a.EvaluateExpressionBytes(asmTokens, mnemonic, preprocess)
+			if err != nil {
+				return AddressingMode{}, err
+			}
+			var value any
+			switch t.ID {
+			case GreaterThanToken:
+				value = reduceUnsigned(uint64((reduceUnsigned(uint64(v), 2).(uint16)&0xFF00)>>8), 1)
+			case LessThanToken:
+				value = reduceUnsigned(uint64((reduceUnsigned(uint64(v), 2).(uint16) & 0x00FF)), 1)
 			}
 
-		// case GreaterThanToken, LessThanToken:
-		// 	upperByte := t.ID == GreaterThanToken
-		// 	if asmTokens.Peek().ID == IdentifierToken {
-		// 	}
+			operandValues = append(operandValues, value.(byte))
+			parsedAddressingMode += oneByteOperand
 
 		case IdentifierToken:
 			identifier = t.Literal
@@ -408,27 +408,24 @@ parseLoop:
 				parsedAddressingMode += strings.ToUpper(identifier)
 				break
 			}
-			operandSizeMask, value, err := a.LabelOrConstantIdentifier(mnemonic, identifier, preprocess)
+
+			evaluatedValue, err := a.EvaluateExpressionBytes(asmTokens, mnemonic, preprocess)
 			if err != nil {
 				return AddressingMode{}, err
 			}
-			if value != nil && operandSizeMask != "" {
-				operandValues = append(operandValues, value)
-				parsedAddressingMode += a.operandSizeForLabel(mnemonic, operandSizeMask)
-				break
+
+			// Work out what the size mask should be for this label/constant
+			operandSizeMask, _, _ := a.LabelOrConstantIdentifier(mnemonic, identifier, preprocess)
+
+			noBytes := 1
+			if operandSizeMask == twoByteOperand {
+				noBytes = 2
 			}
-			if !preprocess {
-				return AddressingMode{}, fmt.Errorf("[parseAddressingMode] identifier '%s' not found", identifier)
-			}
-			operandSizeMask, v, err := a.preprocessorLabelSizer(mnemonic)
-			if err != nil {
-				return AddressingMode{}, fmt.Errorf("[parseAddressingMode] preprocessor label sizing failed: %w", err)
-			}
-			operandValues = append(operandValues, v)
-			parsedAddressingMode += operandSizeMask
-			// If preprocesing then we need to make an assumption that this is referencing a labal
-			// that hasn't been defined yet, so assumptions about the addressing mode needs to be made
-			// Depending on the mnemonic
+
+			// Ensure that the value is appropriate for the size mask nn = 1 Bytes, nnnn= 2 Bytes
+			value := ReduceBytes(evaluatedValue, noBytes)
+			operandValues = append(operandValues, value)
+			parsedAddressingMode += a.operandSizeForLabel(mnemonic, operandSizeMask)
 
 		case AsterixSymbolToken:
 			// Check what comes after the asterisk
@@ -441,7 +438,7 @@ parseLoop:
 					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] expected value after %s", nextToken.Literal)
 				}
 
-				operandSizeMask, v, err := parseOperandSize(nextToken.ID == MinusToken, valueToken.Value)
+				operandSizeMask, v, err := minimumOperandSize(nextToken.ID == MinusToken, valueToken.Value)
 				if err != nil {
 					return AddressingMode{}, err
 				}
@@ -491,7 +488,7 @@ func (a *Assembler) operandSizeForLabel(mnemonic, currentSizeStr string) string 
 
 func (a *Assembler) LabelOrConstantIdentifier(mnemonic, identifier string, preprocess bool) (sizeMask string, value any, err error) {
 	if value, ok := a.constants[identifier]; ok {
-		operandSizeMask, v, err := parseOperandSize(false, value)
+		operandSizeMask, v, err := minimumOperandSize(false, value)
 		if err != nil {
 			return "", nil, err
 		}
@@ -504,12 +501,21 @@ func (a *Assembler) LabelOrConstantIdentifier(mnemonic, identifier string, prepr
 		}
 		return operandSizeMask, v, nil
 	}
+	if preprocess {
+		return a.preprocessorLabelSizer(mnemonic)
+	}
 	return "", nil, nil
 }
 
-// parseOperandSize converts any integer type to operand size mask and value
-// Returns "nn" for 8-bit values, "nnnn" for 16-bit values, etc.
-// Handles negative flag by promoting to larger size if needed
+func (a *Assembler) EvaluateExpressionBytes(asmTokens *AssemblerTokens, mnemonic string, preprocess bool) (int64, error) {
+	// Parse the expression using Pratt parser
+	result, err := a.parseCurrentExpression(asmTokens, mnemonic, 0, preprocess)
+	if err != nil {
+		return 0, err
+	}
+
+	return result, nil
+}
 
 func (a *Assembler) parseLabelOffset(mnemonic string, address uint64) (string, any, error) {
 	addressingModes, ok := a.instructionSet[mnemonic]
@@ -525,7 +531,7 @@ func (a *Assembler) parseLabelOffset(mnemonic string, address uint64) (string, a
 		return string(cpu.RelativeModeStr), ReduceBytes(delta, 1), nil
 	}
 
-	return fourByteOperand, ReduceBytes(address, 2), nil
+	return twoByteOperand, ReduceBytes(address, 2), nil
 }
 
 // parseLabelOffset

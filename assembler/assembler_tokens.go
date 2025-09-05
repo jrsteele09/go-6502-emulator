@@ -39,3 +39,7 @@ func (at *AssemblerTokens) Next() *lexer.Token {
 func (at *AssemblerTokens) Peek() *lexer.Token {
 	return at.nextToken
 }
+
+func (at *AssemblerTokens) Current() *lexer.Token {
+	return at.currToken
+}

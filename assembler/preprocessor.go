@@ -268,16 +268,21 @@ func (a *Assembler) calculateDataSpaceDirectiveSize(asmTokens *AssemblerTokens) 
 }
 
 // preprocessorLabelSizer determines operand size for forward-referenced labels during preprocessing
+// It makes assumptions based on the mnemonic and whether it has Relative addressing modes
 func (a *Assembler) preprocessorLabelSizer(mnemonic string) (string, any, error) {
+	// If Non Mnemonic, assume a label address and not a relative address calculation
+	if mnemonic == "" {
+		return twoByteOperand, ReduceBytes(0x0, 2), nil
+	}
 	addressingModes, ok := a.instructionSet[mnemonic]
 	if !ok {
 		return "", nil, fmt.Errorf("[Assembler preprocessorLabelSizer] unknown mnemonic '%s'", mnemonic)
 	}
 	if _, found := addressingModes[cpu.RelativeModeStr]; found {
-		return twoByteOperand, ReduceBytes(0, 1), nil
+		return oneByteOperand, ReduceBytes(0x0, 1), nil
 	}
 
-	return fourByteOperand, ReduceBytes(0, 2), nil
+	return twoByteOperand, ReduceBytes(0x0, 2), nil
 }
 
 // processConstantAssignment handles identifier = value assignments during preprocessing

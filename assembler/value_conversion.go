@@ -49,8 +49,36 @@ func toUint64(value any) (uint64, error) {
 	}
 }
 
-// parseOperandSize determines the operand size and converts values for assembly
-func parseOperandSize(negative bool, value any) (string, any, error) {
+// toUint64 converts various integer types to uint64
+func toInt64(value any) (int64, error) {
+	switch v := value.(type) {
+	case int64:
+		return v, nil
+	case uint64:
+		return int64(v), nil
+	case uint32:
+		return int64(v), nil
+	case int32:
+		return int64(v), nil
+	case uint16:
+		return int64(v), nil
+	case int16:
+		return int64(v), nil
+	case uint8:
+		return int64(v), nil
+	case int8:
+		return int64(v), nil
+	case int:
+		return int64(v), nil
+	default:
+		return 0, fmt.Errorf("invalid integer type: %T", value)
+	}
+}
+
+// minimumOperandSize converts any integer type to operand size mask and value
+// Returns "nn" for 8-bit values, "nnnn" for 16-bit values, etc.
+// Handles negative flag by promoting to larger size if needed
+func minimumOperandSize(negative bool, value any) (string, any, error) {
 	var finalValue int64
 	var naturalSize int // Natural size in bytes of the input type
 
@@ -190,15 +218,30 @@ func ToLittleEndianBytes[T constraints.Integer](value T) ([]byte, error) {
 func ReduceBytes(value any, noOfBytes int) any {
 	switch v := value.(type) {
 	case int:
-		return reduceSigned(int64(v), noOfBytes)
+		if v < 0 {
+			return reduceSigned(int64(v), noOfBytes)
+		}
+		return reduceUnsigned(uint64(v), noOfBytes)
 	case int8:
-		return reduceSigned(int64(v), noOfBytes)
+		if v < 0 {
+			return reduceSigned(int64(v), noOfBytes)
+		}
+		return reduceUnsigned(uint64(v), noOfBytes)
 	case int16:
-		return reduceSigned(int64(v), noOfBytes)
+		if v < 0 {
+			return reduceSigned(int64(v), noOfBytes)
+		}
+		return reduceUnsigned(uint64(v), noOfBytes)
 	case int32:
-		return reduceSigned(int64(v), noOfBytes)
+		if v < 0 {
+			return reduceSigned(int64(v), noOfBytes)
+		}
+		return reduceUnsigned(uint64(v), noOfBytes)
 	case int64:
-		return reduceSigned(v, noOfBytes)
+		if v < 0 {
+			return reduceSigned(int64(v), noOfBytes)
+		}
+		return reduceUnsigned(uint64(v), noOfBytes)
 	case uint:
 		return reduceUnsigned(uint64(v), noOfBytes)
 	case uint8:
