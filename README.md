@@ -3,7 +3,9 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/jrsteele09/go-6502-emulator)](https://goreportcard.com/report/github.com/jrsteele09/go-6502-emulator)
 [![GoDoc](https://pkg.go.dev/badge/github.com/jrsteele09/go-6502-emulator)](https://pkg.go.dev/github.com/jrsteele09/go-6502-emulator)
 
-A simple but powerful 6502 assembler and debugger written in Go. This project provides everything you need to write, assemble, and debug 6502 assembly programs with a clean command-line interface.
+A simple 6502 assembler and debugger written in Go. This project aims to provide everything you need to write, assemble, and debug 6502 assembly programs.
+
+This will continue to evolve over time, but the aim is to be compatible with as many 6502 assemblers as possible.
 
 ## Features
 
