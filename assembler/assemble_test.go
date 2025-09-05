@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	expectedResultsFolder = "./testasm/expected_results"
+	expectedResultsFolder = "./test_assembly_files/expected_results"
 )
 
 func createHardware() (*memory.Memory[uint16], *cpu.CPU) {
@@ -28,7 +28,7 @@ func TestAssemble_TestIncludeFile(t *testing.T) {
 	// SETUP
 	_, cpu := createHardware()
 	asm := assembler.New(cpu.OpCodes())
-	resolver := utils.NewOSFileResolver("./testasm/TestIncludeFile")
+	resolver := utils.NewOSFileResolver("./test_assembly_files/TestIncludeFile")
 
 	// ASSEMBLE
 	segments, err := asm.AssembleFile("testinclude.asm", resolver)
@@ -46,7 +46,7 @@ func TestAssemble_Snake(t *testing.T) {
 	// SETUP
 	_, cpu := createHardware()
 	asm := assembler.New(cpu.OpCodes())
-	resolver := utils.NewOSFileResolver("./testasm/TestSnakeAssembly")
+	resolver := utils.NewOSFileResolver("./test_assembly_files/TestSnakeAssembly")
 
 	// ASSEMBLE
 	segments, err := asm.AssembleFile("snake.asm", resolver)
@@ -64,7 +64,7 @@ func TestAssemble_TestBorderFlashLoop(t *testing.T) {
 	// SETUP
 	_, cpu := createHardware()
 	asm := assembler.New(cpu.OpCodes())
-	resolver := utils.NewOSFileResolver("./testasm/TestBorderFlashLoop")
+	resolver := utils.NewOSFileResolver("./test_assembly_files/TestBorderFlashLoop")
 
 	// ASSEMBLE
 	segments, err := asm.AssembleFile("screen.asm", resolver)
@@ -82,7 +82,7 @@ func TestAssemble_MultiSegmentAssembly(t *testing.T) {
 	// SETUP
 	_, cpu := createHardware()
 	asm := assembler.New(cpu.OpCodes())
-	resolver := utils.NewOSFileResolver("./testasm/TestMultiSegmentAssembly")
+	resolver := utils.NewOSFileResolver("./test_assembly_files/TestMultiSegmentAssembly")
 
 	// ASSEMBLE
 	segments, err := asm.AssembleFile("main.asm", resolver)
@@ -99,7 +99,7 @@ func TestAssemble_OpenTheBorder(t *testing.T) {
 	// SETUP
 	_, cpu := createHardware()
 	asm := assembler.New(cpu.OpCodes())
-	resolver := utils.NewOSFileResolver("./testasm/TestOpenTheBorderAssembly")
+	resolver := utils.NewOSFileResolver("./test_assembly_files/TestOpenTheBorderAssembly")
 
 	// ASSEMBLE
 	segments, err := asm.AssembleFile("main.asm", resolver)
@@ -116,7 +116,24 @@ func TestAssemble_ForwardReference(t *testing.T) {
 	// SETUP
 	_, cpu := createHardware()
 	asm := assembler.New(cpu.OpCodes())
-	resolver := utils.NewOSFileResolver("./testasm/TestForwardReferenceLabel")
+	resolver := utils.NewOSFileResolver("./test_assembly_files/TestForwardReferenceLabel")
+
+	// ASSEMBLE
+	segments, err := asm.AssembleFile("main.asm", resolver)
+
+	// ASSERT ASSEMBLED RESULTS
+	require.NoError(t, err, "AssembleFile failed")
+	require.Len(t, segments, 1, "Expected exactly one segment")
+
+	// ASSERT DISASSEMBLY
+	disassembleAndCompare(t, segments, false)
+}
+
+func TestAssemble_ConstantsDefinitions(t *testing.T) {
+	// SETUP
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	resolver := utils.NewOSFileResolver("./test_assembly_files/TestConstantDefinitions")
 
 	// ASSEMBLE
 	segments, err := asm.AssembleFile("main.asm", resolver)

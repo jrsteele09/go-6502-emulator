@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/jrsteele09/go-6502-emulator/assembler"
-	"github.com/jrsteele09/go-6502-emulator/assembler/bin"
+	"github.com/jrsteele09/go-6502-emulator/assembler/output"
 	"github.com/jrsteele09/go-6502-emulator/cpu"
 	"github.com/jrsteele09/go-6502-emulator/memory"
 	"github.com/jrsteele09/go-6502-emulator/utils"
@@ -118,10 +118,10 @@ func main() {
 	}
 
 	// Create binary format based on output format flag
-	var format bin.BinaryFormat
+	var format output.BinaryFormat
 	switch *outputFormat {
 	case "prg":
-		format = bin.NewPRGFormat()
+		format = output.NewPRGFormat()
 	case "d64":
 		// Extract base name for disk name
 		diskName := strings.ToUpper(filepath.Base(strings.TrimSuffix(*outputFile, filepath.Ext(*outputFile))))
@@ -138,7 +138,7 @@ func main() {
 			}
 		}
 
-		format = bin.NewD64FormatWithFilename(diskName, "01", fileName)
+		format = output.NewD64FormatWithFilename(diskName, "01", fileName)
 	case "t64":
 		// Extract base name for tape name
 		tapeName := strings.ToUpper(filepath.Base(strings.TrimSuffix(*outputFile, filepath.Ext(*outputFile))))
@@ -155,7 +155,7 @@ func main() {
 			}
 		}
 
-		format = bin.NewT64FormatWithFilename(tapeName, fileName, 30)
+		format = output.NewT64FormatWithFilename(tapeName, fileName, 30)
 	}
 
 	err = format.CreateFile(*outputFile, segments, *verbose)

@@ -1,4 +1,4 @@
-package bin
+package output
 
 import "github.com/jrsteele09/go-6502-emulator/assembler"
 

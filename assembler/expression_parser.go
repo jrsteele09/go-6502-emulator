@@ -26,13 +26,13 @@ func (a *Assembler) getPrecedence(tokenID lexer.TokenIdentifier) int {
 	}
 }
 
-func (a *Assembler) parseNextExpression(asmTokens *AssemblerTokens, mnemonic string, precedence int, preprocess bool) (int64, error) {
+func (a *Assembler) parseNextExpression(asmTokens *Tokens, mnemonic string, precedence int, preprocess bool) (int64, error) {
 	asmTokens.Next() // Advance to next token
 	return a.parseCurrentExpression(asmTokens, mnemonic, precedence, preprocess)
 }
 
 // parseExpression implements a Pratt parser for mathematical expressions
-func (a *Assembler) parseCurrentExpression(asmTokens *AssemblerTokens, mnemonic string, precedence int, preprocess bool) (int64, error) {
+func (a *Assembler) parseCurrentExpression(asmTokens *Tokens, mnemonic string, precedence int, preprocess bool) (int64, error) {
 	// Parse prefix expression (primary)
 	left, err := a.parsePrimary(asmTokens, mnemonic, preprocess)
 	if err != nil {
@@ -82,7 +82,7 @@ func (a *Assembler) parseCurrentExpression(asmTokens *AssemblerTokens, mnemonic 
 }
 
 // parsePrimary parses primary expressions (literals, identifiers, parentheses, unary minus)
-func (a *Assembler) parsePrimary(asmTokens *AssemblerTokens, mnemonic string, preprocess bool) (int64, error) {
+func (a *Assembler) parsePrimary(asmTokens *Tokens, mnemonic string, preprocess bool) (int64, error) {
 	token := asmTokens.Current()
 	if token == nil {
 		return 0, fmt.Errorf("[parsePrimary] unexpected end of expression")
@@ -100,7 +100,7 @@ func (a *Assembler) parsePrimary(asmTokens *AssemblerTokens, mnemonic string, pr
 	case IdentifierToken:
 		_, value, err := a.LabelOrConstantIdentifier(mnemonic, token.Literal, preprocess)
 		if err != nil || value == nil {
-			return 0, fmt.Errorf("[parsePrimary] identifier lookup failed: %w", err)
+			return 0, fmt.Errorf("[parsePrimary] identifier lookup failed for %s %s", mnemonic, token.Literal)
 		}
 
 		return toInt64(value)

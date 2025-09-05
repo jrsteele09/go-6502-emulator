@@ -10,11 +10,66 @@ import (
 	"github.com/jrsteele09/go-lexer/lexer"
 )
 
+const (
+	AsterixSymbolToken lexer.TokenIdentifier = lexer.LastStdLiteral + iota
+	EqualsSymbolToken
+	LeftParenthesis
+	RightParenthesis
+	CommaToken
+	PeriodToken
+	LabelToken
+	IdentifierToken
+	HashToken
+	MnemonicToken
+	MinusToken
+	PlusToken
+	DivideSymbolToken
+	SemiColonToken
+	GreaterThanToken
+	LessThanToken
+)
+
+// KeywordTokens defines keyword to token mappings
+var KeywordTokens = map[string]lexer.TokenIdentifier{}
+
+// Custom tokenizers - On detection of the starting character, jump to a specific tokenizer.
+var customTokenizers = map[string]lexer.TokenizerFunc{
+	"$": lexer.HexTokenizer,
+	"%": lexer.BinaryTokenizer,
+}
+
+var OperatorTokens = map[string]lexer.TokenIdentifier{}
+
+// SymbolTokens defines single delimeter runes to token mappings
+var SymbolTokens = map[rune]lexer.TokenIdentifier{
+	'*': AsterixSymbolToken,
+	'=': EqualsSymbolToken,
+	'(': LeftParenthesis,
+	')': RightParenthesis,
+	',': CommaToken,
+	'.': PeriodToken,
+	'#': HashToken,
+	'-': MinusToken,
+	'+': PlusToken,
+	'/': DivideSymbolToken,
+	'>': GreaterThanToken,
+	'<': LessThanToken,
+}
+
+// comments defines comment syntax mappings
+var comments = map[string]string{
+	";":  "\n",
+	"//": "\n",
+	"/*": "*/",
+}
+
 // AssemblerLexer converts file(s) to a continuous stream of tokens
 type AssemblerLexer struct {
 	fileResolver    utils.FileResolver
 	MaxIncludeDepth int
 	includedFiles   map[string]bool // Track included files to prevent circular includes
+	includeCount    map[string]int
+	importOnce      map[string]bool
 }
 
 // NewAssemblerLexer creates a new preprocessor with the given file resolver
@@ -23,6 +78,8 @@ func NewAssemblerLexer(resolver utils.FileResolver) *AssemblerLexer {
 		fileResolver:    resolver,
 		MaxIncludeDepth: 10, // Reasonable default for include depth
 		includedFiles:   make(map[string]bool),
+		includeCount:    make(map[string]int),
+		importOnce:      make(map[string]bool),
 	}
 }
 
@@ -32,6 +89,8 @@ func NewAssemblerLexer(resolver utils.FileResolver) *AssemblerLexer {
 func (p *AssemblerLexer) Tokens(cfg *lexer.LanguageConfig, input io.Reader, filename string) ([]*lexer.Token, error) {
 	// Reset included files for each processing session
 	p.includedFiles = make(map[string]bool)
+	p.includeCount = make(map[string]int)
+	p.importOnce = make(map[string]bool)
 
 	tokens, err := p.readerTokens(cfg, input, filename, 0)
 	if err != nil {
@@ -83,11 +142,24 @@ func (p *AssemblerLexer) readerTokens(cfg *lexer.LanguageConfig, input io.Reader
 		line := scanner.Text()
 		trimmedLine := strings.TrimSpace(line)
 
+		// Check for preprocessor commands
+		if strings.HasPrefix(trimmedLine, "#") {
+			if skip, err := p.handlePreprocessorCommand(trimmedLine, filename); err != nil {
+				return nil, err
+			} else if skip {
+				continue
+			}
+		}
+
 		// Check for include directives
 		includeFilePath := p.extractIncludePath(trimmedLine)
 		if includeFilePath != "" {
+			if p.importOnce[includeFilePath] && p.includeCount[includeFilePath] > 0 {
+				// Skip this include as it has already been imported once
+				continue
+			}
 			// Flush any accumulated non-include lines before processing include
-			if err := tokenizeSource(includeFilePath); err != nil {
+			if err := tokenizeSource(filename); err != nil {
 				return nil, err
 			}
 
@@ -97,6 +169,7 @@ func (p *AssemblerLexer) readerTokens(cfg *lexer.LanguageConfig, input io.Reader
 			}
 
 			p.includedFiles[includeFilePath] = true
+			p.includeCount[includeFilePath]++
 
 			includeFileReader, err := p.fileResolver.Resolve(includeFilePath)
 			if err != nil {
@@ -109,7 +182,6 @@ func (p *AssemblerLexer) readerTokens(cfg *lexer.LanguageConfig, input io.Reader
 			}
 
 			out = append(out, includedTokens...)
-
 			delete(p.includedFiles, includeFilePath)
 			sourceLine = lineNum + 1
 			continue
@@ -135,6 +207,15 @@ func (p *AssemblerLexer) readerTokens(cfg *lexer.LanguageConfig, input io.Reader
 	}
 
 	return out, nil
+}
+
+func (p *AssemblerLexer) handlePreprocessorCommand(trimmedLine string, filename string) (skipLine bool, err error) {
+	switch trimmedLine {
+	case "#importonce":
+		p.importOnce[filename] = true
+		return true, nil
+	}
+	return false, nil
 }
 
 // extractIncludePath extracts the file path from include directives

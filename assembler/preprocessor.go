@@ -124,51 +124,56 @@ func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error)
 }
 
 // preprocessDirective handles directive processing during the first pass
-func (a *Assembler) preprocessDirective(asmTokens *AssemblerTokens, advanceProgramCounter func(int), finalizeSegment func()) error {
+func (a *Assembler) preprocessDirective(asmTokens *Tokens, advanceProgramCounter func(int), finalizeSegment func()) error {
 	// Check if this is a directive (. followed by directive name)
 	nextToken := asmTokens.Peek()
 	if nextToken != nil && nextToken.ID == IdentifierToken {
 		directiveName := "." + nextToken.Literal
-		if tokenID, found := KeywordTokens[strings.ToUpper(directiveName)]; found {
+		if directiveID, found := a.directives[strings.ToUpper(directiveName)]; found {
 			// Consume the directive name token
 			asmTokens.Next()
 			// Process the specific directive based on its token ID
-			switch tokenID {
-			case ByteDirectiveToken, DbDirectiveToken:
+			switch directiveID {
+			case ByteDirective, DbDirective:
 				size, err := a.calculateByteDirectiveSize(asmTokens)
 				if err != nil {
 					return err
 				}
 				advanceProgramCounter(size)
-			case WordDirectiveToken, DwDirectiveToken:
+			case WordDirective, DwDirective:
 				size, err := a.calculateWordDirectiveSize(asmTokens)
 				if err != nil {
 					return err
 				}
 				advanceProgramCounter(size)
-			case TextDirectiveToken, StringDirectiveToken, StrDirectiveToken, AscDirectiveToken:
+			case TextDirective, StringDirective, StrDirective, AscDirective:
 				size, err := a.calculateTextDirectiveSize(asmTokens)
 				if err != nil {
 					return err
 				}
 				advanceProgramCounter(size)
-			case AsciizDirectiveToken:
+			case AsciizDirective:
 				size, err := a.calculateAsciizDirectiveSize(asmTokens)
 				if err != nil {
 					return err
 				}
 				advanceProgramCounter(size)
-			case OrgDirectiveToken:
+			case OrgDirective:
 				err := a.processOrgDirective(asmTokens, finalizeSegment)
 				if err != nil {
 					return err
 				}
-			case DsDirectiveToken:
+			case DsDirective:
 				size, err := a.calculateDataSpaceDirectiveSize(asmTokens)
 				if err != nil {
 					return err
 				}
 				advanceProgramCounter(size)
+			case VarDirective:
+				err := a.processVarDirective(asmTokens)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -194,7 +199,7 @@ func (a *Assembler) recordLabelAddress(t *lexer.Token) error {
 }
 
 // Size calculation functions for first pass
-func (a *Assembler) calculateByteDirectiveSize(asmTokens *AssemblerTokens) (int, error) {
+func (a *Assembler) calculateByteDirectiveSize(asmTokens *Tokens) (int, error) {
 	size := 0
 	for {
 		t := asmTokens.Peek()
@@ -211,7 +216,7 @@ func (a *Assembler) calculateByteDirectiveSize(asmTokens *AssemblerTokens) (int,
 	return size, nil
 }
 
-func (a *Assembler) calculateWordDirectiveSize(asmTokens *AssemblerTokens) (int, error) {
+func (a *Assembler) calculateWordDirectiveSize(asmTokens *Tokens) (int, error) {
 	size := 0
 	for {
 		t := asmTokens.Peek()
@@ -229,7 +234,7 @@ func (a *Assembler) calculateWordDirectiveSize(asmTokens *AssemblerTokens) (int,
 	return size, nil
 }
 
-func (a *Assembler) calculateTextDirectiveSize(asmTokens *AssemblerTokens) (int, error) {
+func (a *Assembler) calculateTextDirectiveSize(asmTokens *Tokens) (int, error) {
 	t := asmTokens.Next()
 	if t == nil || t.ID != lexer.StringLiteral {
 		return 0, fmt.Errorf("[calculateTextDirectiveSize] expected string after .TEXT")
@@ -241,7 +246,7 @@ func (a *Assembler) calculateTextDirectiveSize(asmTokens *AssemblerTokens) (int,
 	return len(str), nil
 }
 
-func (a *Assembler) calculateAsciizDirectiveSize(asmTokens *AssemblerTokens) (int, error) {
+func (a *Assembler) calculateAsciizDirectiveSize(asmTokens *Tokens) (int, error) {
 	t := asmTokens.Next()
 	if t == nil || t.ID != lexer.StringLiteral {
 		return 0, fmt.Errorf("[calculateAsciizDirectiveSize] expected string after .ASCIIZ")
@@ -253,7 +258,7 @@ func (a *Assembler) calculateAsciizDirectiveSize(asmTokens *AssemblerTokens) (in
 	return len(str) + 1, nil // +1 for null terminator
 }
 
-func (a *Assembler) calculateDataSpaceDirectiveSize(asmTokens *AssemblerTokens) (int, error) {
+func (a *Assembler) calculateDataSpaceDirectiveSize(asmTokens *Tokens) (int, error) {
 	t := asmTokens.Next()
 	if t == nil {
 		return 0, fmt.Errorf("[calculateDataSpaceDirectiveSize] expected size after .DS")
@@ -286,7 +291,7 @@ func (a *Assembler) preprocessorLabelSizer(mnemonic string) (string, any, error)
 }
 
 // processConstantAssignment handles identifier = value assignments during preprocessing
-func (a *Assembler) processConstantAssignment(identifierToken *lexer.Token, asmTokens *AssemblerTokens) error {
+func (a *Assembler) processConstantAssignment(identifierToken *lexer.Token, asmTokens *Tokens) error {
 	variableName := identifierToken.Literal
 
 	// Check for duplicate variable
@@ -308,17 +313,14 @@ func (a *Assembler) processConstantAssignment(identifierToken *lexer.Token, asmT
 	// Get value
 	valueToken := asmTokens.Next()
 	if valueToken == nil {
-		return fmt.Errorf("[processConstantAssignment] expected value after '='")
+		return fmt.Errorf("[processConstantAssignment] expected value after %s '='", variableName)
 	}
 
-	switch valueToken.ID {
-	case lexer.HexLiteral, lexer.IntegerLiteral:
-		a.constants[variableName] = valueToken.Value
-	// case ProgramCounterToken:
-	// 	a.constants[variableName] = uint16(a.programCounter)
-	default:
-		return fmt.Errorf("[processConstantAssignment] invalid value type for constant assignment")
+	evaluatedValue, err := a.EvaluateExpression(asmTokens, "", true)
+	if err != nil {
+		return fmt.Errorf("[processConstantAssignment] failed to evaluate expression for %s: %w", variableName, err)
 	}
 
+	a.constants[variableName] = evaluatedValue
 	return nil
 }

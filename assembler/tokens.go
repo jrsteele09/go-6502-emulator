@@ -4,8 +4,8 @@ import (
 	"github.com/jrsteele09/go-lexer/lexer"
 )
 
-// AssemblerTokens wraps a slice of tokens and provides methods for sequential processing
-type AssemblerTokens struct {
+// Tokens wraps a slice of tokens and provides methods for sequential processing
+type Tokens struct {
 	tokens    []*lexer.Token
 	tokenIdx  int
 	currToken *lexer.Token
@@ -13,8 +13,8 @@ type AssemblerTokens struct {
 }
 
 // NewAssemblerTokens creates a new AssemblerTokens instance with the given tokens
-func NewAssemblerTokens(tokens []*lexer.Token) *AssemblerTokens {
-	at := &AssemblerTokens{
+func NewAssemblerTokens(tokens []*lexer.Token) *Tokens {
+	at := &Tokens{
 		tokens: tokens,
 	}
 
@@ -24,7 +24,7 @@ func NewAssemblerTokens(tokens []*lexer.Token) *AssemblerTokens {
 }
 
 // Next advances to the next token and returns the current token
-func (at *AssemblerTokens) Next() *lexer.Token {
+func (at *Tokens) Next() *lexer.Token {
 	at.currToken = at.nextToken
 	if at.tokenIdx >= len(at.tokens)-1 {
 		at.nextToken = nil
@@ -36,10 +36,10 @@ func (at *AssemblerTokens) Next() *lexer.Token {
 }
 
 // Peek returns the next token without advancing the position
-func (at *AssemblerTokens) Peek() *lexer.Token {
+func (at *Tokens) Peek() *lexer.Token {
 	return at.nextToken
 }
 
-func (at *AssemblerTokens) Current() *lexer.Token {
+func (at *Tokens) Current() *lexer.Token {
 	return at.currToken
 }
