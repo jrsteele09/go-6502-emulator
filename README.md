@@ -5,7 +5,7 @@
 
 A simple 6502 assembler and debugger written in Go. This project aims to provide everything you need to write, assemble, and debug 6502 assembly programs.
 
-This will continue to evolve over time, but the aim is to be compatible with as many 6502 assemblers as possible.
+The assembler will continue to evolve over time, but the aim is to be compatible with as many 6502 assemblers as possible.
 
 ## Features
 
