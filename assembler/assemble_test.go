@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	createExpectedResults = false
 	expectedResultsFolder = "./testasm/expected_results"
 )
 
@@ -40,7 +39,7 @@ func TestAssemble_TestIncludeFile(t *testing.T) {
 	require.Equal(t, uint16(0xC000), segments[0].StartAddress, "Expected start address $C000")
 
 	// ASSERT DISSASSEMBLY
-	disassembleAndCompare(t, segments)
+	disassembleAndCompare(t, segments, false)
 }
 
 func TestAssemble_Snake(t *testing.T) {
@@ -58,7 +57,7 @@ func TestAssemble_Snake(t *testing.T) {
 	require.Equal(t, uint16(0x4000), segments[0].StartAddress, "Expected start address $C000")
 
 	// ASSERT DISSASSEMBLY
-	disassembleAndCompare(t, segments)
+	disassembleAndCompare(t, segments, false)
 }
 
 func TestAssemble_TestBorderFlashLoop(t *testing.T) {
@@ -76,7 +75,7 @@ func TestAssemble_TestBorderFlashLoop(t *testing.T) {
 	require.Equal(t, uint16(0xC000), segments[0].StartAddress, "Expected start address $C000")
 
 	// ASSERT DISASSEMBLY
-	disassembleAndCompare(t, segments)
+	disassembleAndCompare(t, segments, false)
 }
 
 func TestAssemble_MultiSegmentAssembly(t *testing.T) {
@@ -93,27 +92,44 @@ func TestAssemble_MultiSegmentAssembly(t *testing.T) {
 	require.Len(t, segments, 2, "Expected exactly one segment")
 
 	// ASSERT DISASSEMBLY
-	disassembleAndCompare(t, segments)
+	disassembleAndCompare(t, segments, false)
 }
 
-// func TestAssemble_OpenTheBorder(t *testing.T) {
-// 	// SETUP
-// 	_, cpu := createHardware()
-// 	asm := assembler.New(cpu.OpCodes())
-// 	resolver := utils.NewOSFileResolver("./testasm/TestOpenTheBorderAssembly")
+func TestAssemble_OpenTheBorder(t *testing.T) {
+	// SETUP
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	resolver := utils.NewOSFileResolver("./testasm/TestOpenTheBorderAssembly")
 
-// 	// ASSEMBLE
-// 	segments, err := asm.AssembleFile("temp.asm", resolver)
+	// ASSEMBLE
+	segments, err := asm.AssembleFile("main.asm", resolver)
 
-// 	// ASSERT ASSEMBLED RESULTS
-// 	require.NoError(t, err, "AssembleFile failed")
-// 	require.Len(t, segments, 1, "Expected exactly one segment")
+	// ASSERT ASSEMBLED RESULTS
+	require.NoError(t, err, "AssembleFile failed")
+	require.Len(t, segments, 1, "Expected exactly one segment")
 
-// 	// ASSERT DISASSEMBLY
-// 	disassembleAndCompare(t, segments)
-// }
+	// ASSERT DISASSEMBLY
+	disassembleAndCompare(t, segments, false)
+}
 
-func disassembleAndCompare(t *testing.T, segments []assembler.AssembledData) {
+func TestAssemble_ForwardReference(t *testing.T) {
+	// SETUP
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	resolver := utils.NewOSFileResolver("./testasm/TestForwardReferenceLabel")
+
+	// ASSEMBLE
+	segments, err := asm.AssembleFile("main.asm", resolver)
+
+	// ASSERT ASSEMBLED RESULTS
+	require.NoError(t, err, "AssembleFile failed")
+	require.Len(t, segments, 1, "Expected exactly one segment")
+
+	// ASSERT DISASSEMBLY
+	disassembleAndCompare(t, segments, false)
+}
+
+func disassembleAndCompare(t *testing.T, segments []assembler.AssembledData, createExpectedResults bool) {
 	mem, cpu := createHardware()
 	writeSegmentsToMemory(mem, segments)
 	dbg := debugger.NewDisassembler(mem, cpu.OpCodes())
