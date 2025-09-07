@@ -146,6 +146,21 @@ func TestAssemble_ConstantsDefinitions(t *testing.T) {
 	disassembleAndCompare(t, segments, false)
 }
 
+func TestAssembler_ConstantTooLarge(t *testing.T) {
+	// SETUP
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	resolver := utils.NewOSFileResolver("./test_assembly_files/TestLargeConstants")
+
+	// ASSEMBLE
+	segments, err := asm.AssembleFile("main.asm", resolver)
+
+	// ASSERT ASSEMBLED RESULTS
+	require.Error(t, err, "Should have number too large error")
+	require.Contains(t, err.Error(), "number too large", "Expected number too large error")
+	disassembleAndCompare(t, segments, true)
+}
+
 func disassembleAndCompare(t *testing.T, segments []assembler.AssembledData, createExpectedResults bool) {
 	mem, cpu := createHardware()
 	writeSegmentsToMemory(mem, segments)

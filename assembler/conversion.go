@@ -72,7 +72,7 @@ func minimumOperandSize(negative bool, value any) (string, any, error) {
 		sizeMask = twoByteOperand
 		reducedValue = ReduceBytes(finalValue, 2)
 	default:
-		return "", nil, fmt.Errorf("[parseOperandSize] Number too large: %d", finalValue)
+		return "", nil, fmt.Errorf("number too large: %d", finalValue)
 	}
 
 	return sizeMask, reducedValue, nil

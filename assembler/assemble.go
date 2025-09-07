@@ -151,25 +151,25 @@ func (a *Assembler) AssembleFile(mainFile string, fileResolver utils.FileResolve
 
 	reader, err := fileResolver.Resolve(mainFile)
 	if err != nil {
-		return nil, fmt.Errorf("[Assembler AssembleFile] Resolve [%w]", err)
+		return nil, fmt.Errorf("Assembler AssembleFile Resolve [%w]", err)
 	}
 
 	asmLexer := NewAssemblerLexer(fileResolver)
 	tokens, err := asmLexer.Tokens(a.lexerConfig, reader, mainFile)
 	if err != nil {
-		return nil, fmt.Errorf("[Assembler AssembleFile] Tokenize [%w]", err)
+		return nil, fmt.Errorf("Assembler AssembleFile Tokenize [%w]", err)
 	}
 
 	// First pass: calculate memory layout and collect labels
 	segments, err := a.preprocessor(tokens)
 	if err != nil {
-		return nil, fmt.Errorf("[Assembler AssembleFile] preprocessor [%w]", err)
+		return nil, fmt.Errorf("Assembler preprocessor [%w]", err)
 	}
 
 	// Second pass: generate machine code
 	err = a.generateCode(tokens, segments)
 	if err != nil {
-		return nil, fmt.Errorf("[Assembler AssembleFile] generateCode [%w]", err)
+		return nil, fmt.Errorf("Assembler AssembleFile generateCode [%w]", err)
 	}
 
 	return segments, nil

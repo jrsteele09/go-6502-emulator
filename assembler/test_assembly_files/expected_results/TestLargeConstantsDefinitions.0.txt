@@ -1,0 +1,1 @@
+$0000: AD FF FF   LDA $FFFF

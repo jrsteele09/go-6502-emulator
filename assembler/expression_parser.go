@@ -93,14 +93,14 @@ func (a *Assembler) parsePrimary(asmTokens *Tokens, mnemonic string, preprocess 
 		// Convert literal to int64
 		value, err := toInt64(token.Value)
 		if err != nil {
-			return 0, fmt.Errorf("[parsePrimary] invalid literal: %w", err)
+			return 0, fmt.Errorf("invalid literal: %w", err)
 		}
 		return value, nil
 
 	case IdentifierToken:
 		_, value, err := a.LabelOrConstantIdentifier(mnemonic, token.Literal, preprocess)
 		if err != nil || value == nil {
-			return 0, fmt.Errorf("[parsePrimary] identifier lookup failed for %s %s", mnemonic, token.Literal)
+			return 0, err
 		}
 
 		return toInt64(value)
@@ -123,12 +123,12 @@ func (a *Assembler) parsePrimary(asmTokens *Tokens, mnemonic string, preprocess 
 		// Expect closing parenthesis
 		closeParen := asmTokens.Next()
 		if closeParen == nil || closeParen.ID != RightParenthesis {
-			return 0, fmt.Errorf("[parsePrimary] expected closing parenthesis")
+			return 0, fmt.Errorf("expected closing parenthesis")
 		}
 
 		return result, nil
 
 	default:
-		return 0, fmt.Errorf("[parsePrimary] unexpected token: %s", token.Literal)
+		return 0, fmt.Errorf("unexpected token: %s", token.Literal)
 	}
 }
