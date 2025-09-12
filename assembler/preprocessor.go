@@ -69,6 +69,16 @@ func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error)
 				currentSegmentSize = 0
 			}
 
+		case PlusToken, MinusToken:
+			if tokenPosition != 1 {
+				return nil, fmt.Errorf("[preprocessor] unexpected token '%s'", t.Literal)
+			}
+			// Handle shorthand labels (+ and -)
+			err := a.recordPlusOrMinusLabelAddress(t, asmTokens)
+			if err != nil {
+				return nil, err
+			}
+
 		case LabelToken:
 			err := a.recordLabelAddress(t)
 			if err != nil {
@@ -195,6 +205,24 @@ func (a *Assembler) recordLabelAddress(t *lexer.Token) error {
 	}
 
 	a.labels[labelName] = uint64(a.programCounter)
+	return nil
+}
+
+// recordPlusOrMinusLabelAddress records the current program counter for '+' or '-' shorthand labels
+func (a *Assembler) recordPlusOrMinusLabelAddress(t *lexer.Token, asmTokens *Tokens) error {
+	labelSymbol := t.Literal
+	for {
+		nextToken := asmTokens.Peek()
+		if nextToken == nil || nextToken.ID != t.ID {
+			break
+		}
+		labelSymbol += nextToken.Literal
+		asmTokens.Next() // Consume the token
+	}
+	if _, exists := a.plusMinusLabels[labelSymbol]; !exists {
+		a.plusMinusLabels[labelSymbol] = []uint64{}
+	}
+	a.plusMinusLabels[labelSymbol] = append(a.plusMinusLabels[labelSymbol], uint64(a.programCounter))
 	return nil
 }
 

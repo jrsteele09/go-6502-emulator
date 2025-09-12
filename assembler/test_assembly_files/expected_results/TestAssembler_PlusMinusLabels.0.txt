@@ -1,0 +1,8 @@
+$C000: 4C 05 C0   JMP $C005
+$C003: D0 FB      BNE $C000
+$C005: A9 01      LDA #$01
+$C007: A2 02      LDX #$02
+$C009: A2 03      LDX #$03
+$C00B: 4C 10 C0   JMP $C010
+$C00E: D0 F7      BNE $C007
+$C010: 60         RTS
