@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 
 	"github.com/jrsteele09/go-6502-emulator/cpu"
@@ -35,9 +36,40 @@ type Instruction struct {
 	Definition *cpu.OpCodeDef
 }
 
+type addresses []uint64
+
+// closestAddress:
+//
+//	Pass the program Counter and set before to true to find the closest address before the program counter, set
+//	it to false to find the closes address after the program counter.
+//
+//	Returns -1 if no address found
+func (addr addresses) closestAddress(programCounter uint64, before bool) int64 {
+	addressApplicable := func(a uint64) bool {
+		if before {
+			return a > programCounter
+		}
+		return a < programCounter
+	}
+	closestAddress := int64(-1)
+	for _, a := range addr {
+		if addressApplicable(a) {
+			continue
+		}
+		delta := int64(math.Abs(float64(int64(programCounter - a))))
+		closestDelta := int64(math.Abs(float64(int64(programCounter) - closestAddress)))
+
+		if closestAddress == -1 || (delta < closestDelta) {
+			closestAddress = int64(a)
+		}
+	}
+	return closestAddress
+}
+
 type Assembler struct {
 	instructionSet        map[string]map[cpu.AddressingModeType]Instruction
-	labels                map[string]uint64 // Labels address
+	labels                map[string]uint64    // Labels address
+	plusMinusLabels       map[string]addresses // '+' and '-' labels for shorthand label resolution
 	constants             map[string]any
 	addressingModeSymbols map[string]struct{}
 	directives            map[string]int
@@ -96,6 +128,7 @@ func New(opcodes []*cpu.OpCodeDef) *Assembler {
 	assembler := &Assembler{
 		instructionSet:        instructionSet,
 		labels:                make(map[string]uint64),
+		plusMinusLabels:       make(map[string]addresses),
 		constants:             make(map[string]interface{}),
 		addressingModeSymbols: addressingModeSymbols,
 		directives:            directives,
@@ -249,6 +282,15 @@ func (a *Assembler) generateCode(tokens []*lexer.Token, segments []AssembledData
 		case LabelToken:
 			// Labels already processed in first pass
 			continue
+
+		case PlusToken, MinusToken:
+			if tokenPosition != 1 {
+				return fmt.Errorf("[generateCode] unexpected token '%s'", t.Literal)
+			}
+			tokenPosition = 0 // Reset the token position, there may be another "+" or "-"
+			continue
+
+			// Plus / Minus tokens already pre-processed, just consume the token
 
 		case IdentifierToken:
 			// Check if this is a constant assignment (identifier = value)
@@ -406,7 +448,28 @@ parseLoop:
 		switch t.ID {
 		case lexer.EndOfLineType, lexer.EOFType:
 			break parseLoop
-		case lexer.HexLiteral, lexer.IntegerLiteral, MinusToken:
+		case lexer.HexLiteral, lexer.IntegerLiteral, MinusToken, PlusToken:
+
+			peekToken := asmTokens.Peek()
+			if t.ID == MinusToken || t.ID == PlusToken && (peekToken == nil || peekToken.ID == t.ID || peekToken.ID == lexer.EndOfLineType || peekToken.ID == lexer.EOFType) {
+				sizeMask, labelValue, err := a.PlusMinusLabel(mnemonic, t, asmTokens, preprocess)
+				if err != nil {
+					return AddressingMode{}, err
+				}
+
+				noBytes := 1
+				if sizeMask == twoByteOperand {
+					noBytes = 2
+				}
+
+				// Ensure that the value is appropriate for the size mask nn = 1 Bytes, nnnn= 2 Bytes
+				value := ReduceBytes(labelValue, noBytes)
+				operandValues = append(operandValues, value)
+				parsedAddressingMode += a.operandSizeForLabel(mnemonic, sizeMask)
+
+				break parseLoop
+			}
+
 			evaluatedValue, err := a.EvaluateExpression(asmTokens, mnemonic, preprocess)
 			if err != nil {
 				return AddressingMode{}, err
@@ -519,6 +582,47 @@ func (a *Assembler) operandSizeForLabel(mnemonic, currentSizeStr string) string 
 	return currentSizeStr
 }
 
+// Works out the closest address for when labels are referenced with a simple "+" or "-"
+func (a *Assembler) PlusMinusLabel(mnemonic string, t *lexer.Token, asmTokens *Tokens, preprocess bool) (string, any, error) {
+	if t.ID != PlusToken && t.ID != MinusToken {
+		return "", nil, fmt.Errorf("[PlusMinusLabel] expected + or - token, got %s", t.Literal)
+	}
+
+	// Handles cases where "++++" or "---" are used
+	labelSymbol := t.Literal
+	for {
+		nextToken := asmTokens.Peek()
+		if nextToken == nil || nextToken.ID != t.ID {
+			break
+		}
+		labelSymbol += nextToken.Literal
+		asmTokens.Next() // Consume the token
+	}
+
+	// Lookup the addresses for the label
+	addresses, found := a.plusMinusLabels[labelSymbol]
+	if !found {
+		if preprocess {
+			return a.preprocessorLabelSizer(mnemonic)
+		} else {
+			return "", 0, fmt.Errorf("label %s not found", labelSymbol)
+		}
+	}
+
+	// Find the closest addressa
+	findBeforeProgramCounter := t.ID == MinusToken
+	closestAddress := addresses.closestAddress(uint64(a.programCounter), findBeforeProgramCounter)
+	if closestAddress == -1 {
+		if preprocess {
+			return a.preprocessorLabelSizer(mnemonic)
+		} else {
+			return "", 0, fmt.Errorf("label %s not found", labelSymbol)
+		}
+	}
+
+	return a.parseLabelOffset(mnemonic, uint64(closestAddress))
+}
+
 func (a *Assembler) LabelOrConstantIdentifier(mnemonic, identifier string, preprocess bool) (sizeMask string, value any, err error) {
 	if value, ok := a.constants[identifier]; ok {
 		operandSizeMask, v, err := minimumOperandSize(false, value)
@@ -528,16 +632,12 @@ func (a *Assembler) LabelOrConstantIdentifier(mnemonic, identifier string, prepr
 		return operandSizeMask, v, nil
 	}
 	if address, ok := a.labels[identifier]; ok {
-		operandSizeMask, v, err := a.parseLabelOffset(mnemonic, address)
-		if err != nil {
-			return "", nil, err
-		}
-		return operandSizeMask, v, nil
+		return a.parseLabelOffset(mnemonic, address)
 	}
 	if preprocess {
 		return a.preprocessorLabelSizer(mnemonic)
 	}
-	return "", nil, nil
+	return "", nil, fmt.Errorf("undefined identifier: %s", identifier)
 }
 
 func (a *Assembler) EvaluateExpression(asmTokens *Tokens, mnemonic string, preprocess bool) (int64, error) {
@@ -862,4 +962,14 @@ func (a *Assembler) identifierTokenCreator(identifier string) *lexer.Token {
 
 	// Identifier
 	return lexer.NewToken(IdentifierToken, identifier, 0)
+}
+
+func (a *Assembler) consumeSameTokens(t *lexer.Token, asmTokens *Tokens) {
+	for {
+		nextToken := asmTokens.Peek()
+		if nextToken == nil || nextToken.ID != t.ID {
+			break
+		}
+		asmTokens.Next() // Consume the token
+	}
 }

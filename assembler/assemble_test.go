@@ -158,7 +158,21 @@ func TestAssembler_ConstantTooLarge(t *testing.T) {
 	// ASSERT ASSEMBLED RESULTS
 	require.Error(t, err, "Should have number too large error")
 	require.Contains(t, err.Error(), "number too large", "Expected number too large error")
-	disassembleAndCompare(t, segments, true)
+	disassembleAndCompare(t, segments, false)
+}
+
+func TestAssembler_PlusMinusLabels(t *testing.T) {
+	// SETUP
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	resolver := utils.NewOSFileResolver("./test_assembly_files/TestPlusMinusLabelOffset")
+
+	// ASSEMBLE
+	segments, err := asm.AssembleFile("main.asm", resolver)
+
+	// ASSERT ASSEMBLED RESULTS
+	require.NoError(t, err, "Should have no error")
+	disassembleAndCompare(t, segments, false)
 }
 
 func disassembleAndCompare(t *testing.T, segments []assembler.AssembledData, createExpectedResults bool) {
