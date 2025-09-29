@@ -11,15 +11,15 @@ type OpCodeDef struct {
 	AddressingModeType AddressingModeType
 	Bytes              int
 	Cycles             int
-	ExecGetter         InstructionGetter
+	GetInstructionFunc InstructionFunctionGetter
 	AddressingMode     AddressingMode
 }
 
 // InstructionFunc defines a function type for executing an instruction and returning whether it is completed and any error encountered.
 type InstructionFunc = func() (Completed, error)
 
-// InstructionGetter defines a function type for getting the instruction execution function based on the opcode definition.
-type InstructionGetter func(OpCodeDef) InstructionFunc
+// InstructionFunctionGetter defines a function type for getting the instruction execution function based on the opcode definition.
+type InstructionFunctionGetter func(OpCodeDef) InstructionFunc
 
 // Mnemonic formats the mnemonic string with the addressing mode type.
 func Mnemonic(mnemonic string, am AddressingModeType) string {
@@ -39,7 +39,7 @@ func NewInstruction(am func(am AddressingModeType) AddressingMode) InstructionDe
 }
 
 // Instruction creates an OpCodeDef instance for the given mnemonic, cycles, and execution function getter.
-func (id InstructionDefinition) Instruction(Mnemonic string, cycles int, execGet InstructionGetter) *OpCodeDef {
+func (id InstructionDefinition) Instruction(Mnemonic string, cycles int, execGet InstructionFunctionGetter) *OpCodeDef {
 	oc := &OpCodeDef{Mnemonic: Mnemonic}
 
 	components := strings.Split(strings.TrimSpace(Mnemonic), " ")
@@ -59,7 +59,7 @@ func (id InstructionDefinition) Instruction(Mnemonic string, cycles int, execGet
 	oc.Cycles = cycles
 
 	oc.AddressingMode = id.addressingModeGetter(oc.AddressingModeType)
-	oc.ExecGetter = execGet
+	oc.GetInstructionFunc = execGet
 
 	return oc
 }

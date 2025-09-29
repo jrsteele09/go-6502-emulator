@@ -229,8 +229,8 @@ func (p *CPU) addPCOffset(b byte) (uint16, bool) {
 func (p *CPU) adc(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, false)
 
-	var adcMode = map[bool]func(b byte){
-		true: func(b byte) {
+	var adcMode = map[BinaryOrDecimalMode]func(b byte){
+		BCDMode: func(b byte) {
 			// BCD Mode
 			carryFlag := false
 			lowNibble := (p.Reg.A & 0x0F) + (b & 0x0F)
@@ -254,7 +254,7 @@ func (p *CPU) adc(opcode OpCodeDef) InstructionFunc {
 			p.Reg.A = byte(result & 0xFF)
 			p.Reg.SetStatus(CarryFlag, carryFlag)
 		},
-		false: func(b byte) {
+		BinaryMode: func(b byte) {
 			// Binary Mode
 			m := p.Reg.A
 			r := m + b
@@ -273,7 +273,7 @@ func (p *CPU) adc(opcode OpCodeDef) InstructionFunc {
 			return false, nil
 		}
 		m := p.Reg.A
-		adcMode[p.Reg.IsSet(DecimalFlag)](b)
+		adcMode[BinaryOrDecimalMode(p.Reg.IsSet(DecimalFlag))](b)
 		p.Reg.SetZeroFlag(p.Reg.A)
 		p.Reg.SetOverflowFlag(m, b, p.Reg.A, true)
 		p.Reg.SetNegativeFlag(p.Reg.A)
@@ -768,8 +768,8 @@ func (p *CPU) rts(_ OpCodeDef) InstructionFunc {
 func (p *CPU) sbc(opcode OpCodeDef) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, false)
 
-	var sbcMode = map[bool]func(b byte){
-		true: func(b byte) {
+	var sbcMode = map[BinaryOrDecimalMode]func(b byte){
+		BCDMode: func(b byte) {
 			// BCD Mode
 			carry := byte(1)
 			if !p.Reg.IsSet(CarryFlag) {
@@ -805,7 +805,7 @@ func (p *CPU) sbc(opcode OpCodeDef) InstructionFunc {
 			p.Reg.SetStatus(CarryFlag, int8(highNibble) >= 0)
 		},
 
-		false: func(b byte) {
+		BinaryMode: func(b byte) {
 			// Binary Mode
 			m := p.Reg.A
 			c := byte(0)
@@ -826,7 +826,7 @@ func (p *CPU) sbc(opcode OpCodeDef) InstructionFunc {
 			return false, nil
 		}
 		m := p.Reg.A
-		sbcMode[p.Reg.IsSet(DecimalFlag)](b)
+		sbcMode[BinaryOrDecimalMode(p.Reg.IsSet(DecimalFlag))](b)
 		p.Reg.SetZeroFlag(p.Reg.A)
 		p.Reg.SetNegativeFlag(p.Reg.A)
 		p.Reg.SetOverflowFlag(m, b, p.Reg.A, false)
