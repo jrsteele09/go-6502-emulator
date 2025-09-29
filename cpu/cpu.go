@@ -9,6 +9,12 @@ import (
 
 // Completed represents whether an instruction has completed execution.
 type Completed bool
+type BinaryOrDecimalMode bool
+
+const (
+	BCDMode    BinaryOrDecimalMode = true
+	BinaryMode                     = false
+)
 
 // CPU6502 interface defines the methods required to emulate the 6502 CPU.
 type CPU6502 interface {
@@ -46,7 +52,7 @@ type CPU struct {
 	opCodes           []*OpCodeDef
 	cycles            uint64
 	instructionCycles int
-	instruction       InstructionFunc
+	instructionFunc   InstructionFunc
 	operands          []byte
 	irq               bool
 	nmi               bool
@@ -113,13 +119,13 @@ func (p *CPU) Execute() (Completed, error) {
 		p.instructionCycles--
 		return false, nil
 	}
-	completed, err := p.instruction()
+	completed, err := p.instructionFunc()
 	if completed {
 		if p.checkInterrupts() {
-			p.instruction = p.interruptInstruction
+			p.instructionFunc = p.interruptInstruction
 			p.instructionCycles = 7
 		} else {
-			p.instruction = p.readOpCode
+			p.instructionFunc = p.readOpCode
 			p.instructionCycles = 0
 		}
 	}
@@ -147,7 +153,7 @@ func (p *CPU) readOpCode() (Completed, error) {
 	for i := 0; i < opCodeDef.Bytes-1; i++ {
 		p.operands[i] = p.NextByte()
 	}
-	p.instruction = opCodeDef.ExecGetter(*opCodeDef)
+	p.instructionFunc = opCodeDef.GetInstructionFunc(*opCodeDef)
 	return false, nil
 }
 
@@ -216,6 +222,6 @@ func (p *CPU) Reset() {
 	resetVecLow := p.mem.Read(uint16(resetVectorAddr))
 	resetVecHigh := p.mem.Read(uint16(resetVectorAddr + 1))
 	p.Reg.PC = (uint16(resetVecHigh) << 8) | uint16(resetVecLow)
-	p.instruction = p.readOpCode
+	p.instructionFunc = p.readOpCode
 	p.instructionCycles = 0
 }
