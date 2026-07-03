@@ -6,14 +6,14 @@ import (
 
 // Tokens wraps a slice of tokens and provides methods for sequential processing
 type Tokens struct {
-	tokens    []*lexer.Token
+	tokens    []lexer.Token
 	tokenIdx  int
-	currToken *lexer.Token
-	nextToken *lexer.Token
+	currToken lexer.Token
+	nextToken lexer.Token
 }
 
 // NewAssemblerTokens creates a new AssemblerTokens instance with the given tokens
-func NewAssemblerTokens(tokens []*lexer.Token) *Tokens {
+func NewAssemblerTokens(tokens []lexer.Token) *Tokens {
 	at := &Tokens{
 		tokens: tokens,
 	}
@@ -24,11 +24,11 @@ func NewAssemblerTokens(tokens []*lexer.Token) *Tokens {
 }
 
 // Next advances to the next token and returns the current token
-func (at *Tokens) Next() *lexer.Token {
+func (at *Tokens) Next() lexer.Token {
 	at.currToken = at.nextToken
 	if at.tokenIdx >= len(at.tokens)-1 {
-		at.nextToken = nil
-		return nil
+		at.nextToken = lexer.Token{ID: lexer.EOFType}
+		return lexer.Token{ID: lexer.EOFType}
 	}
 	at.tokenIdx++
 	at.nextToken = at.tokens[at.tokenIdx]
@@ -36,10 +36,10 @@ func (at *Tokens) Next() *lexer.Token {
 }
 
 // Peek returns the next token without advancing the position
-func (at *Tokens) Peek() *lexer.Token {
+func (at *Tokens) Peek() lexer.Token {
 	return at.nextToken
 }
 
-func (at *Tokens) Current() *lexer.Token {
+func (at *Tokens) Current() lexer.Token {
 	return at.currToken
 }

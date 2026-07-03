@@ -9,7 +9,7 @@ import (
 )
 
 // preprocessor performs the first pass of assembly: calculate memory layout and collect labels
-func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error) {
+func (a *Assembler) preprocessor(tokens []lexer.Token) ([]AssembledData, error) {
 	// Track memory segments that will be needed
 	type SegmentInfo struct {
 		StartAddress uint16
@@ -42,7 +42,7 @@ func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error)
 	for {
 		tokenPosition++
 		t := asmTokens.Next()
-		if t == nil || t.ID == lexer.EOFType {
+		if t.ID == lexer.EOFType {
 			break
 		}
 
@@ -98,7 +98,7 @@ func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error)
 		case IdentifierToken:
 			// Check if this is a constant assignment (identifier = value)
 			nextToken := asmTokens.Peek()
-			if nextToken != nil && nextToken.ID == EqualsSymbolToken {
+			if nextToken.ID == EqualsSymbolToken {
 				err := a.processConstantAssignment(t, asmTokens)
 				if err != nil {
 					return nil, err
@@ -137,7 +137,7 @@ func (a *Assembler) preprocessor(tokens []*lexer.Token) ([]AssembledData, error)
 func (a *Assembler) preprocessDirective(asmTokens *Tokens, advanceProgramCounter func(int), finalizeSegment func()) error {
 	// Check if this is a directive (. followed by directive name)
 	nextToken := asmTokens.Peek()
-	if nextToken != nil && nextToken.ID == IdentifierToken {
+	if nextToken.ID == IdentifierToken {
 		directiveName := "." + nextToken.Literal
 		if directiveID, found := a.directives[strings.ToUpper(directiveName)]; found {
 			// Consume the directive name token
@@ -191,7 +191,7 @@ func (a *Assembler) preprocessDirective(asmTokens *Tokens, advanceProgramCounter
 }
 
 // recordLabelAddress records the current program counter as the address for a label
-func (a *Assembler) recordLabelAddress(t *lexer.Token) error {
+func (a *Assembler) recordLabelAddress(t lexer.Token) error {
 	labelName := strings.TrimSuffix(t.Literal, ":")
 
 	// Check for duplicate label
@@ -209,11 +209,11 @@ func (a *Assembler) recordLabelAddress(t *lexer.Token) error {
 }
 
 // recordPlusOrMinusLabelAddress records the current program counter for '+' or '-' shorthand labels
-func (a *Assembler) recordPlusOrMinusLabelAddress(t *lexer.Token, asmTokens *Tokens) error {
+func (a *Assembler) recordPlusOrMinusLabelAddress(t lexer.Token, asmTokens *Tokens) error {
 	labelSymbol := t.Literal
 	for {
 		nextToken := asmTokens.Peek()
-		if nextToken == nil || nextToken.ID != t.ID {
+		if nextToken.ID != t.ID {
 			break
 		}
 		labelSymbol += nextToken.Literal
@@ -248,7 +248,7 @@ func (a *Assembler) calculateWordDirectiveSize(asmTokens *Tokens) (int, error) {
 	size := 0
 	for {
 		t := asmTokens.Peek()
-		if t == nil || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
+		if t.ID == lexer.NullType || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
 			break
 		}
 		asmTokens.Next() // Consume the token
@@ -264,7 +264,7 @@ func (a *Assembler) calculateWordDirectiveSize(asmTokens *Tokens) (int, error) {
 
 func (a *Assembler) calculateTextDirectiveSize(asmTokens *Tokens) (int, error) {
 	t := asmTokens.Next()
-	if t == nil || t.ID != lexer.StringLiteral {
+	if t.ID != lexer.StringLiteral {
 		return 0, fmt.Errorf("[calculateTextDirectiveSize] expected string after .TEXT")
 	}
 	str, ok := t.Value.(string)
@@ -276,7 +276,7 @@ func (a *Assembler) calculateTextDirectiveSize(asmTokens *Tokens) (int, error) {
 
 func (a *Assembler) calculateAsciizDirectiveSize(asmTokens *Tokens) (int, error) {
 	t := asmTokens.Next()
-	if t == nil || t.ID != lexer.StringLiteral {
+	if t.ID != lexer.StringLiteral {
 		return 0, fmt.Errorf("[calculateAsciizDirectiveSize] expected string after .ASCIIZ")
 	}
 	str, ok := t.Value.(string)
@@ -288,7 +288,7 @@ func (a *Assembler) calculateAsciizDirectiveSize(asmTokens *Tokens) (int, error)
 
 func (a *Assembler) calculateDataSpaceDirectiveSize(asmTokens *Tokens) (int, error) {
 	t := asmTokens.Next()
-	if t == nil {
+	if t.ID == lexer.NullType || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
 		return 0, fmt.Errorf("[calculateDataSpaceDirectiveSize] expected size after .DS")
 	}
 
@@ -319,7 +319,7 @@ func (a *Assembler) preprocessorLabelSizer(mnemonic string) (string, any, error)
 }
 
 // processConstantAssignment handles identifier = value assignments during preprocessing
-func (a *Assembler) processConstantAssignment(identifierToken *lexer.Token, asmTokens *Tokens) error {
+func (a *Assembler) processConstantAssignment(identifierToken lexer.Token, asmTokens *Tokens) error {
 	variableName := identifierToken.Literal
 
 	// Check for duplicate variable
@@ -334,13 +334,13 @@ func (a *Assembler) processConstantAssignment(identifierToken *lexer.Token, asmT
 
 	// Consume the equals token
 	equalsToken := asmTokens.Next()
-	if equalsToken == nil || equalsToken.ID != EqualsSymbolToken {
+	if equalsToken.ID != EqualsSymbolToken {
 		return fmt.Errorf("[processConstantAssignment] expected '=' after identifier '%s'", variableName)
 	}
 
 	// Get value
 	valueToken := asmTokens.Next()
-	if valueToken == nil {
+	if valueToken.ID == lexer.NullType || valueToken.ID == lexer.EndOfLineType || valueToken.ID == lexer.EOFType {
 		return fmt.Errorf("[processConstantAssignment] expected value after %s '='", variableName)
 	}
 

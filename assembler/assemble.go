@@ -135,15 +135,16 @@ func New(opcodes []*cpu.OpCodeDef) *Assembler {
 		programCounter:        0x0000,
 	}
 
-	assembler.lexerConfig = lexer.NewLexerLanguage(
-		lexer.WithKeywords(KeywordTokens),
-		lexer.WithCustomTokenizers(customTokenizers),
-		lexer.WithOperators(OperatorTokens),
-		lexer.WithSymbols(SymbolTokens),
-		lexer.WithCommentMap(comments),
-		lexer.WithSpecializationCreators(assembler.identifierTokenCreator),
-		lexer.WithExtendendedIdentifierRunes("_", ":"), // Allow underscores in identifiers, but when parsing an identifier, stop at a colon (Enables things like Labels)
-	)
+	assembler.lexerConfig = lexer.NewLexerLanguage(lexer.LanguageConfig{
+		Keywords:                KeywordTokens,
+		Operators:               OperatorTokens,
+		Symbols:                 SymbolTokens,
+		Comments:                comments,
+		ExtendedIdentifierRunes: "_",
+		IdentifierTermination:   ":",
+		PrefixTokenizers:        prefixTokenizers,
+		TokenCreators:           []func(identifier string) lexer.Token{assembler.identifierTokenCreator},
+	})
 
 	return assembler
 }
@@ -216,7 +217,7 @@ func (a *Assembler) reset() {
 	// a.originAddress = 0x0000
 }
 
-func (a *Assembler) generateCode(tokens []*lexer.Token, segments []AssembledData) error {
+func (a *Assembler) generateCode(tokens []lexer.Token, segments []AssembledData) error {
 	// Create a map for quick segment lookup by address -> segment index
 	segmentMap := make(map[uint16]int)
 	for i, segment := range segments {
@@ -255,7 +256,7 @@ func (a *Assembler) generateCode(tokens []*lexer.Token, segments []AssembledData
 	for {
 		tokenPosition++
 		t := asmTokens.Next()
-		if t == nil || t.ID == lexer.EOFType {
+		if t.ID == lexer.EOFType {
 			break
 		}
 
@@ -295,7 +296,7 @@ func (a *Assembler) generateCode(tokens []*lexer.Token, segments []AssembledData
 		case IdentifierToken:
 			// Check if this is a constant assignment (identifier = value)
 			nextToken := asmTokens.Peek()
-			if nextToken != nil && nextToken.ID == EqualsSymbolToken {
+			if nextToken.ID == EqualsSymbolToken {
 				// Skip constant assignments in second pass, already processed
 				asmTokens.Next() // consume equals
 				asmTokens.Next() // consume value
@@ -318,7 +319,7 @@ func (a *Assembler) generateCode(tokens []*lexer.Token, segments []AssembledData
 func (a *Assembler) addressForAsterixOrgDirective(asmTokens *Tokens, finalizeSegment func()) error {
 	// Check if this is "*=" (program counter set)
 	nextToken := asmTokens.Peek()
-	if nextToken != nil && nextToken.ID == EqualsSymbolToken {
+	if nextToken.ID == EqualsSymbolToken {
 		// Consume the equals token
 		asmTokens.Next()
 		// Process as program counter set (same as .ORG)
@@ -333,20 +334,18 @@ func (a *Assembler) addressForAsterixOrgDirective(asmTokens *Tokens, finalizeSeg
 func (a *Assembler) checkForOrgAsterixDirective(asmTokens *Tokens, updateCurrentSegment func()) error {
 	// Check if this is "*=" (program counter set)
 	nextToken := asmTokens.Peek()
-	if nextToken != nil && nextToken.ID == EqualsSymbolToken {
+	if nextToken.ID == EqualsSymbolToken {
 		// Consume the equals token
 		asmTokens.Next()
 		// Process program counter change using the same logic as .ORG
 		t := asmTokens.Next()
-		if t != nil {
-			newAddress, err := a.tokenAddressValue(t)
-			if err != nil {
-				return err
-			}
-			a.programCounter = newAddress
-			// Update segment after program counter change
-			updateCurrentSegment()
+		newAddress, err := a.tokenAddressValue(t)
+		if err != nil {
+			return err
 		}
+		a.programCounter = newAddress
+		// Update segment after program counter change
+		updateCurrentSegment()
 	}
 	return nil
 }
@@ -354,7 +353,7 @@ func (a *Assembler) checkForOrgAsterixDirective(asmTokens *Tokens, updateCurrent
 func (a *Assembler) processAssemblerDirective(asmTokens *Tokens, insertIntoMemory func([]byte), updateCurrentSegment func()) error {
 	// Check if this is a directive (. followed by directive name)
 	nextToken := asmTokens.Peek()
-	if nextToken != nil && nextToken.ID == IdentifierToken {
+	if nextToken.ID == IdentifierToken {
 		directiveName := "." + nextToken.Literal
 		if directiveID, found := a.directives[strings.ToUpper(directiveName)]; found {
 			// Consume the directive name token
@@ -404,7 +403,7 @@ func (a *Assembler) processAssemblerDirective(asmTokens *Tokens, insertIntoMemor
 func (a *Assembler) generateCodeForOrgDirective(asmTokens *Tokens, updateCurrentSegment func()) error {
 	// Process program counter change - same as *= but without equals sign
 	t := asmTokens.Next()
-	if t != nil {
+	if t.ID != lexer.NullType {
 		newAddress, err := a.tokenAddressValue(t)
 		if err != nil {
 			return err
@@ -416,7 +415,7 @@ func (a *Assembler) generateCodeForOrgDirective(asmTokens *Tokens, updateCurrent
 	return nil
 }
 
-func (a *Assembler) generateInstructionCode(t *lexer.Token, asmTokens *Tokens, insertIntoMemory func([]byte)) error {
+func (a *Assembler) generateInstructionCode(t lexer.Token, asmTokens *Tokens, insertIntoMemory func([]byte)) error {
 	addressingMode, err := a.parseAddressingMode(t.Literal, asmTokens, false)
 	if err != nil {
 		return err
@@ -451,7 +450,7 @@ parseLoop:
 		case lexer.HexLiteral, lexer.IntegerLiteral, MinusToken, PlusToken:
 
 			peekToken := asmTokens.Peek()
-			if t.ID == MinusToken || t.ID == PlusToken && (peekToken == nil || peekToken.ID == t.ID || peekToken.ID == lexer.EndOfLineType || peekToken.ID == lexer.EOFType) {
+			if t.ID == MinusToken || t.ID == PlusToken && (peekToken.ID == lexer.NullType || peekToken.ID == t.ID || peekToken.ID == lexer.EndOfLineType || peekToken.ID == lexer.EOFType) {
 				sizeMask, labelValue, err := a.PlusMinusLabel(mnemonic, t, asmTokens, preprocess)
 				if err != nil {
 					return AddressingMode{}, err
@@ -527,10 +526,10 @@ parseLoop:
 			// Check what comes after the asterisk
 			nextToken := asmTokens.Peek()
 
-			if nextToken != nil && nextToken.ID == PlusToken || nextToken.ID == MinusToken {
+			if nextToken.ID == PlusToken || nextToken.ID == MinusToken {
 				asmTokens.Next() // Get passed the signToken
 				valueToken := asmTokens.Next()
-				if valueToken == nil || (valueToken.ID != lexer.HexLiteral && valueToken.ID != lexer.IntegerLiteral) {
+				if valueToken.ID == lexer.NullType || (valueToken.ID != lexer.HexLiteral && valueToken.ID != lexer.IntegerLiteral) {
 					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] expected value after %s", nextToken.Literal)
 				}
 
@@ -583,7 +582,7 @@ func (a *Assembler) operandSizeForLabel(mnemonic, currentSizeStr string) string 
 }
 
 // Works out the closest address for when labels are referenced with a simple "+" or "-"
-func (a *Assembler) PlusMinusLabel(mnemonic string, t *lexer.Token, asmTokens *Tokens, preprocess bool) (string, any, error) {
+func (a *Assembler) PlusMinusLabel(mnemonic string, t lexer.Token, asmTokens *Tokens, preprocess bool) (string, any, error) {
 	if t.ID != PlusToken && t.ID != MinusToken {
 		return "", nil, fmt.Errorf("[PlusMinusLabel] expected + or - token, got %s", t.Literal)
 	}
@@ -592,7 +591,7 @@ func (a *Assembler) PlusMinusLabel(mnemonic string, t *lexer.Token, asmTokens *T
 	labelSymbol := t.Literal
 	for {
 		nextToken := asmTokens.Peek()
-		if nextToken == nil || nextToken.ID != t.ID {
+		if nextToken.ID != t.ID {
 			break
 		}
 		labelSymbol += nextToken.Literal
@@ -669,17 +668,17 @@ func (a *Assembler) parseLabelOffset(mnemonic string, address uint64) (string, a
 
 // parseLabelOffset
 
-func (a *Assembler) mnemonicTokenCreator(identifier string) *lexer.Token {
+func (a *Assembler) mnemonicTokenCreator(identifier string) lexer.Token {
 	identifier = strings.ToUpper(identifier)
 	if _, found := a.instructionSet[identifier]; !found {
-		return nil
+		return lexer.Token{}
 	}
 	return lexer.NewToken(MnemonicToken, identifier, 0)
 }
 
-func labelTokenCreator(identifier string) *lexer.Token {
+func labelTokenCreator(identifier string) lexer.Token {
 	if len(identifier) < 2 && !strings.HasSuffix(identifier, ":") {
-		return nil
+		return lexer.Token{}
 	}
 	return lexer.NewToken(LabelToken, identifier, 0)
 }
@@ -688,7 +687,7 @@ func (a *Assembler) processOrgDirective(asmTokens *Tokens, finalizeSegment func(
 	finalizeSegment() // Close current segment
 
 	t := asmTokens.Next()
-	if t == nil {
+	if t.ID == lexer.NullType || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
 		return fmt.Errorf("[processOrgDirective] expected address after .ORG")
 	}
 
@@ -704,7 +703,7 @@ func (a *Assembler) processOrgDirective(asmTokens *Tokens, finalizeSegment func(
 }
 
 // tokenAddressValue extracts an address value from a token
-func (a *Assembler) tokenAddressValue(t *lexer.Token) (uint16, error) {
+func (a *Assembler) tokenAddressValue(t lexer.Token) (uint16, error) {
 	switch t.ID {
 	case lexer.HexLiteral, lexer.IntegerLiteral:
 		value, err := toUint64(t.Value)
@@ -724,7 +723,7 @@ func (a *Assembler) processByteDirective(asmTokens *Tokens, insertIntoMemory fun
 
 	for {
 		t := asmTokens.Peek()
-		if t == nil || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
+		if t.ID == lexer.NullType || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
 			break
 		}
 		asmTokens.Next() // Consume the token
@@ -768,7 +767,7 @@ func (a *Assembler) processWordDirective(asmTokens *Tokens, insertIntoMemory fun
 
 	for {
 		t := asmTokens.Peek()
-		if t == nil || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
+		if t.ID == lexer.NullType || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
 			break
 		}
 		asmTokens.Next() // Consume the token
@@ -813,7 +812,7 @@ func (a *Assembler) processWordDirective(asmTokens *Tokens, insertIntoMemory fun
 
 func (a *Assembler) processTextDirective(asmTokens *Tokens, insertIntoMemory func([]byte)) error {
 	t := asmTokens.Next()
-	if t == nil || t.ID != lexer.StringLiteral {
+	if t.ID != lexer.StringLiteral {
 		return fmt.Errorf("[processTextDirective] expected string after .TEXT")
 	}
 
@@ -829,7 +828,7 @@ func (a *Assembler) processTextDirective(asmTokens *Tokens, insertIntoMemory fun
 
 func (a *Assembler) processAsciizDirective(asmTokens *Tokens, insertIntoMemory func([]byte)) error {
 	t := asmTokens.Next()
-	if t == nil || t.ID != lexer.StringLiteral {
+	if t.ID != lexer.StringLiteral {
 		return fmt.Errorf("[processAsciizDirective] expected string after .ASCIIZ")
 	}
 
@@ -848,7 +847,7 @@ func (a *Assembler) processAsciizDirective(asmTokens *Tokens, insertIntoMemory f
 func (a *Assembler) processEquDirective(asmTokens *Tokens) error {
 	// Get variable name
 	nameToken := asmTokens.Next()
-	if nameToken == nil || nameToken.ID != IdentifierToken {
+	if nameToken.ID != IdentifierToken {
 		return fmt.Errorf("[processEquDirective] expected identifier after .EQU")
 	}
 
@@ -866,13 +865,13 @@ func (a *Assembler) processEquDirective(asmTokens *Tokens) error {
 
 	// Skip equals sign if present
 	nextToken := asmTokens.Peek()
-	if nextToken != nil && nextToken.ID == EqualsSymbolToken {
+	if nextToken.ID == EqualsSymbolToken {
 		asmTokens.Next()
 	}
 
 	// Get value
 	valueToken := asmTokens.Next()
-	if valueToken == nil {
+	if valueToken.ID == lexer.NullType || valueToken.ID == lexer.EndOfLineType || valueToken.ID == lexer.EOFType {
 		return fmt.Errorf("[processEquDirective] expected value after .EQU")
 	}
 
@@ -890,7 +889,7 @@ func (a *Assembler) processEquDirective(asmTokens *Tokens) error {
 
 func (a *Assembler) processDataSpaceDirective(asmTokens *Tokens, insertIntoMemory func([]byte)) error {
 	t := asmTokens.Next()
-	if t == nil {
+	if t.ID == lexer.NullType || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
 		return fmt.Errorf("[processDataSpaceDirective] expected size after .DS")
 	}
 
@@ -920,7 +919,7 @@ func (a *Assembler) skipDirectiveTokens(asmTokens *Tokens) {
 	// Skip tokens until end of line
 	for {
 		t := asmTokens.Next()
-		if t == nil || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
+		if t.ID == lexer.NullType || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
 			break
 		}
 	}
@@ -933,7 +932,7 @@ func (a *Assembler) processVarDirective(asmTokens *Tokens) error {
 	}
 	nextToken := asmTokens.Peek()
 
-	if nextToken != nil && nextToken.ID == EqualsSymbolToken {
+	if nextToken.ID == EqualsSymbolToken {
 		err := a.processConstantAssignment(t, asmTokens)
 		if err != nil {
 			return err
@@ -943,7 +942,7 @@ func (a *Assembler) processVarDirective(asmTokens *Tokens) error {
 	return fmt.Errorf("[Assembler] Invalid Format for Var %s", t.Literal)
 }
 
-func (a *Assembler) identifierTokenCreator(identifier string) *lexer.Token {
+func (a *Assembler) identifierTokenCreator(identifier string) lexer.Token {
 	// Program Counter
 	// if identifier == "*" {
 	// 	return lexer.NewToken(ProgramCounterToken, identifier, 0)
@@ -956,20 +955,10 @@ func (a *Assembler) identifierTokenCreator(identifier string) *lexer.Token {
 
 	// Mnemonic
 	t := a.mnemonicTokenCreator(identifier)
-	if t != nil {
+	if t.ID != lexer.NullType {
 		return t
 	}
 
 	// Identifier
 	return lexer.NewToken(IdentifierToken, identifier, 0)
-}
-
-func (a *Assembler) consumeSameTokens(t *lexer.Token, asmTokens *Tokens) {
-	for {
-		nextToken := asmTokens.Peek()
-		if nextToken == nil || nextToken.ID != t.ID {
-			break
-		}
-		asmTokens.Next() // Consume the token
-	}
 }

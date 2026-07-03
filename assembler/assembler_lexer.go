@@ -33,7 +33,7 @@ const (
 var KeywordTokens = map[string]lexer.TokenIdentifier{}
 
 // Custom tokenizers - On detection of the starting character, jump to a specific tokenizer.
-var customTokenizers = map[string]lexer.TokenizerFunc{
+var prefixTokenizers = map[string]lexer.TokenizerFunc{
 	"$": lexer.HexTokenizer,
 	"%": lexer.BinaryTokenizer,
 }
@@ -86,7 +86,7 @@ func NewAssemblerLexer(resolver utils.FileResolver) *AssemblerLexer {
 // Tokens tokenizes the input while expanding include directives, preserving
 // SourceLine and SourceColumn as they appear in their original files.
 // It tokenizes line-by-line so that line numbers remain accurate in the produced tokens.
-func (p *AssemblerLexer) Tokens(cfg *lexer.LanguageConfig, input io.Reader, filename string) ([]*lexer.Token, error) {
+func (p *AssemblerLexer) Tokens(cfg *lexer.LanguageConfig, input io.Reader, filename string) ([]lexer.Token, error) {
 	// Reset included files for each processing session
 	p.includedFiles = make(map[string]bool)
 	p.includeCount = make(map[string]int)
@@ -100,12 +100,12 @@ func (p *AssemblerLexer) Tokens(cfg *lexer.LanguageConfig, input io.Reader, file
 }
 
 // readerTokens recursively processes a reader, expanding includes and returning tokens
-func (p *AssemblerLexer) readerTokens(cfg *lexer.LanguageConfig, input io.Reader, filename string, depth int) ([]*lexer.Token, error) {
+func (p *AssemblerLexer) readerTokens(cfg *lexer.LanguageConfig, input io.Reader, filename string, depth int) ([]lexer.Token, error) {
 	if depth > p.MaxIncludeDepth {
 		return nil, fmt.Errorf("maximum include depth (%d) exceeded", p.MaxIncludeDepth)
 	}
 
-	var out []*lexer.Token
+	var out []lexer.Token
 	scanner := bufio.NewScanner(input)
 	lineNum := 0
 	var sourceCode strings.Builder
@@ -123,7 +123,7 @@ func (p *AssemblerLexer) readerTokens(cfg *lexer.LanguageConfig, input io.Reader
 		// Offset SourceLine to match original file lines and filter EOF
 		lineOffset := uint(sourceLine - 1)
 		for _, t := range toks {
-			if t == nil || t.ID == lexer.EOFType {
+			if t.ID == lexer.EOFType {
 				continue
 			}
 			if t.SourceLine > 0 {
