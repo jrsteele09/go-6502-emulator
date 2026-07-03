@@ -450,7 +450,7 @@ parseLoop:
 		case lexer.HexLiteral, lexer.IntegerLiteral, MinusToken, PlusToken:
 
 			peekToken := asmTokens.Peek()
-			if t.ID == MinusToken || t.ID == PlusToken && (peekToken.ID == lexer.NullType || peekToken.ID == t.ID || peekToken.ID == lexer.EndOfLineType || peekToken.ID == lexer.EOFType) {
+			if t.ID == MinusToken || t.ID == PlusToken && (isTerminatorToken(peekToken.ID) || peekToken.ID == t.ID) {
 				sizeMask, labelValue, err := a.PlusMinusLabel(mnemonic, t, asmTokens, preprocess)
 				if err != nil {
 					return AddressingMode{}, err
@@ -529,7 +529,7 @@ parseLoop:
 			if nextToken.ID == PlusToken || nextToken.ID == MinusToken {
 				asmTokens.Next() // Get passed the signToken
 				valueToken := asmTokens.Next()
-				if valueToken.ID == lexer.NullType || (valueToken.ID != lexer.HexLiteral && valueToken.ID != lexer.IntegerLiteral) {
+				if valueToken.ID != lexer.HexLiteral && valueToken.ID != lexer.IntegerLiteral {
 					return AddressingMode{}, fmt.Errorf("[parseAddressingMode] expected value after %s", nextToken.Literal)
 				}
 
@@ -687,7 +687,7 @@ func (a *Assembler) processOrgDirective(asmTokens *Tokens, finalizeSegment func(
 	finalizeSegment() // Close current segment
 
 	t := asmTokens.Next()
-	if t.ID == lexer.NullType || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
+	if isTerminatorToken(t.ID) {
 		return fmt.Errorf("[processOrgDirective] expected address after .ORG")
 	}
 
@@ -723,7 +723,7 @@ func (a *Assembler) processByteDirective(asmTokens *Tokens, insertIntoMemory fun
 
 	for {
 		t := asmTokens.Peek()
-		if t.ID == lexer.NullType || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
+		if isTerminatorToken(t.ID) {
 			break
 		}
 		asmTokens.Next() // Consume the token
@@ -767,7 +767,7 @@ func (a *Assembler) processWordDirective(asmTokens *Tokens, insertIntoMemory fun
 
 	for {
 		t := asmTokens.Peek()
-		if t.ID == lexer.NullType || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
+		if isTerminatorToken(t.ID) {
 			break
 		}
 		asmTokens.Next() // Consume the token
@@ -871,7 +871,7 @@ func (a *Assembler) processEquDirective(asmTokens *Tokens) error {
 
 	// Get value
 	valueToken := asmTokens.Next()
-	if valueToken.ID == lexer.NullType || valueToken.ID == lexer.EndOfLineType || valueToken.ID == lexer.EOFType {
+	if isTerminatorToken(valueToken.ID) {
 		return fmt.Errorf("[processEquDirective] expected value after .EQU")
 	}
 
@@ -889,7 +889,7 @@ func (a *Assembler) processEquDirective(asmTokens *Tokens) error {
 
 func (a *Assembler) processDataSpaceDirective(asmTokens *Tokens, insertIntoMemory func([]byte)) error {
 	t := asmTokens.Next()
-	if t.ID == lexer.NullType || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
+	if isTerminatorToken(t.ID) {
 		return fmt.Errorf("[processDataSpaceDirective] expected size after .DS")
 	}
 
@@ -919,7 +919,7 @@ func (a *Assembler) skipDirectiveTokens(asmTokens *Tokens) {
 	// Skip tokens until end of line
 	for {
 		t := asmTokens.Next()
-		if t.ID == lexer.NullType || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
+		if isTerminatorToken(t.ID) {
 			break
 		}
 	}
