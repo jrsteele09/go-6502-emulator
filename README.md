@@ -11,7 +11,7 @@ The assembler will continue to evolve over time, but the vision is to be compati
 
 **Assembler:**
 - Full 6502 instruction set support
-- PRG file output format
+- PRG, D64, and T64 file output formats
 - Comprehensive error reporting with line numbers
 - Support for labels, constants, and expressions
 
@@ -26,7 +26,7 @@ The assembler will continue to evolve over time, but the vision is to be compati
 ## Installation
 
 ### Prerequisites
-- Go 1.24 or later
+- Go 1.26 or later
 
 ### Building from Source
 
@@ -44,14 +44,23 @@ Place them in an appropriate location for your system and configure a path to th
 ### Basic Usage
 
 ```bash
-# Simple example
+# Simple example (outputs program.prg)
 asm6502 -i program.s
 
 # Assemble with custom output filename
 asm6502 -i program.s -o myprogram.prg
 
+# Assemble to D64 disk image
+asm6502 -i program.s -f d64
+
+# Assemble to T64 tape archive with custom program name
+asm6502 -i program.s -f t64 -n MYPROG
+
 # Verbose output showing assembly progress
 asm6502 -i program.s -v
+
+# Show version
+asm6502 -version
 
 # Show help
 asm6502 -h
@@ -169,26 +178,6 @@ LOOP:
 - Comments using semicolons (;)
 - `.ORG` directive for setting assembly origin
 - `.BYTE` and `.WORD` directives for data definition
-
-## Examples
-
-Check out the `examples/` directory for sample programs demonstrating:
-- Basic assembly programming
-- Memory operations and addressing modes
-- Nested loops and branching
-
-To build and run the examples:
-
-```bash
-# Assemble an example
-asm6502 -i examples/hello.asm -o hello.prg
-
-# Load it in the debugger
-debug6502
-> L hello.prg
-> D
-> S    # Step through the program
-```
 
 ## License
 
