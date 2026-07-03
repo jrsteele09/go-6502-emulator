@@ -248,7 +248,7 @@ func (a *Assembler) calculateWordDirectiveSize(asmTokens *Tokens) (int, error) {
 	size := 0
 	for {
 		t := asmTokens.Peek()
-		if t.ID == lexer.NullType || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
+		if isTerminatorToken(t.ID) {
 			break
 		}
 		asmTokens.Next() // Consume the token
@@ -288,7 +288,7 @@ func (a *Assembler) calculateAsciizDirectiveSize(asmTokens *Tokens) (int, error)
 
 func (a *Assembler) calculateDataSpaceDirectiveSize(asmTokens *Tokens) (int, error) {
 	t := asmTokens.Next()
-	if t.ID == lexer.NullType || t.ID == lexer.EndOfLineType || t.ID == lexer.EOFType {
+	if isTerminatorToken(t.ID) {
 		return 0, fmt.Errorf("[calculateDataSpaceDirectiveSize] expected size after .DS")
 	}
 
@@ -340,7 +340,7 @@ func (a *Assembler) processConstantAssignment(identifierToken lexer.Token, asmTo
 
 	// Get value
 	valueToken := asmTokens.Next()
-	if valueToken.ID == lexer.NullType || valueToken.ID == lexer.EndOfLineType || valueToken.ID == lexer.EOFType {
+	if isTerminatorToken(valueToken.ID) {
 		return fmt.Errorf("[processConstantAssignment] expected value after %s '='", variableName)
 	}
 

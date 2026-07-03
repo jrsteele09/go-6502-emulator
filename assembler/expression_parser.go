@@ -42,7 +42,7 @@ func (a *Assembler) parseCurrentExpression(asmTokens *Tokens, mnemonic string, p
 	// Parse infix expressions based on precedence
 	for {
 		nextToken := asmTokens.Peek()
-		if nextToken.ID == lexer.NullType || nextToken.ID == lexer.EndOfLineType || nextToken.ID == lexer.EOFType {
+		if isTerminatorToken(nextToken.ID) {
 			break
 		}
 
@@ -84,7 +84,7 @@ func (a *Assembler) parseCurrentExpression(asmTokens *Tokens, mnemonic string, p
 // parsePrimary parses primary expressions (literals, identifiers, parentheses, unary minus)
 func (a *Assembler) parsePrimary(asmTokens *Tokens, mnemonic string, preprocess bool) (int64, error) {
 	token := asmTokens.Current()
-	if token.ID == lexer.NullType || token.ID == lexer.EndOfLineType || token.ID == lexer.EOFType {
+	if isTerminatorToken(token.ID) {
 		return 0, fmt.Errorf("[parsePrimary] unexpected end of expression")
 	}
 
