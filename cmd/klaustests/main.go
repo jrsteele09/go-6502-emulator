@@ -22,12 +22,12 @@ const (
 	functionalTestBinURL = "https://raw.githubusercontent.com/Klaus2m5/6502_65C02_functional_tests/master/bin_files/6502_functional_test.bin"
 	functionalTestLstURL = "https://raw.githubusercontent.com/Klaus2m5/6502_65C02_functional_tests/master/bin_files/6502_functional_test.lst"
 
-	defaultCacheDir        = "cpu/testdata/klaus"
+	defaultCacheDir        = "testdata/klaus"
 	functionalTestBinName  = "6502_functional_test.bin"
 	functionalTestLstName  = "6502_functional_test.lst"
 	defaultStartAddress    = uint16(0x0400)
 	defaultSuccessAddress  = uint16(0x3469)
-	defaultMaxInstructions = uint64(100_000_000)
+	defaultMaxInstructions = uint64(900_000_000)
 )
 
 func main() {
