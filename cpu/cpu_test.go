@@ -163,6 +163,17 @@ func TestADC(t *testing.T) {
 			assert.Equal(t, uint64(2), p.cycles, name)
 			assert.Equal(t, true, p.Reg.IsSet(CarryFlag), name)
 		}},
+		{"TestADCImmediateCarryInWrapsToZeroAndSetsCarry", func(p *CPU) int {
+			p.mem.Write(startAddress, 0x69, 0xFF)
+			p.Reg.A = 0x00
+			p.Reg.SetStatus(CarryFlag, true)
+			return 1
+		}, func(t *testing.T, p *CPU, name string) {
+			assert.Equal(t, byte(0x00), p.Reg.A, name)
+			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, true, p.Reg.IsSet(CarryFlag), name)
+			assert.Equal(t, true, p.Reg.IsSet(ZeroFlag), name)
+		}},
 		{"TestADCImmediateOverFlag", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x69, 0x02)
 			p.Reg.A = 127
@@ -889,6 +900,7 @@ func TestBRK(t *testing.T) {
 			p.mem.Write(startAddress, 0x00)
 			p.mem.Write(irqVector, 0x12)
 			p.mem.Write(irqVector+1, 0xF0)
+			p.Reg.Status = 0
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xF012), p.Reg.PC)
@@ -896,7 +908,9 @@ func TestBRK(t *testing.T) {
 			assert.Equal(t, uint8(0xD0), p.mem.Read(stackAddress)) // Check values on stack
 			assert.Equal(t, uint8(0x02), p.mem.Read(stackAddress-1))
 			assert.Equal(t, uint8(BreakFlag), p.mem.Read(stackAddress-2)&BreakFlag)
+			assert.Equal(t, uint8(UnusedFlag), p.mem.Read(stackAddress-2)&UnusedFlag)
 			assert.Equal(t, true, p.Reg.IsSet(BreakFlag))
+			assert.Equal(t, true, p.Reg.IsSet(InterruptDisableFlag))
 			assert.Equal(t, uint64(7), p.cycles, name)
 		}},
 	}
@@ -1004,7 +1018,7 @@ func TestCMP(t *testing.T) {
 			assert.Equal(t, uint64(2), p.cycles, name)
 			assert.Equal(t, false, p.Reg.IsSet(NegativeFlag), name)
 			assert.Equal(t, true, p.Reg.IsSet(ZeroFlag), name)
-			assert.Equal(t, false, p.Reg.IsSet(CarryFlag), name)
+			assert.Equal(t, true, p.Reg.IsSet(CarryFlag), name)
 		}},
 		{"TestCMPZeropage", func(p *CPU) int {
 			p.mem.Write(startAddress, 0xC5, 0x80)
@@ -1177,7 +1191,7 @@ func TestCPX(t *testing.T) {
 			assert.Equal(t, uint64(2), p.cycles, name)
 			assert.Equal(t, false, p.Reg.IsSet(NegativeFlag), name)
 			assert.Equal(t, true, p.Reg.IsSet(ZeroFlag), name)
-			assert.Equal(t, false, p.Reg.IsSet(CarryFlag), name)
+			assert.Equal(t, true, p.Reg.IsSet(CarryFlag), name)
 		}},
 		{"TestCPXZeropage", func(p *CPU) int {
 			p.mem.Write(startAddress, 0xE4, 0x80)
@@ -1236,7 +1250,7 @@ func TestCPY(t *testing.T) {
 			assert.Equal(t, uint64(2), p.cycles, name)
 			assert.Equal(t, false, p.Reg.IsSet(NegativeFlag), name)
 			assert.Equal(t, true, p.Reg.IsSet(ZeroFlag), name)
-			assert.Equal(t, false, p.Reg.IsSet(CarryFlag), name)
+			assert.Equal(t, true, p.Reg.IsSet(CarryFlag), name)
 		}},
 		{"TestCPYZeropage", func(p *CPU) int {
 			p.mem.Write(startAddress, 0xC4, 0x80)
@@ -1595,6 +1609,16 @@ func TestJump(t *testing.T) {
 			assert.Equal(t, uint64(5), p.cycles, name)
 			assert.Equal(t, uint16(0x5010), p.Reg.PC)
 		}},
+		{"TestJMPAbsoluteIndirectPageWrapBug", func(p *CPU) int {
+			p.mem.Write(startAddress, 0x6C, 0xFF, 0x51)
+			p.mem.Write(0x51FF, 0x10)
+			p.mem.Write(0x5100, 0x50)
+			p.mem.Write(0x5200, 0x60)
+			return 1
+		}, func(t *testing.T, p *CPU, name string) {
+			assert.Equal(t, uint64(5), p.cycles, name)
+			assert.Equal(t, uint16(0x5010), p.Reg.PC)
+		}},
 		{"TestJSR", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x20, 0x00, 0x51)
 			return 1
@@ -1602,7 +1626,7 @@ func TestJump(t *testing.T) {
 			assert.Equal(t, uint64(6), p.cycles, name)
 			assert.Equal(t, uint16(0x5100), p.Reg.PC)
 			assert.Equal(t, byte(0xD0), p.mem.Read(stackAddress))
-			assert.Equal(t, byte(0x03), p.mem.Read(stackAddress-1))
+			assert.Equal(t, byte(0x02), p.mem.Read(stackAddress-1))
 		}},
 	}
 	executeTests(t, tests)
@@ -1812,7 +1836,8 @@ func TestLDX(t *testing.T) {
 		{"TestLDXAbsoluteY", func(p *CPU) int {
 			p.mem.Write(startAddress, 0xBE, 0x80, 0x00)
 			p.mem.Write(0x0081, 01)
-			p.Reg.X = 0x01
+			p.Reg.Y = 0x01
+			p.Reg.X = 0xff
 			p.Reg.A = 0xff
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
@@ -1822,7 +1847,8 @@ func TestLDX(t *testing.T) {
 		{"TestLDXAbsoluteYPageOverflow", func(p *CPU) int {
 			p.mem.Write(startAddress, 0xBE, 0x01, 0x00)
 			p.mem.Write(0x0100, 01)
-			p.Reg.X = 0xFF
+			p.Reg.Y = 0xFF
+			p.Reg.X = 0xff
 			p.Reg.A = 0xff
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
@@ -1918,12 +1944,14 @@ func TestLSR(t *testing.T) {
 		{"TestLSRImmediate", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x4A)
 			p.Reg.A = 0x2
+			p.Reg.SetStatus(NegativeFlag, true)
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint64(2), p.cycles, name)
 			assert.Equal(t, byte(0x01), p.Reg.A, name)
 			assert.Equal(t, false, p.Reg.IsSet(CarryFlag), name)
 			assert.Equal(t, false, p.Reg.IsSet(ZeroFlag), name)
+			assert.Equal(t, false, p.Reg.IsSet(NegativeFlag), name)
 		}},
 		{"TestLSRImmediateZeroAndCarryFlagsSet", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x4A)
@@ -2173,11 +2201,54 @@ func TestPHP(t *testing.T) {
 	var tests = []InstructionTest{
 		{"TestPHP", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x08)
-			p.Reg.Status = 0xFF
+			p.Reg.Status = byte(InterruptDisableFlag)
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
-			assert.Equal(t, uint8(0xFF), p.mem.Read(stackAddress)) // Check values on stack
+			expected := byte(InterruptDisableFlag | BreakFlag | UnusedFlag)
+			assert.Equal(t, expected, p.mem.Read(stackAddress)) // Check values on stack
 			assert.Equal(t, uint64(3), p.cycles, name)
+		}},
+	}
+	executeTests(t, tests)
+}
+
+func TestZeroPageIndirectAddressWrap(t *testing.T) {
+	var tests = []InstructionTest{
+		{"TestIndexedIndirectHighByteWrapsInZeroPage", func(p *CPU) int {
+			p.mem.Write(startAddress, 0xA1, 0xFE) // LDA ($FE,X)
+			p.Reg.X = 0x01
+			p.mem.Write(0x00FF, 0x34)
+			p.mem.Write(0x0000, 0x12)
+			p.mem.Write(0x0100, 0x99)
+			p.mem.Write(0x1234, 0xAB)
+			return 1
+		}, func(t *testing.T, p *CPU, name string) {
+			assert.Equal(t, uint8(0xAB), p.Reg.A, name)
+			assert.Equal(t, uint64(6), p.cycles, name)
+		}},
+		{"TestIndirectIndexedHighByteWrapsInZeroPage", func(p *CPU) int {
+			p.mem.Write(startAddress, 0xB1, 0xFF) // LDA ($FF),Y
+			p.Reg.Y = 0x01
+			p.mem.Write(0x00FF, 0x33)
+			p.mem.Write(0x0000, 0x12)
+			p.mem.Write(0x0100, 0x99)
+			p.mem.Write(0x1234, 0xCD)
+			return 1
+		}, func(t *testing.T, p *CPU, name string) {
+			assert.Equal(t, uint8(0xCD), p.Reg.A, name)
+			assert.Equal(t, uint64(5), p.cycles, name)
+		}},
+		{"TestIndirectIndexedStoreUsesPageCarry", func(p *CPU) int {
+			p.mem.Write(startAddress, 0x91, 0x10) // STA ($10),Y
+			p.Reg.A = 0xEF
+			p.Reg.Y = 0x02
+			p.mem.Write(0x0010, 0xFF)
+			p.mem.Write(0x0011, 0x12)
+			return 1
+		}, func(t *testing.T, p *CPU, name string) {
+			assert.Equal(t, uint8(0xEF), p.mem.Read(0x1301), name)
+			assert.Equal(t, uint8(0x00), p.mem.Read(0x1201), name)
+			assert.Equal(t, uint64(6), p.cycles, name)
 		}},
 	}
 	executeTests(t, tests)
@@ -2188,10 +2259,27 @@ func TestPLA(t *testing.T) {
 		{"TestPLA", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x68)
 			p.mem.Write(stackAddress, 0xFF)
+			p.Reg.S = 0xFE
 			p.Reg.A = 0x00
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint8(0xFF), p.Reg.A) // Check values on stack
+			assert.Equal(t, true, p.Reg.IsSet(NegativeFlag), name)
+			assert.Equal(t, false, p.Reg.IsSet(ZeroFlag), name)
+			assert.Equal(t, uint8(0xFF), p.Reg.S, name)
+			assert.Equal(t, uint64(4), p.cycles, name)
+		}},
+		{"TestPLAZeroFlag", func(p *CPU) int {
+			p.mem.Write(startAddress, 0x68)
+			p.mem.Write(stackAddress, 0x00)
+			p.Reg.S = 0xFE
+			p.Reg.A = 0xFF
+			return 1
+		}, func(t *testing.T, p *CPU, name string) {
+			assert.Equal(t, uint8(0x00), p.Reg.A, name)
+			assert.Equal(t, false, p.Reg.IsSet(NegativeFlag), name)
+			assert.Equal(t, true, p.Reg.IsSet(ZeroFlag), name)
+			assert.Equal(t, uint8(0xFF), p.Reg.S, name)
 			assert.Equal(t, uint64(4), p.cycles, name)
 		}},
 	}
@@ -2203,10 +2291,12 @@ func TestPLP(t *testing.T) {
 		{"TestPLP", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x28)
 			p.mem.Write(stackAddress, 0xFF)
+			p.Reg.S = 0xFE
 			p.Reg.Status = 0x00
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint8(0xFF), p.Reg.Status) // Check values on stack
+			assert.Equal(t, uint8(0xFF), p.Reg.S, name)
 			assert.Equal(t, uint64(4), p.cycles, name)
 		}},
 	}
@@ -2380,7 +2470,7 @@ func TestRTI(t *testing.T) {
 			p.mem.Write(stackAddress, 0xC0)
 			p.mem.Write(stackAddress-1, 0x00)
 			p.mem.Write(stackAddress-2, 0xFF)
-			p.Reg.S = uint8(0xFF - 2)
+			p.Reg.S = uint8(0xFF - 3)
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint64(6), p.cycles, name)
@@ -2395,13 +2485,13 @@ func TestRTS(t *testing.T) {
 	var tests = []InstructionTest{
 		{"TestRORAccumulator", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x60)
-			p.mem.Write(stackAddress, 0xC0)
-			p.mem.Write(stackAddress-1, 0x00)
-			p.Reg.S = uint8(0xFF - 1)
+			p.mem.Write(stackAddress, 0xD0)
+			p.mem.Write(stackAddress-1, 0x02)
+			p.Reg.S = uint8(0xFF - 2)
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint64(6), p.cycles, name)
-			assert.Equal(t, uint16(0xC000), p.Reg.PC, name)
+			assert.Equal(t, uint16(0xD003), p.Reg.PC, name)
 		}},
 	}
 	executeTests(t, tests)
@@ -2449,6 +2539,16 @@ func TestSBC(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, byte(160), p.Reg.A, name)
+			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, false, p.Reg.IsSet(CarryFlag), name)
+		}},
+		{"TestSBCImmediateBorrowFromFFClearsCarry", func(p *CPU) int {
+			p.mem.Write(startAddress, 0xE9, 0xFF)
+			p.Reg.SetStatus(CarryFlag, false)
+			p.Reg.A = 0x03
+			return 1
+		}, func(t *testing.T, p *CPU, name string) {
+			assert.Equal(t, byte(0x03), p.Reg.A, name)
 			assert.Equal(t, uint64(2), p.cycles, name)
 			assert.Equal(t, false, p.Reg.IsSet(CarryFlag), name)
 		}},
@@ -3046,21 +3146,23 @@ func TestTXS(t *testing.T) {
 		{"TestTXSNegativeFlag", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x9A)
 			p.Reg.X = 0x80
+			p.Reg.Status = byte(ZeroFlag)
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, byte(0x80), p.Reg.S, name)
-			assert.Equal(t, false, p.Reg.IsSet(ZeroFlag))
-			assert.Equal(t, true, p.Reg.IsSet(NegativeFlag))
+			assert.Equal(t, true, p.Reg.IsSet(ZeroFlag))
+			assert.Equal(t, false, p.Reg.IsSet(NegativeFlag))
 			assert.Equal(t, uint64(2), p.cycles, name)
 		}},
 		{"TestTXSZeroFlag", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x9A)
 			p.Reg.X = 0x00
+			p.Reg.Status = byte(NegativeFlag)
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, byte(0x00), p.Reg.S, name)
-			assert.Equal(t, true, p.Reg.IsSet(ZeroFlag))
-			assert.Equal(t, false, p.Reg.IsSet(NegativeFlag))
+			assert.Equal(t, false, p.Reg.IsSet(ZeroFlag))
+			assert.Equal(t, true, p.Reg.IsSet(NegativeFlag))
 			assert.Equal(t, uint64(2), p.cycles, name)
 		}},
 	}

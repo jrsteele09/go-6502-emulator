@@ -117,7 +117,7 @@ func indexedIndirectAddress(cpu CPU6502) uint16 {
 
 	zeropageAddress := uint16(operands[0] + cpu.Registers().X)
 	lsb := (mem.Read(zeropageAddress))
-	msb := (mem.Read(zeropageAddress + 1))
+	msb := (mem.Read((zeropageAddress + 1) & 0x00FF))
 	return ((uint16(msb) << 8) | uint16(lsb))
 }
 
@@ -125,15 +125,10 @@ func indirectIndexedAddress(cpu CPU6502, ignoreExtraCycle bool) (uint16, bool) {
 	mem := cpu.Memory()
 	zeropageAddress := uint16(cpu.Operands()[0])
 	lsb := mem.Read(zeropageAddress)
-	msb := mem.Read(zeropageAddress + 1)
-	newLsb := lsb + cpu.Registers().Y
-	extraCycle := false
-	if !ignoreExtraCycle && newLsb < lsb {
-		msb++
-		extraCycle = true
-	}
-
-	address := (uint16(msb) << 8) + uint16(newLsb)
+	msb := mem.Read((zeropageAddress + 1) & 0x00FF)
+	baseAddress := (uint16(msb) << 8) | uint16(lsb)
+	address := baseAddress + uint16(cpu.Registers().Y)
+	extraCycle := !ignoreExtraCycle && (baseAddress&0xFF00) != (address&0xFF00)
 	return address, extraCycle
 }
 
@@ -149,7 +144,8 @@ func (m absoluteIndirectMode) Address(cpu CPU6502) uint16 {
 	absoluteAddress := absoluteAddress(cpu)
 	mem := cpu.Memory()
 	lsb := mem.Read(absoluteAddress)
-	msb := mem.Read(absoluteAddress + 1)
+	msbAddress := (absoluteAddress & 0xFF00) | ((absoluteAddress + 1) & 0x00FF)
+	msb := mem.Read(msbAddress)
 	return (uint16(msb) << 8) + uint16(lsb)
 }
 

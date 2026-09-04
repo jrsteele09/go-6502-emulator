@@ -180,7 +180,7 @@ func (p *CPU) interruptStackPush() {
 	p.Push(byte(p.Reg.PC >> 8))
 	p.Push(byte(p.Reg.PC & 0xff))
 	p.Reg.SetStatus(BreakFlag, false)
-	p.Push(byte(p.Reg.Status))
+	p.Push(p.Reg.Status | byte(UnusedFlag))
 	p.Reg.SetStatus(InterruptDisableFlag, true)
 }
 
@@ -200,9 +200,9 @@ func (p *CPU) Push(b byte) {
 
 // Pop pops a byte from the stack.
 func (p *CPU) Pop() byte {
+	p.Reg.S++
 	a := stackPageAddress + uint16(p.Reg.S)
 	b := p.mem.Read(uint16(a))
-	p.Reg.S++
 	return b
 }
 

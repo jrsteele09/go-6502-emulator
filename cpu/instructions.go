@@ -148,7 +148,7 @@ func createOpCodes(p *CPU) []*OpCodeDef {
 	opCodes[0xA6] = id.Instruction(Mnemonic(ldxStr, ZeropageModeStr), 3, p.ldx)
 	opCodes[0xB6] = id.Instruction(Mnemonic(ldxStr, ZeropageYModeStr), 4, p.ldx)
 	opCodes[0xAE] = id.Instruction(Mnemonic(ldxStr, AbsoluteModeStr), 4, p.ldx)
-	opCodes[0xBE] = id.Instruction(Mnemonic(ldxStr, AbsoluteIndexedXModeStr), 4, p.ldx)
+	opCodes[0xBE] = id.Instruction(Mnemonic(ldxStr, AbsoluteIndexedYModeStr), 4, p.ldx)
 	opCodes[0xA0] = id.Instruction(Mnemonic(ldyStr, ImmediateModeStr), 2, p.ldy)
 	opCodes[0xA4] = id.Instruction(Mnemonic(ldyStr, ZeropageModeStr), 3, p.ldy)
 	opCodes[0xB4] = id.Instruction(Mnemonic(ldyStr, ZeropageXModeStr), 4, p.ldy)
@@ -231,39 +231,34 @@ func (p *CPU) adc(opcode OpCodeDef) InstructionFunc {
 
 	var adcMode = map[BinaryOrDecimalMode]func(b byte){
 		BCDMode: func(b byte) {
-			// BCD Mode
-			carryFlag := false
-			lowNibble := (p.Reg.A & 0x0F) + (b & 0x0F)
+			carry := uint16(0)
 			if p.Reg.IsSet(CarryFlag) {
-				lowNibble++
-			}
-			highNibble := (p.Reg.A & 0xF0) + (b & 0xF0)
-
-			if lowNibble > 0x09 {
-				lowNibble += 0x06
+				carry = 1
 			}
 
-			highNibble += (lowNibble & 0xF0) // Add carry from low nibble, if any
-
-			if highNibble > 0x90 {
-				highNibble += 0x60 // Decimal adjustment for the high nibble
-				carryFlag = true
+			sum := uint16(p.Reg.A) + uint16(b) + carry
+			if uint16(p.Reg.A&0x0F)+uint16(b&0x0F)+carry > 0x09 {
+				sum += 0x06
+			}
+			if sum > 0x99 {
+				sum += 0x60
 			}
 
-			result := uint16(lowNibble&0x0F) + uint16(highNibble)
-			p.Reg.A = byte(result & 0xFF)
-			p.Reg.SetStatus(CarryFlag, carryFlag)
+			p.Reg.A = byte(sum)
+			p.Reg.SetStatus(CarryFlag, sum > 0xFF)
 		},
 		BinaryMode: func(b byte) {
 			// Binary Mode
 			m := p.Reg.A
-			r := m + b
+			carry := uint16(0)
 			if p.Reg.IsSet(CarryFlag) {
-				r++
+				carry = 1
 			}
+			sum := uint16(m) + uint16(b) + carry
+			r := byte(sum)
 			p.Reg.A = r
 
-			p.Reg.SetCarryFlag(m, p.Reg.A)
+			p.Reg.SetStatus(CarryFlag, sum > 0xFF)
 		},
 	}
 
@@ -403,7 +398,8 @@ func (p *CPU) brk(_ OpCodeDef) InstructionFunc {
 		p.Push(byte(p.Reg.PC >> 8))
 		p.Push(byte(p.Reg.PC & 0xff))
 		p.Reg.SetStatus(BreakFlag, true)
-		p.Push(byte(p.Reg.Status))
+		p.Push(p.Reg.Status | byte(BreakFlag) | byte(UnusedFlag))
+		p.Reg.SetStatus(InterruptDisableFlag, true)
 		lowPC = p.mem.Read(irqVector)
 		highPC = p.mem.Read(irqVector + 1)
 		p.Reg.PC = (uint16(highPC) << 8) | uint16(lowPC)
@@ -461,7 +457,7 @@ func (p *CPU) compare(opcode OpCodeDef, regValue uint8) InstructionFunc {
 
 		p.Reg.SetStatus(ZeroFlag, (result == 0))
 		p.Reg.SetStatus(NegativeFlag, (bit7 == 1))
-		p.Reg.SetStatus(CarryFlag, (regValue > b))
+		p.Reg.SetStatus(CarryFlag, (regValue >= b))
 		return true, nil
 	}
 }
@@ -571,8 +567,9 @@ func (p *CPU) jmp(opcode OpCodeDef) InstructionFunc {
 
 func (p *CPU) jsr(opcode OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
-		p.Push(byte((p.Reg.PC & 0xFF00) >> 8))
-		p.Push(byte(p.Reg.PC & 0x00FF))
+		returnAddress := p.Reg.PC - 1
+		p.Push(byte((returnAddress & 0xFF00) >> 8))
+		p.Push(byte(returnAddress & 0x00FF))
 		address := opcode.AddressingMode.Address(p)
 		p.Reg.PC = address
 		return true, nil
@@ -639,6 +636,7 @@ func (p *CPU) lsr(opcode OpCodeDef) InstructionFunc {
 
 		b = b >> 1
 		p.Reg.SetZeroFlag(b)
+		p.Reg.SetStatus(NegativeFlag, false)
 		p.Reg.SetStatus(CarryFlag, bit0 == 1)
 
 		store(b)
@@ -676,7 +674,7 @@ func (p *CPU) pha(_ OpCodeDef) InstructionFunc {
 
 func (p *CPU) php(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
-		p.Push(p.Reg.S)
+		p.Push(p.Reg.Status | byte(BreakFlag) | byte(UnusedFlag))
 		return true, nil
 	}
 }
@@ -684,6 +682,8 @@ func (p *CPU) php(_ OpCodeDef) InstructionFunc {
 func (p *CPU) pla(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.A = p.Pop()
+		p.Reg.SetZeroFlag(p.Reg.A)
+		p.Reg.SetNegativeFlag(p.Reg.A)
 		return true, nil
 	}
 }
@@ -760,7 +760,7 @@ func (p *CPU) rts(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		lowBytePC := p.Pop()
 		hiBytePC := p.Pop()
-		p.Reg.PC = (uint16(lowBytePC) | (uint16(hiBytePC) << 8))
+		p.Reg.PC = (uint16(lowBytePC) | (uint16(hiBytePC) << 8)) + 1
 		return true, nil
 	}
 }
@@ -770,53 +770,36 @@ func (p *CPU) sbc(opcode OpCodeDef) InstructionFunc {
 
 	var sbcMode = map[BinaryOrDecimalMode]func(b byte){
 		BCDMode: func(b byte) {
-			// BCD Mode
-			carry := byte(1)
+			borrow := uint16(1)
 			if !p.Reg.IsSet(CarryFlag) {
-				carry = 0
+				borrow = 0
 			}
 
-			// Extract high and low nibbles
-			accLow := p.Reg.A & 0x0F
-			accHigh := p.Reg.A & 0xF0
-			bLow := b & 0x0F
-			bHigh := b & 0xF0
-
-			// Perform BCD subtraction on low nibble
-			lowNibble := accLow - bLow - (1 - carry)
-			borrow := byte(0)
-			if int8(lowNibble) < 0 {
-				lowNibble += 10 // Adjust for BCD
-				borrow = 0x10   // Generate a borrow for the high nibble
+			diff := int(p.Reg.A) - int(b) - int(1-borrow)
+			result := diff
+			if int(p.Reg.A&0x0F)-int(b&0x0F)-int(1-borrow) < 0 {
+				result -= 0x06
 			}
-
-			// Perform BCD subtraction on high nibble
-			highNibble := accHigh - bHigh - borrow
-			if int8(highNibble) < 0 {
-				highNibble += 0xA0 // Adjust for BCD
+			if diff < 0 {
+				result -= 0x60
 			}
-
-			// Combine high and low nibbles
-			result := (highNibble & 0xF0) + (lowNibble & 0x0F)
 
 			p.Reg.A = byte(result)
-
-			// Set or clear the Carry flag
-			p.Reg.SetStatus(CarryFlag, int8(highNibble) >= 0)
+			p.Reg.SetStatus(CarryFlag, diff >= 0)
 		},
 
 		BinaryMode: func(b byte) {
 			// Binary Mode
 			m := p.Reg.A
-			c := byte(0)
+			borrow := uint16(1)
 			if p.Reg.IsSet(CarryFlag) {
-				c = 1
+				borrow = 0
 			}
-			r := m - b - (1 - c)
+			r := m - b - byte(borrow)
 			p.Reg.A = r
 
 			// Update the Carry flag
-			p.Reg.SetStatus(CarryFlag, m >= (b+(1-c)))
+			p.Reg.SetStatus(CarryFlag, uint16(m) >= uint16(b)+borrow)
 		},
 	}
 
@@ -919,8 +902,6 @@ func (p *CPU) txa(_ OpCodeDef) InstructionFunc {
 func (p *CPU) txs(_ OpCodeDef) InstructionFunc {
 	return func() (Completed, error) {
 		p.Reg.S = p.Reg.X
-		p.Reg.SetZeroFlag(p.Reg.S)
-		p.Reg.SetNegativeFlag(p.Reg.S)
 		return true, nil
 	}
 }
