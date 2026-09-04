@@ -187,7 +187,10 @@ func TestDecimalModeAssembly(t *testing.T) {
 	// ASSERT ASSEMBLED RESULTS
 	require.NoError(t, err, "AssembleFile failed")
 	require.Len(t, segments, 2, "Expected exactly two segments")
-	require.Equal(t, uint16(0x00), segments[0].StartAddress, "Expected start address $C000")
+	require.Equal(t, uint16(0x00), segments[0].StartAddress, "Expected BSS segment at $0000")
+	require.Len(t, segments[0].Data.Bytes(), 17, "Expected decimal test BSS storage")
+	require.Equal(t, make([]byte, 17), segments[0].Data.Bytes(), "Expected BSS storage to be zero-filled")
+	require.Equal(t, uint16(0x0200), segments[1].StartAddress, "Expected code segment at $0200")
 
 	// ASSERT DISSASSEMBLY
 	disassembleAndCompare(t, segments, true)

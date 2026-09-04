@@ -310,6 +310,26 @@ func TestADC(t *testing.T) {
 			assert.Equal(t, false, p.Reg.IsSet(CarryFlag), name)
 			assert.Equal(t, false, p.Reg.IsSet(OverflowFlag), name)
 		}},
+		{"TestADCDecimalModeInvalidBCDHighCorrection", func(p *CPU) int {
+			p.mem.Write(startAddress, 0x69, 0x04)
+			p.Reg.SetStatus(DecimalFlag, true)
+			p.Reg.SetStatus(CarryFlag, true)
+			p.Reg.A = 0x8F
+			return 1
+		}, func(t *testing.T, p *CPU, name string) {
+			assert.Equal(t, byte(0x9A), p.Reg.A, name)
+			assert.Equal(t, false, p.Reg.IsSet(CarryFlag), name)
+		}},
+		{"TestADCDecimalModeInvalidBCDLowCorrection", func(p *CPU) int {
+			p.mem.Write(startAddress, 0x69, 0x0A)
+			p.Reg.SetStatus(DecimalFlag, true)
+			p.Reg.SetStatus(CarryFlag, true)
+			p.Reg.A = 0x0F
+			return 1
+		}, func(t *testing.T, p *CPU, name string) {
+			assert.Equal(t, byte(0x10), p.Reg.A, name)
+			assert.Equal(t, false, p.Reg.IsSet(CarryFlag), name)
+		}},
 		{"TestADCDecimalMode", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x69, 0x39)
 			p.Reg.SetStatus(DecimalFlag, true)

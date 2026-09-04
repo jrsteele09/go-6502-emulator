@@ -236,11 +236,14 @@ func (p *CPU) adc(opcode OpCodeDef) InstructionFunc {
 				carry = 1
 			}
 
-			sum := uint16(p.Reg.A) + uint16(b) + carry
-			if uint16(p.Reg.A&0x0F)+uint16(b&0x0F)+carry > 0x09 {
-				sum += 0x06
+			lowSum := uint16(p.Reg.A&0x0F) + uint16(b&0x0F) + carry
+			highSum := uint16(p.Reg.A&0xF0) + uint16(b&0xF0)
+			if lowSum > 0x09 {
+				lowSum += 0x06
+				highSum += 0x10
 			}
-			if sum > 0x99 {
+			sum := highSum | (lowSum & 0x0F)
+			if highSum >= 0xA0 {
 				sum += 0x60
 			}
 

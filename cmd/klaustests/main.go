@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jrsteele09/go-6502-emulator/assembler"
 	"github.com/jrsteele09/go-6502-emulator/cpu"
 	"github.com/jrsteele09/go-6502-emulator/debugger"
 	"github.com/jrsteele09/go-6502-emulator/memory"
@@ -21,22 +22,36 @@ import (
 const (
 	functionalTestBinURL = "https://raw.githubusercontent.com/Klaus2m5/6502_65C02_functional_tests/master/bin_files/6502_functional_test.bin"
 	functionalTestLstURL = "https://raw.githubusercontent.com/Klaus2m5/6502_65C02_functional_tests/master/bin_files/6502_functional_test.lst"
+	decimalTestSourceURL = "https://raw.githubusercontent.com/Klaus2m5/6502_65C02_functional_tests/master/6502_decimal_test.a65"
 
 	defaultCacheDir        = "testdata/klaus"
 	functionalTestBinName  = "6502_functional_test.bin"
 	functionalTestLstName  = "6502_functional_test.lst"
+	decimalTestSourceName  = "6502_decimal_test.a65"
 	defaultStartAddress    = uint16(0x0400)
 	defaultSuccessAddress  = uint16(0x3469)
 	defaultMaxInstructions = uint64(900_000_000)
+	decimalTestStart       = uint16(0x0200)
+	decimalTestError       = uint16(0x000C)
+	decimalTestStopOpcode  = byte(0xDB)
 )
 
 func main() {
 	cacheDir := flag.String("cache-dir", defaultCacheDir, "directory used to cache downloaded Klaus test artifacts")
+	source := flag.String("source", "", "assemble and run a source test instead of the downloaded functional test")
 	forceDownload := flag.Bool("force", false, "download test artifacts even when cached files exist")
 	startAddress := flag.String("start", formatAddress(defaultStartAddress), "program start address")
 	successAddress := flag.String("pass", formatAddress(defaultSuccessAddress), "success trap address")
 	maxInstructions := flag.Uint64("max-instructions", defaultMaxInstructions, "maximum completed instructions before failing")
 	flag.Parse()
+
+	if *source != "" {
+		if err := runSourceTest(*source, *maxInstructions); err != nil {
+			fatalf("%v", err)
+		}
+		fmt.Println("PASS: assembled source test completed successfully")
+		return
+	}
 
 	start, err := parseAddress(*startAddress)
 	if err != nil {
@@ -47,7 +62,7 @@ func main() {
 		fatalf("invalid -pass address: %v", err)
 	}
 
-	binPath, lstPath, err := ensureFunctionalTestArtifacts(*cacheDir, *forceDownload)
+	binPath, lstPath, decimalSourcePath, err := ensureKlausTestArtifacts(*cacheDir, *forceDownload)
 	if err != nil {
 		fatalf("failed to prepare Klaus functional test artifacts: %v", err)
 	}
@@ -61,24 +76,75 @@ func main() {
 	}
 
 	fmt.Println("PASS: Klaus 6502 functional test reached the success trap")
+	fmt.Printf("Using Klaus decimal test source: %s\n", decimalSourcePath)
+	if err := runSourceTest(decimalSourcePath, *maxInstructions); err != nil {
+		fatalf("decimal source test failed: %v", err)
+	}
+
+	fmt.Println("PASS: Klaus decimal mode test completed successfully")
 }
 
-func ensureFunctionalTestArtifacts(cacheDir string, force bool) (string, string, error) {
+func runSourceTest(sourcePath string, maxInstructions uint64) error {
+	sourceFile, err := os.Open(sourcePath)
+	if err != nil {
+		return fmt.Errorf("open source test: %w", err)
+	}
+	defer sourceFile.Close()
+
+	mem := memory.NewMemory[uint16](64 * 1024)
+	testCPU := cpu.NewCPU(mem, false)
+	segments, err := assembler.New(testCPU.OpCodes()).Assemble(sourceFile, sourcePath)
+	if err != nil {
+		return fmt.Errorf("assemble source test: %w", err)
+	}
+	for _, segment := range segments {
+		mem.Write(segment.StartAddress, segment.Data.Bytes()...)
+	}
+
+	testCPU.Registers().PC = decimalTestStart
+	disasm := debugger.NewDisassembler(mem, testCPU.OpCodes())
+	for instructions := uint64(0); instructions < maxInstructions; instructions++ {
+		currentPC := testCPU.Registers().PC
+		if mem.Read(currentPC) == decimalTestStopOpcode {
+			if mem.Read(decimalTestError) != 0 {
+				return fmt.Errorf("source test reported ERROR=%d at %s after %d instructions (N1=$%02X N2=$%02X DA=$%02X AR=$%02X CF=$%02X)\n%s", mem.Read(decimalTestError), formatAddress(currentPC), instructions, mem.Read(0x0000), mem.Read(0x0001), mem.Read(0x0004), mem.Read(0x0006), mem.Read(0x000A), formatCPUState(testCPU, disasm))
+			}
+			return nil
+		}
+
+		completed := cpu.Completed(false)
+		for !completed {
+			done, executeErr := testCPU.Execute()
+			if executeErr != nil {
+				return fmt.Errorf("execution error at %s after %d instructions: %w\n%s", formatAddress(currentPC), instructions, executeErr, formatCPUState(testCPU, disasm))
+			}
+			completed = done
+		}
+	}
+
+	return fmt.Errorf("source test timed out after %d completed instructions\n%s", maxInstructions, formatCPUState(testCPU, disasm))
+}
+
+func ensureKlausTestArtifacts(cacheDir string, force bool) (string, string, string, error) {
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	binPath := filepath.Join(cacheDir, functionalTestBinName)
 	lstPath := filepath.Join(cacheDir, functionalTestLstName)
+	decimalSourcePath := filepath.Join(cacheDir, decimalTestSourceName)
 
 	if err := downloadIfNeeded(functionalTestBinURL, binPath, force); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if err := downloadIfNeeded(functionalTestLstURL, lstPath, force); err != nil {
-		return "", "", err
+		return "", "", "", err
+	}
+	if err := downloadIfNeeded(decimalTestSourceURL, decimalSourcePath, force); err != nil {
+		return "", "", "", err
 	}
 
-	return binPath, lstPath, nil
+	return binPath, lstPath, decimalSourcePath, nil
 }
 
 func downloadIfNeeded(url, path string, force bool) error {
