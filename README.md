@@ -22,6 +22,9 @@ The assembler will continue to evolve over time, but the vision is to be compati
 - Breakpoint management
 - PRG loading and execution control
 
+**Testing:**
+- Functional testing with the [Klaus 6502 functional tests and decimal mode test](https://github.com/Klaus2m5/6502_65C02_functional_tests)
+
 ## Installation
 
 ### Prerequisites
