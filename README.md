@@ -1,7 +1,6 @@
 # 6502 Assembler and Debugger
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/jrsteele09/go-6502-emulator)](https://goreportcard.com/report/github.com/jrsteele09/go-6502-emulator)
-[![GoDoc](https://pkg.go.dev/badge/github.com/jrsteele09/go-6502-emulator)](https://pkg.go.dev/github.com/jrsteele09/go-6502-emulator)
+[![Go Reference](https://pkg.go.dev/badge/github.com/jrsteele09/go-6502-emulator)](https://pkg.go.dev/github.com/jrsteele09/go-6502-emulator)
 
 A simple 6502 assembler and debugger written in Go. This project aims to provide everything you need to write, assemble, and debug 6502 assembly programs.
 
@@ -13,7 +12,7 @@ The assembler will continue to evolve over time, but the vision is to be compati
 - Full 6502 instruction set support
 - PRG, D64, and T64 file output formats
 - Comprehensive error reporting with line numbers
-- Support for labels, constants, and expressions
+- Support for labels, constants, expressions, and include files
 
 **Debugger:**
 - Interactive REPL-style debugger
@@ -21,7 +20,7 @@ The assembler will continue to evolve over time, but the vision is to be compati
 - Disassembly with PC and breakpoint markers
 - Single-step execution with register display
 - Breakpoint management
-- Program loading and execution control
+- PRG loading and execution control
 
 ## Installation
 
@@ -74,7 +73,13 @@ asm6502 -h
 debug6502
 ```
 
-This opens an interactive debugger session with a helpful prompt showing the current program counter.
+This opens an interactive debugger session, shows command help, and displays a prompt with the current program counter.
+
+You can also auto-load one or more PRG files on startup:
+
+```bash
+debug6502 program.prg
+```
 
 ### Basic Debugger Commands
 
@@ -101,13 +106,13 @@ Available Commands:
 ```bash
 $ debug6502
 ╔══════════════════════════════════════════════════════════════╗
-║                    6502 Debugger v1.0.0                      ║
+║                     6502 Debugger v0.6                       ║
 ╚══════════════════════════════════════════════════════════════╝
 
-. $0000> L hello.prg        # Load your assembled program
-Loaded PRG file: hello.prg
-  Segment 1: $1000 to $11FF (512 bytes)
-Total: 512 bytes loaded
+. $0000> L basic.prg        # Load your assembled program
+Loaded PRG file: basic.prg
+  Segment 1: $1000 to $100A (11 bytes)
+Total: 11 bytes loaded
 PC set to $1000
 
 . $1000> R                  # Show registers
@@ -118,30 +123,29 @@ Registers:
 . $1000> D                  # Disassemble from current PC
 Disassembly from $1000:
 
-> $1000: A2 00      LDX #$00
-  $1002: A9 20      LDA #$20
-  $1004: 9D 00 04   STA $0400,X
-  $1007: 9D 00 05   STA $0500,X
-  $100A: 9D 00 06   STA $0600,X
-  $100D: 9D E8 07   STA $07E8,X
-  $1010: E8         INX
-  $1011: D0 F1      BNE $1004
+> $1000: A9 42      LDA #$42
+  $1002: 8D 20 D0   STA $D020
+  $1005: A2 10      LDX #$10
+  $1007: CA         DEX
+  $1008: D0 FD      BNE $1007
+  $100A: 60         RTS
 
-. $1000> B $1010            # Set breakpoint
-Breakpoint set at $1010
-
-. $1000> G                  # Run program
-Running from $1000...
-Breakpoint hit at $1010
-Next: $1010: E8         INX
-
-. $1010> S                  # Step one instruction
-Executing: $1010: E8         INX
+. $1000> S                  # Step one instruction
+Executing: $1000: A9 42      LDA #$42
 Registers:
-  A: $20  X: $01  Y: $00  PC: $1011  S: $FF
+  A: $42  X: $00  Y: $00  PC: $1002  S: $FF
   Flags: $24 (%00100100) (..1..I..)  NV1BDIZC
 
-. $1011> Q                  # Quit debugger
+. $1002> B $1007            # Set breakpoint
+Breakpoint set at $1007
+
+. $1002> G                  # Run program
+Running from $1002... (Ctrl+C to break)
+
+Breakpoint hit at $1007
+Next: $1007: CA         DEX
+
+. $1007> Q                  # Quit debugger
 Quitting...
 ```
 
@@ -169,15 +173,21 @@ LOOP:
 .ORG $2000
     .BYTE $01, $02, $03    ; Define byte data
     .WORD $1234            ; Define 16-bit word
+    .TEXT "HELLO"          ; Define string data
+    .ASCIIZ "READY"        ; Define null-terminated string data
 ```
 
 ### Supported Features
 - All standard 6502 instructions and addressing modes
-- Labels and local symbols
-- Hex literals ($42) and decimal numbers (66)
-- Comments using semicolons (;)
-- `.ORG` directive for setting assembly origin
-- `.BYTE` and `.WORD` directives for data definition
+- Labels and `+`/`-` shorthand labels
+- Constants with `NAME = value` or `.VAR NAME = value`
+- Expressions using arithmetic, label references, and constants
+- Hex (`$42`), binary (`%01000010`), and decimal (`66`) literals
+- Low-byte (`<LABEL`) and high-byte (`>LABEL`) address extraction
+- Comments using semicolons (`;`), `//`, or `/* ... */`
+- Include files with `#include "file.asm"` or `.include "file.asm"`
+- Origin directives with `.ORG $1000` or `* = $1000`
+- Data directives: `.BYTE`, `.DB`, `.WORD`, `.DW`, `.TEXT`, `.STRING`, `.STR`, `.ASC`, `.ASCIIZ`, and `.DS`
 
 ## License
 

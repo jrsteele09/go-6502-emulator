@@ -88,7 +88,7 @@ func (r *DebuggerRepl) AutoLoad(files []string) {
 func (r *DebuggerRepl) printBanner() {
 	fmt.Printf("%s%s", Bold, Cyan)
 	fmt.Println("╔══════════════════════════════════════════════════════════════╗")
-	fmt.Println("║                    6502 Debugger v1.0.0                      ║")
+	fmt.Println("║                     6502 Debugger v0.6                       ║")
 	fmt.Println("╚══════════════════════════════════════════════════════════════╝")
 	fmt.Printf("%s", Reset)
 	fmt.Println()
