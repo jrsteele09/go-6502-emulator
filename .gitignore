@@ -21,3 +21,6 @@ bin
 
 # Go workspace file
 go.work
+
+# Downloaded Klaus 6502 test artifacts
+**/testdata/klaus/

@@ -175,6 +175,24 @@ func TestAssembler_PlusMinusLabels(t *testing.T) {
 	disassembleAndCompare(t, segments, false)
 }
 
+func TestDecimalModeAssembly(t *testing.T) {
+	// SETUP
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	resolver := utils.NewOSFileResolver("./test_assembly_files/TestDecimalModeAssembly")
+
+	// ASSEMBLE
+	segments, err := asm.AssembleFile("main.asm", resolver)
+
+	// ASSERT ASSEMBLED RESULTS
+	require.NoError(t, err, "AssembleFile failed")
+	require.Len(t, segments, 2, "Expected exactly two segments")
+	require.Equal(t, uint16(0x00), segments[0].StartAddress, "Expected start address $C000")
+
+	// ASSERT DISSASSEMBLY
+	disassembleAndCompare(t, segments, true)
+}
+
 func disassembleAndCompare(t *testing.T, segments []assembler.AssembledData, createExpectedResults bool) {
 	mem, cpu := createHardware()
 	writeSegmentsToMemory(mem, segments)

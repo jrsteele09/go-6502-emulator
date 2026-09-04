@@ -27,6 +27,17 @@ const (
 	SemiColonToken
 	GreaterThanToken
 	LessThanToken
+	AmpersandToken
+	PipeToken
+	CaretToken
+	TildeToken
+	BangToken
+	ShiftLeftToken
+	ShiftRightToken
+	NotEqualToken
+	EqualEqualToken
+	LessEqualToken
+	GreaterEqualToken
 )
 
 // KeywordTokens defines keyword to token mappings
@@ -38,7 +49,14 @@ var prefixTokenizers = map[string]lexer.TokenizerFunc{
 	"%": lexer.BinaryTokenizer,
 }
 
-var OperatorTokens = map[string]lexer.TokenIdentifier{}
+var OperatorTokens = map[string]lexer.TokenIdentifier{
+	"<<": ShiftLeftToken,
+	">>": ShiftRightToken,
+	"!=": NotEqualToken,
+	"==": EqualEqualToken,
+	"<=": LessEqualToken,
+	">=": GreaterEqualToken,
+}
 
 // SymbolTokens defines single delimeter runes to token mappings
 var SymbolTokens = map[rune]lexer.TokenIdentifier{
@@ -54,6 +72,11 @@ var SymbolTokens = map[rune]lexer.TokenIdentifier{
 	'/': DivideSymbolToken,
 	'>': GreaterThanToken,
 	'<': LessThanToken,
+	'&': AmpersandToken,
+	'|': PipeToken,
+	'^': CaretToken,
+	'~': TildeToken,
+	'!': BangToken,
 }
 
 // comments defines comment syntax mappings
@@ -72,7 +95,7 @@ type AssemblerLexer struct {
 	importOnce      map[string]bool
 }
 
-// NewAssemblerLexer creates a new preprocessor with the given file resolver
+// NewAssemblerLexer creates a lexer with the given file resolver.
 func NewAssemblerLexer(resolver utils.FileResolver) *AssemblerLexer {
 	return &AssemblerLexer{
 		fileResolver:    resolver,
@@ -104,6 +127,12 @@ func (p *AssemblerLexer) readerTokens(cfg *lexer.LanguageConfig, input io.Reader
 	if depth > p.MaxIncludeDepth {
 		return nil, fmt.Errorf("maximum include depth (%d) exceeded", p.MaxIncludeDepth)
 	}
+
+	processed, err := preprocessor(input, filename)
+	if err != nil {
+		return nil, fmt.Errorf("source preprocessing: %w", err)
+	}
+	input = processed
 
 	var out []lexer.Token
 	scanner := bufio.NewScanner(input)
