@@ -43,6 +43,9 @@ Place them in an appropriate location for your system and configure a path to th
 
 ## Assembler Usage
 
+See the [assembler guide](assembler/README.md) for the Go API, supported source
+syntax, and an internal pipeline diagram.
+
 ### Basic Usage
 
 ```bash
