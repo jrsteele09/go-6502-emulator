@@ -27,6 +27,8 @@ func TestEvaluateSourceExpression_KlausStyleOperators(t *testing.T) {
 		"1<<3":        0x08,
 		"lo($1234)":   0x34,
 		"hi($1234)":   0x12,
+		"lo $1234":    0x34,
+		"hi $1234":    0x12,
 		"<$1234":      0x34,
 		">$1234":      0x12,
 		"'R'-3":       0x4f,

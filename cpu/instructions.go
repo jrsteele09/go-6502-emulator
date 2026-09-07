@@ -312,29 +312,34 @@ func (p *CPU) asl(opcode OpCodeDef) InstructionFunc {
 
 func (p *CPU) branch(opcode OpCodeDef, flag StatusFlag, state bool) InstructionFunc {
 	load := opcode.AddressingMode.Load(p, true)
-	var complete Completed = false
-	readByte := byte(0x00)
 	var newPC uint16
-	var overflow bool
+	var pageCrossed bool
+	phase := 0
 
 	return func() (Completed, error) {
-		if overflow {
+		switch phase {
+		case 1:
+			phase++
+			if pageCrossed {
+				return false, nil
+			}
+			p.Reg.PC = newPC
+			return true, nil
+		case 2:
 			p.Reg.PC = newPC
 			return true, nil
 		}
+
 		if p.Reg.IsSet(flag) != state {
 			return true, nil
 		}
-		readByte, complete = load()
+		readByte, complete := load()
 		if !complete {
 			return false, nil
 		}
-		newPC, overflow = p.addPCOffset(readByte)
-		if overflow {
-			return false, nil
-		}
-		p.Reg.PC = newPC
-		return true, nil
+		newPC, pageCrossed = p.addPCOffset(readByte)
+		phase = 1
+		return false, nil
 	}
 }
 

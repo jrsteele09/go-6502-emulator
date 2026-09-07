@@ -604,7 +604,7 @@ func TestBCC(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD000), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBCC +5", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x90, 0x05)
@@ -612,7 +612,15 @@ func TestBCC(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD007), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
+		}},
+		{"TestBCC +0", func(p *CPU) int {
+			p.mem.Write(startAddress, 0x90, 0x00)
+			p.Reg.SetStatus(CarryFlag, false)
+			return 1
+		}, func(t *testing.T, p *CPU, name string) {
+			assert.Equal(t, uint16(0xD002), p.Reg.PC, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBCC -5", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x90, 0xf9)
@@ -620,7 +628,7 @@ func TestBCC(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xcffb), p.Reg.PC, name)
-			assert.Equal(t, uint64(3), p.cycles, name)
+			assert.Equal(t, uint64(4), p.cycles, name)
 		}},
 	}
 	executeTests(t, tests)
@@ -634,7 +642,7 @@ func TestBCS(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD000), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBCS +5", func(p *CPU) int {
 			p.mem.Write(startAddress, 0xB0, 0x05)
@@ -642,7 +650,7 @@ func TestBCS(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD007), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBCS -5", func(p *CPU) int {
 			p.mem.Write(startAddress, 0xB0, 0xf9)
@@ -650,7 +658,7 @@ func TestBCS(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xcffb), p.Reg.PC, name)
-			assert.Equal(t, uint64(3), p.cycles, name)
+			assert.Equal(t, uint64(4), p.cycles, name)
 		}},
 	}
 	executeTests(t, tests)
@@ -664,7 +672,7 @@ func TestBEQ(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD000), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBCC -1 Zero Flag false", func(p *CPU) int {
 			p.mem.Write(startAddress, 0xF0, 0xFE)
@@ -681,7 +689,7 @@ func TestBEQ(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD007), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBCC -5", func(p *CPU) int {
 			p.mem.Write(startAddress, 0xF0, 0xf9)
@@ -689,7 +697,7 @@ func TestBEQ(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xcffb), p.Reg.PC, name)
-			assert.Equal(t, uint64(3), p.cycles, name)
+			assert.Equal(t, uint64(4), p.cycles, name)
 		}},
 	}
 	executeTests(t, tests)
@@ -703,7 +711,7 @@ func TestBMI(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD000), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBMI -1 Negative Flag false", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x30, 0xFE)
@@ -720,7 +728,7 @@ func TestBMI(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD007), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBMI -5", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x30, 0xf9)
@@ -728,7 +736,7 @@ func TestBMI(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xcffb), p.Reg.PC, name)
-			assert.Equal(t, uint64(3), p.cycles, name)
+			assert.Equal(t, uint64(4), p.cycles, name)
 		}},
 	}
 	executeTests(t, tests)
@@ -742,7 +750,7 @@ func TestBNE(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD000), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBNE -1 Zero Flag false", func(p *CPU) int {
 			p.mem.Write(startAddress, 0xD0, 0xFE)
@@ -759,7 +767,7 @@ func TestBNE(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD007), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBNE -5", func(p *CPU) int {
 			p.mem.Write(startAddress, 0xD0, 0xf9)
@@ -767,7 +775,7 @@ func TestBNE(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xcffb), p.Reg.PC, name)
-			assert.Equal(t, uint64(3), p.cycles, name)
+			assert.Equal(t, uint64(4), p.cycles, name)
 		}},
 	}
 	executeTests(t, tests)
@@ -781,7 +789,7 @@ func TestBPL(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD000), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBPL -1 Negative Flag true", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x10, 0xFE)
@@ -798,7 +806,7 @@ func TestBPL(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD007), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBPL -5", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x10, 0xf9)
@@ -806,7 +814,7 @@ func TestBPL(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xcffb), p.Reg.PC, name)
-			assert.Equal(t, uint64(3), p.cycles, name)
+			assert.Equal(t, uint64(4), p.cycles, name)
 		}},
 	}
 	executeTests(t, tests)
@@ -820,7 +828,7 @@ func TestBVC(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD000), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBVC -1 Overflow Flag true", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x50, 0xFE)
@@ -837,7 +845,7 @@ func TestBVC(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD007), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBVC -5", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x50, 0xf9)
@@ -845,7 +853,7 @@ func TestBVC(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xcffb), p.Reg.PC, name)
-			assert.Equal(t, uint64(3), p.cycles, name)
+			assert.Equal(t, uint64(4), p.cycles, name)
 		}},
 	}
 	executeTests(t, tests)
@@ -867,7 +875,7 @@ func TestBVS(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD000), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 
 		{"TestBVS +5", func(p *CPU) int {
@@ -876,7 +884,7 @@ func TestBVS(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xD007), p.Reg.PC, name)
-			assert.Equal(t, uint64(2), p.cycles, name)
+			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 		{"TestBVS -5", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x70, 0xf9)
@@ -884,7 +892,7 @@ func TestBVS(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xcffb), p.Reg.PC, name)
-			assert.Equal(t, uint64(3), p.cycles, name)
+			assert.Equal(t, uint64(4), p.cycles, name)
 		}},
 	}
 	executeTests(t, tests)

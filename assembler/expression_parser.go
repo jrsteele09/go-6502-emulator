@@ -6,284 +6,195 @@ import (
 	"github.com/jrsteele09/go-lexer/lexer"
 )
 
-// Operator precedence levels for Pratt parser
-const (
-	PRECEDENCE_LOWEST = iota
-	PRECEDENCE_COMPARE
-	PRECEDENCE_BIT_OR
-	PRECEDENCE_BIT_XOR
-	PRECEDENCE_BIT_AND
-	PRECEDENCE_SHIFT
-	PRECEDENCE_SUM     // +, -
-	PRECEDENCE_PRODUCT // *, /
-	PRECEDENCE_PREFIX  // -x, ~x, <x, >x
-)
-
-// getPrecedence returns the precedence of an operator token
-func (a *Assembler) getPrecedence(tokenID lexer.TokenIdentifier) int {
-	switch tokenID {
-	case EqualsSymbolToken, EqualEqualToken, NotEqualToken, LessThanToken, LessEqualToken, GreaterThanToken, GreaterEqualToken:
-		return PRECEDENCE_COMPARE
-	case PipeToken:
-		return PRECEDENCE_BIT_OR
-	case CaretToken:
-		return PRECEDENCE_BIT_XOR
-	case AmpersandToken:
-		return PRECEDENCE_BIT_AND
-	case ShiftLeftToken, ShiftRightToken:
-		return PRECEDENCE_SHIFT
-	case PlusToken, MinusToken:
-		return PRECEDENCE_SUM
-	case AsterixSymbolToken, DivideSymbolToken:
-		return PRECEDENCE_PRODUCT
-	default:
-		return PRECEDENCE_LOWEST
-	}
+// parseCurrentExpression adapts assembler lexer tokens to the expression parser
+// shared with source constants and source conditionals.
+func (a *Assembler) parseCurrentExpression(asmTokens *Tokens, mnemonic string, preprocess bool) (int64, error) {
+	return a.parseCurrentExpressionWithUnknowns(asmTokens, mnemonic, preprocess)
 }
 
-func (a *Assembler) parseNextExpression(asmTokens *Tokens, mnemonic string, precedence int, preprocess bool) (int64, error) {
-	asmTokens.Next() // Advance to next token
-	return a.parseCurrentExpression(asmTokens, mnemonic, precedence, preprocess)
+func (a *Assembler) evaluateConditionalExpression(asmTokens *Tokens) (int64, error) {
+	// Layout conditions must be decidable at their source position. This avoids
+	// selecting a branch using a placeholder and changing layout in generation.
+	return a.parseCurrentExpressionWithUnknowns(asmTokens, "", false)
 }
 
-// parseExpression implements a Pratt parser for mathematical expressions
-func (a *Assembler) parseCurrentExpression(asmTokens *Tokens, mnemonic string, precedence int, preprocess bool) (int64, error) {
-	// Parse prefix expression (primary)
-	left, err := a.parsePrimary(asmTokens, mnemonic, preprocess)
+func (a *Assembler) parseCurrentExpressionWithUnknowns(asmTokens *Tokens, mnemonic string, allowUnknown bool) (int64, error) {
+	tokens, err := collectAssemblerExpressionTokens(asmTokens)
 	if err != nil {
 		return 0, err
 	}
 
-	// Parse infix expressions based on precedence
+	var lookupErr error
+	lookup := func(name string) (int64, bool) {
+		if name == "*" {
+			return int64(a.programCounter), true
+		}
+		if value, ok := a.constants[name]; ok {
+			converted, err := toInt64(value)
+			if err != nil {
+				lookupErr = err
+				return 0, false
+			}
+			return converted, true
+		}
+		if address, ok := a.labels[name]; ok {
+			if mnemonic == "" {
+				return int64(address), true
+			}
+			_, value, err := a.parseLabelOffset(mnemonic, address)
+			if err != nil {
+				lookupErr = err
+				return 0, false
+			}
+			converted, err := toInt64(value)
+			if err != nil {
+				lookupErr = err
+				return 0, false
+			}
+			return converted, true
+		}
+		if !allowUnknown {
+			return 0, false
+		}
+		if mnemonic == "" {
+			return 0, true
+		}
+		_, value, err := a.layoutLabelSizer(mnemonic)
+		if err != nil {
+			lookupErr = err
+			return 0, false
+		}
+		converted, err := toInt64(value)
+		if err != nil {
+			lookupErr = err
+			return 0, false
+		}
+		return converted, true
+	}
+
+	parser := &sourceExpressionParser{tokens: tokens, lookup: lookup}
+	value, err := parser.parseExpression(sourcePrecedenceLowest)
+	if lookupErr != nil {
+		return 0, lookupErr
+	}
+	if err != nil {
+		return 0, err
+	}
+	if parser.peek().kind != sourceExpressionTokenEOF {
+		return 0, fmt.Errorf("unexpected token %q", parser.peek().literal)
+	}
+	return value, nil
+}
+
+func collectAssemblerExpressionTokens(asmTokens *Tokens) ([]sourceExpressionToken, error) {
+	first, err := assemblerExpressionToken(asmTokens.Current())
+	if err != nil {
+		return nil, err
+	}
+	tokens := []sourceExpressionToken{first}
+	parenthesisDepth := expressionParenthesisDelta(first)
+	expectOperand := expressionExpectsOperandAfter(first, true)
+
 	for {
-		nextToken := asmTokens.Peek()
-		if isTerminatorToken(nextToken.ID) {
+		next := asmTokens.Peek()
+		if isTerminatorToken(next.ID) || next.ID == CommaToken {
+			break
+		}
+		if next.ID == RightParenthesis && parenthesisDepth == 0 {
 			break
 		}
 
-		tokenPrecedence := a.getPrecedence(nextToken.ID)
-		if tokenPrecedence <= precedence {
+		token, err := assemblerExpressionToken(next)
+		if err != nil {
+			return nil, err
+		}
+		previous := tokens[len(tokens)-1]
+		if !expressionTokenContinues(previous, token, expectOperand, parenthesisDepth) {
 			break
 		}
-
-		// Consume the operator token
-		operatorToken := asmTokens.Next()
-
-		// Parse the right operand
-		right, err := a.parseNextExpression(asmTokens, mnemonic, tokenPrecedence, preprocess)
-		if err != nil {
-			return 0, err
-		}
-
-		// Apply the operator
-		switch operatorToken.ID {
-		case PlusToken:
-			left = left + right
-		case MinusToken:
-			left = left - right
-		case AsterixSymbolToken:
-			left = left * right
-		case DivideSymbolToken:
-			if right == 0 {
-				return 0, fmt.Errorf("[parseExpression] division by zero")
-			}
-			left = left / right
-		case ShiftLeftToken:
-			if right < 0 {
-				return 0, fmt.Errorf("[parseExpression] negative shift count")
-			}
-			left = left << uint(right)
-		case ShiftRightToken:
-			if right < 0 {
-				return 0, fmt.Errorf("[parseExpression] negative shift count")
-			}
-			left = left >> uint(right)
-		case AmpersandToken:
-			left = left & right
-		case PipeToken:
-			left = left | right
-		case CaretToken:
-			left = left ^ right
-		case EqualsSymbolToken, EqualEqualToken:
-			left = expressionBool(left == right)
-		case NotEqualToken:
-			left = expressionBool(left != right)
-		case LessThanToken:
-			left = expressionBool(left < right)
-		case LessEqualToken:
-			left = expressionBool(left <= right)
-		case GreaterThanToken:
-			left = expressionBool(left > right)
-		case GreaterEqualToken:
-			left = expressionBool(left >= right)
-		default:
-			return 0, fmt.Errorf("[parseExpression] unknown operator: %s", operatorToken.Literal)
-		}
-	}
-
-	return left, nil
-}
-
-// parsePrimary parses primary expressions (literals, identifiers, parentheses, unary minus)
-func (a *Assembler) parsePrimary(asmTokens *Tokens, mnemonic string, preprocess bool) (int64, error) {
-	token := asmTokens.Current()
-	if isTerminatorToken(token.ID) {
-		return 0, fmt.Errorf("[parsePrimary] unexpected end of expression")
-	}
-
-	switch token.ID {
-	case lexer.HexLiteral, lexer.IntegerLiteral:
-		// Convert literal to int64
-		value, err := toInt64(token.Value)
-		if err != nil {
-			return 0, fmt.Errorf("invalid literal: %w", err)
-		}
-		return value, nil
-	case lexer.StringLiteral:
-		value, ok := token.Value.(string)
-		if !ok {
-			return 0, fmt.Errorf("invalid string literal")
-		}
-		if len([]rune(value)) != 1 {
-			return 0, fmt.Errorf("expected character literal, got %q", value)
-		}
-		return int64([]rune(value)[0]), nil
-
-	case IdentifierToken:
-		if isExpressionByteFunction(token.Literal) {
-			return a.parseExpressionByteFunction(asmTokens, mnemonic, token.Literal, preprocess)
-		}
-		value, err := a.expressionIdentifierValue(mnemonic, token.Literal, preprocess)
-		if err != nil {
-			return 0, err
-		}
-		return value, nil
-
-	case MinusToken:
-		// Unary minus
-		right, err := a.parseNextExpression(asmTokens, mnemonic, PRECEDENCE_PREFIX, preprocess)
-		if err != nil {
-			return 0, err
-		}
-		return -right, nil
-	case TildeToken:
-		right, err := a.parseNextExpression(asmTokens, mnemonic, PRECEDENCE_PREFIX, preprocess)
-		if err != nil {
-			return 0, err
-		}
-		return ^right, nil
-
-	case LessThanToken:
-		right, err := a.parseNextExpression(asmTokens, mnemonic, PRECEDENCE_PREFIX, preprocess)
-		if err != nil {
-			return 0, err
-		}
-		return right & 0xff, nil
-
-	case GreaterThanToken:
-		right, err := a.parseNextExpression(asmTokens, mnemonic, PRECEDENCE_PREFIX, preprocess)
-		if err != nil {
-			return 0, err
-		}
-		return (right >> 8) & 0xff, nil
-
-	case AsterixSymbolToken:
-		return int64(a.programCounter), nil
-
-	case LeftParenthesis:
-		// Parenthesized expression
-		result, err := a.parseNextExpression(asmTokens, mnemonic, PRECEDENCE_LOWEST, preprocess)
-		if err != nil {
-			return 0, err
-		}
-
-		// Expect closing parenthesis
-		closeParen := asmTokens.Next()
-		if closeParen.ID != RightParenthesis {
-			return 0, fmt.Errorf("expected closing parenthesis")
-		}
-
-		return result, nil
-
-	default:
-		return 0, fmt.Errorf("unexpected token: %s", token.Literal)
-	}
-}
-
-func (a *Assembler) parseExpressionByteFunction(asmTokens *Tokens, mnemonic string, name string, preprocess bool) (int64, error) {
-	if asmTokens.Peek().ID == LeftParenthesis {
 		asmTokens.Next()
-		value, err := a.parseNextExpression(asmTokens, mnemonic, PRECEDENCE_LOWEST, preprocess)
-		if err != nil {
-			return 0, err
-		}
-		closeParen := asmTokens.Next()
-		if closeParen.ID != RightParenthesis {
-			return 0, fmt.Errorf("expected closing parenthesis after %s", name)
-		}
-		return expressionByte(name, value)
+		tokens = append(tokens, token)
+		parenthesisDepth += expressionParenthesisDelta(token)
+		expectOperand = expressionExpectsOperandAfter(token, expectOperand)
 	}
 
-	value, err := a.parseNextExpression(asmTokens, mnemonic, PRECEDENCE_PREFIX, preprocess)
-	if err != nil {
-		return 0, err
-	}
-	return expressionByte(name, value)
+	tokens = append(tokens, sourceExpressionToken{kind: sourceExpressionTokenEOF})
+	return tokens, nil
 }
 
-func isExpressionByteFunction(name string) bool {
-	switch name {
-	case "lo", "LO", "Lo", "lO", "hi", "HI", "Hi", "hI":
+func expressionTokenContinues(previous, next sourceExpressionToken, expectOperand bool, parenthesisDepth int) bool {
+	if expectOperand {
+		return next.kind == sourceExpressionTokenInteger ||
+			next.kind == sourceExpressionTokenIdentifier ||
+			next.kind == sourceExpressionTokenLeftParen ||
+			next.kind == sourceExpressionTokenOperator
+	}
+	if next.kind == sourceExpressionTokenOperator {
+		return next.literal != "~"
+	}
+	if next.kind == sourceExpressionTokenRightParen {
+		return parenthesisDepth > 0
+	}
+	if previous.kind != sourceExpressionTokenIdentifier || !isSourceExpressionFunction(previous.literal) {
+		return false
+	}
+	return next.kind == sourceExpressionTokenLeftParen ||
+		next.kind == sourceExpressionTokenInteger ||
+		next.kind == sourceExpressionTokenIdentifier ||
+		next.kind == sourceExpressionTokenOperator
+}
+
+func expressionExpectsOperandAfter(token sourceExpressionToken, wasExpectingOperand bool) bool {
+	switch token.kind {
+	case sourceExpressionTokenLeftParen:
+		return true
+	case sourceExpressionTokenOperator:
+		if wasExpectingOperand && token.literal == "*" {
+			return false
+		}
 		return true
 	default:
 		return false
 	}
 }
 
-func expressionByte(name string, value int64) (int64, error) {
-	switch name {
-	case "lo", "LO", "Lo", "lO":
-		return value & 0xff, nil
-	case "hi", "HI", "Hi", "hI":
-		return (value >> 8) & 0xff, nil
-	default:
-		return 0, fmt.Errorf("unknown byte function %s", name)
-	}
-}
-
-func expressionBool(value bool) int64 {
-	if value {
+func expressionParenthesisDelta(token sourceExpressionToken) int {
+	switch token.kind {
+	case sourceExpressionTokenLeftParen:
 		return 1
+	case sourceExpressionTokenRightParen:
+		return -1
+	default:
+		return 0
 	}
-	return 0
 }
 
-func (a *Assembler) expressionIdentifierValue(mnemonic, identifier string, preprocess bool) (int64, error) {
-	if value, ok := a.constants[identifier]; ok {
-		return toInt64(value)
-	}
-
-	if address, ok := a.labels[identifier]; ok {
-		if mnemonic == "" {
-			return int64(address), nil
-		}
-		_, value, err := a.parseLabelOffset(mnemonic, address)
+func assemblerExpressionToken(token lexer.Token) (sourceExpressionToken, error) {
+	switch token.ID {
+	case lexer.HexLiteral, lexer.IntegerLiteral:
+		value, err := toInt64(token.Value)
 		if err != nil {
-			return 0, err
+			return sourceExpressionToken{}, fmt.Errorf("invalid literal: %w", err)
 		}
-		return toInt64(value)
+		return sourceExpressionToken{kind: sourceExpressionTokenInteger, literal: token.Literal, value: value}, nil
+	case lexer.StringLiteral:
+		value, ok := token.Value.(string)
+		if !ok || len([]rune(value)) != 1 {
+			return sourceExpressionToken{}, fmt.Errorf("expected character literal, got %q", token.Literal)
+		}
+		return sourceExpressionToken{kind: sourceExpressionTokenInteger, literal: token.Literal, value: int64([]rune(value)[0])}, nil
+	case IdentifierToken:
+		return sourceExpressionToken{kind: sourceExpressionTokenIdentifier, literal: token.Literal}, nil
+	case LeftParenthesis:
+		return sourceExpressionToken{kind: sourceExpressionTokenLeftParen, literal: token.Literal}, nil
+	case RightParenthesis:
+		return sourceExpressionToken{kind: sourceExpressionTokenRightParen, literal: token.Literal}, nil
+	case PlusToken, MinusToken, AsterixSymbolToken, DivideSymbolToken,
+		AmpersandToken, PipeToken, CaretToken, TildeToken,
+		LessThanToken, GreaterThanToken, EqualsSymbolToken, EqualEqualToken,
+		NotEqualToken, LessEqualToken, GreaterEqualToken, ShiftLeftToken, ShiftRightToken:
+		return sourceExpressionToken{kind: sourceExpressionTokenOperator, literal: token.Literal}, nil
+	default:
+		return sourceExpressionToken{}, fmt.Errorf("unexpected token %q in expression", token.Literal)
 	}
-
-	if preprocess {
-		if mnemonic == "" {
-			return 0, nil
-		}
-		_, value, err := a.layoutLabelSizer(mnemonic)
-		if err != nil {
-			return 0, err
-		}
-		return toInt64(value)
-	}
-
-	return 0, fmt.Errorf("undefined identifier: %s", identifier)
 }

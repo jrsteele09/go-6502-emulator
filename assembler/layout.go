@@ -47,7 +47,7 @@ func (a *Assembler) resolveLayout(tokens []lexer.Token) ([]AssembledData, error)
 			break
 		}
 
-		handledConditional, err := conditionals.Handle(a, t, tokenPosition, asmTokens, true)
+		handledConditional, err := conditionals.Handle(a, t, tokenPosition, asmTokens)
 		if err != nil {
 			return nil, err
 		}

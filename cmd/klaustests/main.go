@@ -34,7 +34,15 @@ const (
 	decimalTestStart       = uint16(0x0200)
 	decimalTestError       = uint16(0x000C)
 	decimalTestStopOpcode  = byte(0xDB)
+	functionalInstructions = uint64(30_646_177)
+	functionalCycles       = uint64(96_241_367)
 )
+
+type runResult struct {
+	Instructions uint64
+	Cycles       uint64
+	StopAddress  uint16
+}
 
 func main() {
 	cacheDir := flag.String("cache-dir", defaultCacheDir, "directory used to cache downloaded Klaus test artifacts")
@@ -46,10 +54,11 @@ func main() {
 	flag.Parse()
 
 	if *source != "" {
-		if err := runSourceTest(*source, *maxInstructions); err != nil {
+		result, err := runDecimalSourceTest(*source, *maxInstructions)
+		if err != nil {
 			fatalf("%v", err)
 		}
-		fmt.Println("PASS: assembled source test completed successfully")
+		fmt.Printf("PASS: assembled decimal source test completed at %s after %d instructions / %d cycles\n", formatAddress(result.StopAddress), result.Instructions, result.Cycles)
 		return
 	}
 
@@ -66,28 +75,39 @@ func main() {
 	if err != nil {
 		fatalf("failed to prepare Klaus functional test artifacts: %v", err)
 	}
+	if err := verifyFunctionalPassTrap(lstPath, pass); err != nil {
+		fatalf("functional test listing does not match configured pass trap: %v", err)
+	}
 
 	fmt.Printf("Using Klaus functional test binary: %s\n", binPath)
 	fmt.Printf("Using Klaus functional test listing: %s\n", lstPath)
 	fmt.Printf("Start: %s  Pass trap: %s  Max instructions: %d\n", formatAddress(start), formatAddress(pass), *maxInstructions)
 
-	if err := runFunctionalTest(binPath, start, pass, *maxInstructions); err != nil {
+	functionalResult, err := runFunctionalTest(binPath, start, pass, *maxInstructions)
+	if err != nil {
 		fatalf("%v", err)
 	}
+	if start == defaultStartAddress && pass == defaultSuccessAddress {
+		if functionalResult.Instructions != functionalInstructions || functionalResult.Cycles != functionalCycles {
+			fatalf("functional test timing mismatch: got %d instructions / %d cycles; expected %d instructions / %d cycles",
+				functionalResult.Instructions, functionalResult.Cycles, functionalInstructions, functionalCycles)
+		}
+	}
 
-	fmt.Println("PASS: Klaus 6502 functional test reached the success trap")
+	fmt.Printf("PASS: Klaus 6502 functional test reached %s after %d instructions / %d cycles\n", formatAddress(functionalResult.StopAddress), functionalResult.Instructions, functionalResult.Cycles)
 	fmt.Printf("Using Klaus decimal test source: %s\n", decimalSourcePath)
-	if err := runSourceTest(decimalSourcePath, *maxInstructions); err != nil {
+	decimalResult, err := runDecimalSourceTest(decimalSourcePath, *maxInstructions)
+	if err != nil {
 		fatalf("decimal source test failed: %v", err)
 	}
 
-	fmt.Println("PASS: Klaus decimal mode test completed successfully")
+	fmt.Printf("PASS: Klaus decimal mode test completed at %s after %d instructions / %d cycles\n", formatAddress(decimalResult.StopAddress), decimalResult.Instructions, decimalResult.Cycles)
 }
 
-func runSourceTest(sourcePath string, maxInstructions uint64) error {
+func runDecimalSourceTest(sourcePath string, maxInstructions uint64) (runResult, error) {
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
-		return fmt.Errorf("open source test: %w", err)
+		return runResult{}, fmt.Errorf("open source test: %w", err)
 	}
 	defer sourceFile.Close()
 
@@ -95,7 +115,7 @@ func runSourceTest(sourcePath string, maxInstructions uint64) error {
 	testCPU := cpu.NewCPU(mem, false)
 	segments, err := assembler.New(testCPU.OpCodes()).Assemble(sourceFile, sourcePath)
 	if err != nil {
-		return fmt.Errorf("assemble source test: %w", err)
+		return runResult{}, fmt.Errorf("assemble source test: %w", err)
 	}
 	for _, segment := range segments {
 		mem.Write(segment.StartAddress, segment.Data.Bytes()...)
@@ -103,26 +123,26 @@ func runSourceTest(sourcePath string, maxInstructions uint64) error {
 
 	testCPU.Registers().PC = decimalTestStart
 	disasm := debugger.NewDisassembler(mem, testCPU.OpCodes())
-	for instructions := uint64(0); instructions < maxInstructions; instructions++ {
+	result := runResult{}
+	for result.Instructions < maxInstructions {
 		currentPC := testCPU.Registers().PC
 		if mem.Read(currentPC) == decimalTestStopOpcode {
 			if mem.Read(decimalTestError) != 0 {
-				return fmt.Errorf("source test reported ERROR=%d at %s after %d instructions (N1=$%02X N2=$%02X DA=$%02X AR=$%02X CF=$%02X)\n%s", mem.Read(decimalTestError), formatAddress(currentPC), instructions, mem.Read(0x0000), mem.Read(0x0001), mem.Read(0x0004), mem.Read(0x0006), mem.Read(0x000A), formatCPUState(testCPU, disasm))
+				return runResult{}, fmt.Errorf("source test reported ERROR=%d at %s after %d instructions / %d cycles (N1=$%02X N2=$%02X DA=$%02X AR=$%02X CF=$%02X)\n%s", mem.Read(decimalTestError), formatAddress(currentPC), result.Instructions, result.Cycles, mem.Read(0x0000), mem.Read(0x0001), mem.Read(0x0004), mem.Read(0x0006), mem.Read(0x000A), formatCPUState(testCPU, disasm))
 			}
-			return nil
+			result.StopAddress = currentPC
+			return result, nil
 		}
 
-		completed := cpu.Completed(false)
-		for !completed {
-			done, executeErr := testCPU.Execute()
-			if executeErr != nil {
-				return fmt.Errorf("execution error at %s after %d instructions: %w\n%s", formatAddress(currentPC), instructions, executeErr, formatCPUState(testCPU, disasm))
-			}
-			completed = done
+		cycles, err := executeInstruction(testCPU)
+		if err != nil {
+			return runResult{}, fmt.Errorf("execution error at %s after %d instructions / %d cycles: %w\n%s", formatAddress(currentPC), result.Instructions, result.Cycles, err, formatCPUState(testCPU, disasm))
 		}
+		result.Instructions++
+		result.Cycles += cycles
 	}
 
-	return fmt.Errorf("source test timed out after %d completed instructions\n%s", maxInstructions, formatCPUState(testCPU, disasm))
+	return runResult{}, fmt.Errorf("source test timed out after %d completed instructions / %d cycles\n%s", maxInstructions, result.Cycles, formatCPUState(testCPU, disasm))
 }
 
 func ensureKlausTestArtifacts(cacheDir string, force bool) (string, string, string, error) {
@@ -192,13 +212,13 @@ func downloadIfNeeded(url, path string, force bool) error {
 	return os.Rename(tmpPath, path)
 }
 
-func runFunctionalTest(binPath string, startAddress, successAddress uint16, maxInstructions uint64) error {
+func runFunctionalTest(binPath string, startAddress, successAddress uint16, maxInstructions uint64) (runResult, error) {
 	image, err := os.ReadFile(binPath)
 	if err != nil {
-		return err
+		return runResult{}, err
 	}
 	if len(image) > 64*1024 {
-		return fmt.Errorf("test binary is %d bytes; expected at most 65536", len(image))
+		return runResult{}, fmt.Errorf("test binary is %d bytes; expected at most 65536", len(image))
 	}
 
 	mem := memory.NewMemory[uint16](64 * 1024)
@@ -209,29 +229,55 @@ func runFunctionalTest(binPath string, startAddress, successAddress uint16, maxI
 
 	disasm := debugger.NewDisassembler(mem, testCPU.OpCodes())
 	lastPC := testCPU.Registers().PC
+	result := runResult{}
 
-	for instructions := uint64(0); instructions < maxInstructions; instructions++ {
+	for result.Instructions < maxInstructions {
 		currentPC := testCPU.Registers().PC
-		completed := cpu.Completed(false)
-		for !completed {
-			done, err := testCPU.Execute()
-			if err != nil {
-				return fmt.Errorf("execution error at %s after %d instructions: %w\n%s", formatAddress(currentPC), instructions, err, formatCPUState(testCPU, disasm))
-			}
-			completed = done
+		cycles, err := executeInstruction(testCPU)
+		if err != nil {
+			return runResult{}, fmt.Errorf("execution error at %s after %d instructions / %d cycles: %w\n%s", formatAddress(currentPC), result.Instructions, result.Cycles, err, formatCPUState(testCPU, disasm))
 		}
+		result.Instructions++
+		result.Cycles += cycles
 
 		pc := testCPU.Registers().PC
 		if pc == lastPC {
 			if pc == successAddress {
-				return nil
+				result.StopAddress = pc
+				return result, nil
 			}
-			return fmt.Errorf("test trapped at %s after %d instructions\n%s", formatAddress(pc), instructions+1, formatCPUState(testCPU, disasm))
+			return runResult{}, fmt.Errorf("test trapped at %s after %d instructions / %d cycles\n%s", formatAddress(pc), result.Instructions, result.Cycles, formatCPUState(testCPU, disasm))
 		}
 		lastPC = pc
 	}
 
-	return fmt.Errorf("timed out after %d completed instructions\n%s", maxInstructions, formatCPUState(testCPU, disasm))
+	return runResult{}, fmt.Errorf("timed out after %d completed instructions / %d cycles\n%s", maxInstructions, result.Cycles, formatCPUState(testCPU, disasm))
+}
+
+func executeInstruction(testCPU *cpu.CPU) (uint64, error) {
+	var cycles uint64
+	completed := cpu.Completed(false)
+	for !completed {
+		done, err := testCPU.Execute()
+		cycles++
+		if err != nil {
+			return cycles, err
+		}
+		completed = done
+	}
+	return cycles, nil
+}
+
+func verifyFunctionalPassTrap(lstPath string, passAddress uint16) error {
+	listing, err := os.ReadFile(lstPath)
+	if err != nil {
+		return err
+	}
+	passTrap := fmt.Sprintf("%04x : 4c%02x%02x", passAddress, byte(passAddress), byte(passAddress>>8))
+	if !strings.Contains(strings.ToLower(string(listing)), passTrap) {
+		return fmt.Errorf("expected %s to contain success trap %q", lstPath, passTrap)
+	}
+	return nil
 }
 
 func parseAddress(s string) (uint16, error) {

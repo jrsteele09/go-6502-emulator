@@ -175,6 +175,17 @@ func TestAssembler_PlusMinusLabels(t *testing.T) {
 	disassembleAndCompare(t, segments, false)
 }
 
+func TestAssembler_PlusMinusLabelsDoNotLeakBetweenAssemblies(t *testing.T) {
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+
+	_, err := asm.Assemble(strings.NewReader("org $1000\njmp +\n+ rts\n"), "first.asm")
+	require.NoError(t, err)
+
+	_, err = asm.Assemble(strings.NewReader("org $1000\njmp +\n"), "second.asm")
+	require.ErrorContains(t, err, "label + not found")
+}
+
 func TestDecimalModeAssembly(t *testing.T) {
 	// SETUP
 	_, cpu := createHardware()
@@ -193,7 +204,7 @@ func TestDecimalModeAssembly(t *testing.T) {
 	require.Equal(t, uint16(0x0200), segments[1].StartAddress, "Expected code segment at $0200")
 
 	// ASSERT DISSASSEMBLY
-	disassembleAndCompare(t, segments, true)
+	disassembleAndCompare(t, segments, false)
 }
 
 func disassembleAndCompare(t *testing.T, segments []assembler.AssembledData, createExpectedResults bool) {

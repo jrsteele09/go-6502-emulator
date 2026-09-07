@@ -1,6 +1,7 @@
 package assembler
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -17,22 +18,26 @@ type sourceConstant struct {
 	expression string
 }
 
-type conditionalState struct {
-	parentActive bool
-	condition    bool
-	elseSeen     bool
-	deferred     bool
-}
+const sourceIdentifierPattern = `[A-Za-z_][A-Za-z0-9_]*`
+
+var (
+	sourceIdentifierRegexp = regexp.MustCompile(`^` + sourceIdentifierPattern + `$`)
+	infixEquRegexp         = regexp.MustCompile(`(?i)^\s*(` + sourceIdentifierPattern + `)\s+\.?equ\s+(.+?)\s*$`)
+	prefixEquRegexp        = regexp.MustCompile(`(?i)^\s*\.equ\s+(` + sourceIdentifierPattern + `)\s*(.*?)\s*$`)
+)
 
 // preprocessSource expands the small, source-level features shared by several
 // 6502 assemblers before the token stream is consumed by the two assembler passes.
 func preprocessSource(source string, filename string) (string, error) {
 	macros := make(map[string]sourceMacro)
 	constants := make(map[string]int64)
-	return processSourceLines(strings.Split(source, "\n"), filename, macros, constants, 0)
+	return processSourceLines(strings.Split(source, "\n"), filename, macros, constants, 0, nil, nil)
 }
 
-func processSourceLines(lines []string, filename string, macros map[string]sourceMacro, constants map[string]int64, depth int) (string, error) {
+type sourceIncludeHandler func(path string, lineNumber int) (string, error)
+type sourceDirectiveHandler func(directive string, lineNumber int) error
+
+func processSourceLines(lines []string, filename string, macros map[string]sourceMacro, constants map[string]int64, depth int, include sourceIncludeHandler, directive sourceDirectiveHandler) (string, error) {
 	if depth > 32 {
 		return "", fmt.Errorf("source macro expansion exceeded maximum depth in %s", filename)
 	}
@@ -44,6 +49,8 @@ func processSourceLines(lines []string, filename string, macros map[string]sourc
 		constants: constants,
 		depth:     depth,
 		active:    true,
+		include:   include,
+		directive: directive,
 	}
 	return processor.process()
 }
@@ -53,11 +60,13 @@ type sourceProcessor struct {
 	filename     string
 	macros       map[string]sourceMacro
 	constants    map[string]int64
-	conditionals []conditionalState
+	conditionals conditionalStack
 	output       []string
 	active       bool
 	depth        int
 	comments     sourceCommentState
+	include      sourceIncludeHandler
+	directive    sourceDirectiveHandler
 }
 
 type sourceLineKind int
@@ -72,6 +81,8 @@ const (
 	sourceLineInactive
 	sourceLineMacroInvocation
 	sourceLineConstant
+	sourceLineInclude
+	sourceLineDirective
 )
 
 func (p *sourceProcessor) process() (string, error) {
@@ -82,7 +93,7 @@ func (p *sourceProcessor) process() (string, error) {
 		}
 		lineNumber = nextLine
 	}
-	if len(p.conditionals) != 0 {
+	if !p.conditionals.Complete() {
 		return "", fmt.Errorf("%s: unterminated conditional block", p.filename)
 	}
 	return strings.Join(p.output, "\n"), nil
@@ -116,6 +127,17 @@ func (p *sourceProcessor) processLine(lineNumber int) (int, error) {
 	case sourceLineConstant:
 		p.output = append(p.output, p.recordConstant(trimmed, line))
 		return lineNumber, nil
+	case sourceLineInclude:
+		included, err := p.include(macroName, lineNumber)
+		if err != nil {
+			return lineNumber, err
+		}
+		if included != "" {
+			p.output = append(p.output, strings.Split(strings.TrimSuffix(included, "\n"), "\n")...)
+		}
+		return lineNumber, nil
+	case sourceLineDirective:
+		return lineNumber, p.directive(macroName, lineNumber)
 	case sourceLineOrdinary:
 		p.output = append(p.output, line)
 		return lineNumber, nil
@@ -140,6 +162,12 @@ func (p *sourceProcessor) classifyLine(trimmed string, words []string) (sourceLi
 	}
 	if !p.active {
 		return sourceLineInactive, "", nil
+	}
+	if path := extractIncludePath(trimmed); path != "" && p.include != nil {
+		return sourceLineInclude, path, nil
+	}
+	if strings.EqualFold(words[0], "#importonce") && p.directive != nil {
+		return sourceLineDirective, "#importonce", nil
 	}
 	if p.isMacroInvocation(words) {
 		return sourceLineMacroInvocation, "", nil
@@ -177,22 +205,28 @@ func (p *sourceProcessor) recordConstant(codeLine string, originalLine string) s
 func (p *sourceProcessor) handleIf(trimmed string, originalLine string, lineNumber int) error {
 	condition, err := evaluateCondition(strings.TrimSpace(strings.TrimPrefix(trimmed, strings.Fields(trimmed)[0])), p.constants)
 	if err != nil {
+		var undefinedSymbol *UndefinedSymbolError
+		if !errors.As(err, &undefinedSymbol) {
+			return fmt.Errorf("%s:%d: invalid conditional expression: %w", p.filename, lineNumber+1, err)
+		}
+		// Labels do not exist yet. Preserve this block so the layout pass can
+		// evaluate the same expression with its symbol table.
 		if p.active {
 			p.output = append(p.output, originalLine)
 		}
-		p.conditionals = append(p.conditionals, conditionalState{parentActive: p.active, condition: true, deferred: true})
+		p.conditionals.Push(p.active, true, true)
 		return nil
 	}
-	p.conditionals = append(p.conditionals, conditionalState{parentActive: p.active, condition: condition})
-	p.active = p.active && condition
+	p.conditionals.Push(p.active, condition, false)
+	p.active = p.conditionals.Active()
 	return nil
 }
 
 func (p *sourceProcessor) handleElse(originalLine string, lineNumber int) error {
-	if len(p.conditionals) == 0 {
+	state := p.conditionals.Current()
+	if state == nil {
 		return fmt.Errorf("%s:%d: unexpected else", p.filename, lineNumber+1)
 	}
-	state := &p.conditionals[len(p.conditionals)-1]
 	if state.elseSeen {
 		return fmt.Errorf("%s:%d: duplicate else", p.filename, lineNumber+1)
 	}
@@ -201,30 +235,21 @@ func (p *sourceProcessor) handleElse(originalLine string, lineNumber int) error 
 		if state.parentActive {
 			p.output = append(p.output, originalLine)
 		}
-		p.active = state.parentActive
-		return nil
 	}
-	p.active = state.parentActive && !state.condition
+	p.active = p.conditionals.Active()
 	return nil
 }
 
 func (p *sourceProcessor) handleEndif(originalLine string, lineNumber int) error {
-	if len(p.conditionals) == 0 {
+	state := p.conditionals.Current()
+	if state == nil {
 		return fmt.Errorf("%s:%d: unexpected endif", p.filename, lineNumber+1)
 	}
-	state := p.conditionals[len(p.conditionals)-1]
 	if state.deferred && state.parentActive {
 		p.output = append(p.output, originalLine)
 	}
-	p.conditionals = p.conditionals[:len(p.conditionals)-1]
-	p.active = true
-	for _, state := range p.conditionals {
-		if state.deferred {
-			p.active = p.active && state.parentActive
-			continue
-		}
-		p.active = p.active && state.parentActive && ((state.condition && !state.elseSeen) || (!state.condition && state.elseSeen))
-	}
+	p.conditionals.Pop()
+	p.active = p.conditionals.Active()
 	return nil
 }
 
@@ -259,7 +284,7 @@ func (p *sourceProcessor) handleMacroInvocation(trimmed string, words []string, 
 	if err != nil {
 		return true, fmt.Errorf("%s:%d: %w", p.filename, lineNumber+1, err)
 	}
-	expandedSource, err := processSourceLines(expanded, p.filename, p.macros, p.constants, p.depth+1)
+	expandedSource, err := processSourceLines(expanded, p.filename, p.macros, p.constants, p.depth+1, p.include, p.directive)
 	if err != nil {
 		return true, err
 	}
@@ -369,26 +394,29 @@ func parseEqualsConstant(line string) (sourceConstant, bool) {
 		return sourceConstant{}, false
 	}
 	name := strings.TrimSpace(parts[0])
-	if !regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`).MatchString(name) {
+	if !sourceIdentifierRegexp.MatchString(name) {
 		return sourceConstant{}, false
 	}
 	return sourceConstant{name: name, expression: strings.TrimSpace(parts[1])}, true
 }
 
 func parseEquConstant(line string) (sourceConstant, bool) {
-	words := strings.Fields(line)
-	if len(words) < 3 || !strings.EqualFold(words[1], "equ") {
+	if matches := infixEquRegexp.FindStringSubmatch(line); matches != nil {
+		return sourceConstant{name: matches[1], expression: matches[2]}, true
+	}
+
+	matches := prefixEquRegexp.FindStringSubmatch(line)
+	if matches == nil {
 		return sourceConstant{}, false
 	}
-	name := words[0]
-	if !regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`).MatchString(name) {
+	expression := strings.TrimSpace(matches[2])
+	if strings.HasPrefix(expression, ",") || strings.HasPrefix(expression, "=") {
+		expression = strings.TrimSpace(expression[1:])
+	}
+	if expression == "" {
 		return sourceConstant{}, false
 	}
-	equOffset := strings.Index(strings.ToLower(line), "equ")
-	if equOffset == -1 {
-		return sourceConstant{}, false
-	}
-	return sourceConstant{name: name, expression: strings.TrimSpace(line[equOffset+len("equ"):])}, true
+	return sourceConstant{name: matches[1], expression: expression}, true
 }
 
 func parseSourceInteger(value string, constants map[string]int64) (int64, error) {

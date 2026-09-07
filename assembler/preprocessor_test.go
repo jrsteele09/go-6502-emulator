@@ -2,6 +2,7 @@ package assembler_test
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/jrsteele09/go-6502-emulator/assembler"
@@ -134,4 +135,95 @@ func TestAssemble_SourcePreprocessorErrorsOnUnterminatedConditional(t *testing.T
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unterminated conditional block")
+}
+
+func TestAssemble_SourcePreprocessorDoesNotDeferInvalidExpression(t *testing.T) {
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+
+	_, err := asm.Assemble(bytes.NewBufferString("if 1 / 0\n db $01\nendif\n"), "invalid-if.asm")
+
+	require.ErrorContains(t, err, "invalid conditional expression: division by zero")
+}
+
+func TestAssemble_ConditionalUsingBackwardLabelIsResolvedDuringLayout(t *testing.T) {
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	source := "org $1000\nstart nop\nif start = $1000\n db $42\nelse\n db $99\nendif\n"
+
+	segments, err := asm.Assemble(strings.NewReader(source), "layout-if.asm")
+
+	require.NoError(t, err)
+	require.Len(t, segments, 1)
+	require.Equal(t, []byte{0xEA, 0x42}, segments[0].Data.Bytes())
+}
+
+func TestAssemble_ConditionalRejectsUnresolvedForwardLabelDuringLayout(t *testing.T) {
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	source := "org $1000\nif target = $1001\n db $42\nendif\ntarget nop\n"
+
+	_, err := asm.Assemble(strings.NewReader(source), "forward-if.asm")
+
+	require.ErrorContains(t, err, `undefined symbol "target"`)
+}
+
+func TestAssemble_MacroDefinedInIncludeIsAvailableToParent(t *testing.T) {
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	resolver := utils.NewMemoryFileResolver(map[string]string{
+		"main.asm":   "org $1000\n.include \"macros.asm\"\nEMIT $42\n",
+		"macros.asm": "EMIT macro value\n db value\nendm\n",
+	})
+
+	segments, err := asm.AssembleFile("main.asm", resolver)
+
+	require.NoError(t, err)
+	require.Len(t, segments, 1)
+	require.Equal(t, []byte{0x42}, segments[0].Data.Bytes())
+}
+
+func TestAssemble_InactiveIncludeIsNotResolved(t *testing.T) {
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	resolver := utils.NewMemoryFileResolver(map[string]string{
+		"main.asm": "org $1000\nif 0\n.include \"missing.asm\"\nendif\ndb $42\n",
+	})
+
+	segments, err := asm.AssembleFile("main.asm", resolver)
+
+	require.NoError(t, err)
+	require.Len(t, segments, 1)
+	require.Equal(t, []byte{0x42}, segments[0].Data.Bytes())
+}
+
+func TestAssemble_EquConstantNameContainingEqu(t *testing.T) {
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+
+	segments, err := asm.Assemble(bytes.NewBufferString("SEQUENCE EQU $42\norg $1000\ndb SEQUENCE\n"), "equ.asm")
+
+	require.NoError(t, err)
+	require.Len(t, segments, 1)
+	require.Equal(t, []byte{0x42}, segments[0].Data.Bytes())
+}
+
+func TestAssemble_EquCompatibilityForms(t *testing.T) {
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	source := `
+BASE = $40
+FIRST EQU BASE + 1
+SECOND .EQU FIRST + 1
+.EQU THIRD, SECOND + 1
+.EQU FOURTH = THIRD + 1
+org $1000
+db FIRST, SECOND, THIRD, FOURTH
+`
+
+	segments, err := asm.Assemble(strings.NewReader(source), "equ-forms.asm")
+
+	require.NoError(t, err)
+	require.Len(t, segments, 1)
+	require.Equal(t, []byte{0x41, 0x42, 0x43, 0x44}, segments[0].Data.Bytes())
 }

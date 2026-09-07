@@ -216,12 +216,12 @@ func (a *Assembler) AssembleFile(mainFile string, fileResolver utils.FileResolve
 	return segments, nil
 }
 
-// reset clears labels and variables for a fresh assembly
+// reset clears symbols and variables for a fresh assembly.
 func (a *Assembler) reset() {
 	a.labels = make(map[string]uint64)
+	a.plusMinusLabels = make(map[string]addresses)
 	a.constants = make(map[string]interface{})
 	a.programCounter = 0x0000
-	// a.originAddress = 0x0000
 }
 
 func (a *Assembler) bareDirective(name string) (int, bool) {
@@ -274,7 +274,7 @@ func (a *Assembler) generateCode(tokens []lexer.Token, segments []AssembledData)
 			break
 		}
 
-		handledConditional, err := conditionals.Handle(a, t, tokenPosition, asmTokens, false)
+		handledConditional, err := conditionals.Handle(a, t, tokenPosition, asmTokens)
 		if err != nil {
 			return err
 		}
@@ -712,7 +712,7 @@ func (a *Assembler) LabelOrConstantIdentifier(mnemonic, identifier string, prepr
 
 func (a *Assembler) EvaluateExpression(asmTokens *Tokens, mnemonic string, preprocess bool) (int64, error) {
 	// Parse the expression using Pratt parser
-	result, err := a.parseCurrentExpression(asmTokens, mnemonic, 0, preprocess)
+	result, err := a.parseCurrentExpression(asmTokens, mnemonic, preprocess)
 	if err != nil {
 		return 0, err
 	}
@@ -903,49 +903,6 @@ func (a *Assembler) processAsciizDirective(asmTokens *Tokens, insertIntoMemory f
 	bytes := []byte(str)
 	bytes = append(bytes, 0) // Add null terminator
 	insertIntoMemory(bytes)
-	return nil
-}
-
-func (a *Assembler) processEquDirective(asmTokens *Tokens) error {
-	// Get variable name
-	nameToken := asmTokens.Next()
-	if nameToken.ID != IdentifierToken {
-		return fmt.Errorf("[processEquDirective] expected identifier after .EQU")
-	}
-
-	variableName := nameToken.Literal
-
-	// Check for duplicate variable
-	if _, exists := a.constants[variableName]; exists {
-		return fmt.Errorf("[processEquDirective] duplicate variable '%s' already defined", variableName)
-	}
-
-	// Check if this variable name conflicts with an existing label
-	if _, exists := a.labels[variableName]; exists {
-		return fmt.Errorf("[processEquDirective] variable '%s' conflicts with existing label", variableName)
-	}
-
-	// Skip equals sign if present
-	nextToken := asmTokens.Peek()
-	if nextToken.ID == EqualsSymbolToken {
-		asmTokens.Next()
-	}
-
-	// Get value
-	valueToken := asmTokens.Next()
-	if isTerminatorToken(valueToken.ID) {
-		return fmt.Errorf("[processEquDirective] expected value after .EQU")
-	}
-
-	switch valueToken.ID {
-	case lexer.HexLiteral, lexer.IntegerLiteral:
-		a.constants[variableName] = valueToken.Value
-	// case ProgramCounterToken:
-	// 	a.constants[variableName] = uint16(a.programCounter)
-	default:
-		return fmt.Errorf("[processEquDirective] invalid value type for .EQU")
-	}
-
 	return nil
 }
 

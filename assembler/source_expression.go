@@ -9,6 +9,14 @@ import (
 
 type SourceSymbolLookup func(name string) (int64, bool)
 
+type UndefinedSymbolError struct {
+	Name string
+}
+
+func (e *UndefinedSymbolError) Error() string {
+	return fmt.Sprintf("undefined symbol %q", e.Name)
+}
+
 type sourceExpressionTokenKind int
 
 const (
@@ -256,15 +264,15 @@ func (p *sourceExpressionParser) parsePrefix(token sourceExpressionToken) (int64
 	case sourceExpressionTokenInteger:
 		return token.value, nil
 	case sourceExpressionTokenIdentifier:
-		if p.peek().kind == sourceExpressionTokenLeftParen && isSourceExpressionFunction(token.literal) {
+		if isSourceExpressionFunction(token.literal) {
 			return p.parseFunctionCall(token.literal)
 		}
 		if p.lookup == nil {
-			return 0, fmt.Errorf("undefined symbol %q", token.literal)
+			return 0, &UndefinedSymbolError{Name: token.literal}
 		}
 		value, ok := p.lookup(token.literal)
 		if !ok {
-			return 0, fmt.Errorf("undefined symbol %q", token.literal)
+			return 0, &UndefinedSymbolError{Name: token.literal}
 		}
 		return value, nil
 	case sourceExpressionTokenLeftParen:
@@ -278,6 +286,15 @@ func (p *sourceExpressionParser) parsePrefix(token sourceExpressionToken) (int64
 		return value, nil
 	case sourceExpressionTokenOperator:
 		switch token.literal {
+		case "*":
+			if p.lookup == nil {
+				return 0, &UndefinedSymbolError{Name: token.literal}
+			}
+			value, ok := p.lookup(token.literal)
+			if !ok {
+				return 0, &UndefinedSymbolError{Name: token.literal}
+			}
+			return value, nil
 		case "-":
 			value, err := p.parseExpression(sourcePrecedencePrefix)
 			if err != nil {
@@ -308,12 +325,17 @@ func (p *sourceExpressionParser) parsePrefix(token sourceExpressionToken) (int64
 }
 
 func (p *sourceExpressionParser) parseFunctionCall(name string) (int64, error) {
-	p.next()
-	value, err := p.parseExpression(sourcePrecedenceLowest)
+	precedence := sourcePrecedencePrefix
+	parenthesized := p.peek().kind == sourceExpressionTokenLeftParen
+	if parenthesized {
+		p.next()
+		precedence = sourcePrecedenceLowest
+	}
+	value, err := p.parseExpression(precedence)
 	if err != nil {
 		return 0, err
 	}
-	if p.next().kind != sourceExpressionTokenRightParen {
+	if parenthesized && p.next().kind != sourceExpressionTokenRightParen {
 		return 0, fmt.Errorf("expected closing parenthesis after %s", name)
 	}
 	switch strings.ToLower(name) {
