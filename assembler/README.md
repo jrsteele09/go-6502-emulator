@@ -4,6 +4,10 @@ The `assembler` package assembles standard 6502 source into one or more memory
 segments. It supports labels, expressions, macros, conditional assembly,
 includes, and Commodore PRG, D64, and T64 output through the `output` package.
 
+For the complete implemented-language reference, including label forms,
+macros, `EQU` variants, directives, and compatibility notes, see
+[`docs/assembler.md`](../docs/assembler.md).
+
 ## Command-Line Use
 
 Build the assembler from the repository root:
