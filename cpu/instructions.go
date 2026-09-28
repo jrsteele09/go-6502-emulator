@@ -59,9 +59,9 @@ const (
 	tyaStr = "TYA"
 )
 
-// createOpCodes returns a map of the actual 6502 opcode numbers to OpCodeDef instances.
-func createOpCodes(p *CPU) []*OpCodeDef {
-	opCodes := make([]*OpCodeDef, 256)
+// createOpCodes returns the actual 6502 opcode definitions indexed by opcode.
+func createOpCodes(p *CPU) [256]OpCodeDef {
+	var opCodes [256]OpCodeDef
 	id := NewInstruction(getAddressingMode)
 	opCodes[0x69] = id.Instruction(Mnemonic(adcStr, ImmediateModeStr), 2, p.adc)
 	opCodes[0x65] = id.Instruction(Mnemonic(adcStr, ZeropageModeStr), 3, p.adc)

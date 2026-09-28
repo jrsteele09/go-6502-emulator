@@ -176,7 +176,7 @@ func main() {
 }
 
 // createOpcodes creates the full 6502 instruction set
-func createOpcodes() []*cpu.OpCodeDef {
+func createOpcodes() []cpu.OpCodeDef {
 	mem := memory.NewMemory[uint16](64 * 1024)
 	testCPU := cpu.NewCPU(mem, true)
 	return testCPU.OpCodes()

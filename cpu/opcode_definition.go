@@ -39,8 +39,8 @@ func NewInstruction(am func(am AddressingModeType) AddressingMode) InstructionDe
 }
 
 // Instruction creates an OpCodeDef instance for the given mnemonic, cycles, and execution function getter.
-func (id InstructionDefinition) Instruction(Mnemonic string, cycles int, execGet InstructionFunctionGetter) *OpCodeDef {
-	oc := &OpCodeDef{Mnemonic: Mnemonic}
+func (id InstructionDefinition) Instruction(Mnemonic string, cycles int, execGet InstructionFunctionGetter) OpCodeDef {
+	oc := OpCodeDef{Mnemonic: Mnemonic}
 
 	components := strings.Split(strings.TrimSpace(Mnemonic), " ")
 

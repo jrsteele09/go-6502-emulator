@@ -29,14 +29,15 @@ type CPU6502 interface {
 	Registers() *Registers
 	Memory() memory.Operations[uint16]
 	Operands() []byte
-	OpCodes() []*OpCodeDef
+	OpCodes() []OpCodeDef
 }
 
 const (
-	resetVectorAddr  uint16 = 0xFFFC
-	irqVector        uint16 = 0xFFFE
-	nmiVector        uint16 = 0xFFFA
-	stackPageAddress uint16 = 0x0100
+	resetVectorAddr     uint16 = 0xFFFC
+	irqVector           uint16 = 0xFFFE
+	nmiVector           uint16 = 0xFFFA
+	stackPageAddress    uint16 = 0x0100
+	maxInstructionBytes        = 3
 )
 
 // HaltExecution interface defines methods to stop and resume CPU execution.
@@ -49,11 +50,12 @@ type HaltExecution interface {
 type CPU struct {
 	Reg               *Registers
 	mem               memory.Operations[uint16]
-	opCodes           []*OpCodeDef
+	opCodes           [256]OpCodeDef
 	cycles            uint64
 	instructionCycles int
 	instructionFunc   InstructionFunc
-	operands          []byte
+	operands          [maxInstructionBytes]byte
+	operandLength     uint8
 	irq               bool
 	nmi               bool
 	halted            bool
@@ -80,8 +82,8 @@ func NewCPU(m memory.Operations[uint16], useIllegalOpCodes bool) *CPU {
 	return cpu
 }
 
-func (p *CPU) OpCodes() []*OpCodeDef {
-	return p.opCodes
+func (p *CPU) OpCodes() []OpCodeDef {
+	return p.opCodes[:]
 }
 
 // Registers returns the CPU's registers.
@@ -94,9 +96,10 @@ func (p *CPU) Memory() memory.Operations[uint16] {
 	return p.mem
 }
 
-// Operands returns the operands for the current instruction.
+// Operands returns a view of the operands for the current instruction.
+// The returned slice is reused when the next opcode is decoded and must not be retained.
 func (p *CPU) Operands() []byte {
-	return p.operands
+	return p.operands[:p.operandLength]
 }
 
 // Stop halts the CPU's execution.
@@ -120,16 +123,17 @@ func (p *CPU) Execute() (Completed, error) {
 		return false, nil
 	}
 	completed, err := p.instructionFunc()
-	if completed {
-		if p.checkInterrupts() {
-			p.instructionFunc = p.interruptInstruction
-			p.instructionCycles = 7
-		} else {
-			p.instructionFunc = p.readOpCode
-			p.instructionCycles = 0
-		}
+	if !completed {
+		return completed, err
 	}
-	return completed, err
+	if p.checkInterrupts() {
+		p.instructionFunc = p.interruptInstruction
+		p.instructionCycles = 7
+	} else {
+		p.instructionFunc = p.readOpCode
+		p.instructionCycles = 0
+	}
+	return completed, nil
 }
 
 func (p *CPU) checkInterrupts() bool {
@@ -143,11 +147,12 @@ func (p *CPU) checkInterrupts() bool {
 
 func (p *CPU) readOpCode() (Completed, error) {
 	opCode := p.NextByte()
-	opCodeDef := p.opCodes[opCode]
-	if opCodeDef == nil {
+	opCodeDef := &p.opCodes[opCode]
+	if opCodeDef.GetInstructionFunc == nil {
 		return true, fmt.Errorf("unknown opCode: %x", opCode)
 	}
-	p.operands = make([]byte, opCodeDef.Bytes)
+	p.operandLength = uint8(opCodeDef.Bytes)
+	clear(p.operands[:])
 	p.instructionCycles = (opCodeDef.Cycles - 2) // Take two off for reading op code + next cycle
 
 	for i := 0; i < opCodeDef.Bytes-1; i++ {

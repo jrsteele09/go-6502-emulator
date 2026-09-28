@@ -83,10 +83,11 @@ type Directive struct {
 	Args []interface{}
 }
 
-func New(opcodes []*cpu.OpCodeDef) *Assembler {
+func New(opcodes []cpu.OpCodeDef) *Assembler {
 	instructionSet := make(map[string]map[cpu.AddressingModeType]Instruction)
-	for opcode, opCodeDef := range opcodes {
-		if opCodeDef == nil {
+	for opcode := range opcodes {
+		opCodeDef := &opcodes[opcode]
+		if opCodeDef.GetInstructionFunc == nil {
 			continue
 		}
 		if _, found := instructionSet[opCodeDef.Mnemonic]; !found {

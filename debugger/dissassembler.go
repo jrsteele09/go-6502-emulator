@@ -16,11 +16,11 @@ const (
 // Disassembler is used to convert machine code into human-readable assembly instructions.
 type Disassembler struct {
 	mem     *memory.Memory[uint16]
-	opCodes []*cpu.OpCodeDef
+	opCodes []cpu.OpCodeDef
 }
 
 // NewDisassembler creates a new Disassembler instance.
-func NewDisassembler(mem *memory.Memory[uint16], opCodes []*cpu.OpCodeDef) *Disassembler {
+func NewDisassembler(mem *memory.Memory[uint16], opCodes []cpu.OpCodeDef) *Disassembler {
 	return &Disassembler{
 		mem:     mem,
 		opCodes: opCodes,
@@ -30,9 +30,9 @@ func NewDisassembler(mem *memory.Memory[uint16], opCodes []*cpu.OpCodeDef) *Disa
 // Disassemble disassembles the machine code at the given address and returns the assembly instruction and its length.
 func (d *Disassembler) Disassemble(address uint16) (string, int) {
 	b := d.mem.Read(address)
-	opCode := d.opCodes[b]
+	opCode := &d.opCodes[b]
 
-	if opCode == nil {
+	if opCode.GetInstructionFunc == nil {
 		return strings.TrimSpace(fmt.Sprintf(disassemblyFormat,
 			fmt.Sprintf("$%04X:", address),
 			strings.ToUpper(d.operandsToByteString(b, []byte{}, 1)),
