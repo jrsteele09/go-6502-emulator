@@ -1,24 +1,78 @@
-# 6502 instruction reference
+# 6502 Instruction Set Manual
 
-This reference documents the 6502 instruction set, it includes common undocumented instructions.
+This manual documents the 6502 instruction set. It covers every
+documented instruction and, in a separate appendix, commonly encountered
+undocumented opcodes.
 
-Cycle counts are the base values used by the emulator. A value in **Extra cycles** describes the condition that adds cycles:
+Cycle counts are the minimum hardware cycle counts. A value in **Extra cycles**
+describes the condition that adds cycles:
 
 - **Page crossed: +1** — indexed address calculation moved into another 256-byte page.
 - **Branch taken: +1; page crossed: +2 total** — a taken branch costs one extra cycle, or two when its destination is on another page.
-- **None** — the instruction has a fixed cycle count in this implementation.
+- **None** — the instruction has a fixed cycle count.
 
-## Status flag notation
+## Processor Status (P) register
 
-The processor status register is shown as `N V U B D I Z C`: negative, overflow, unused, break, decimal, interrupt disable, zero, and carry. Each instruction below has a **Status flags** line describing its exact effect in this emulator:
+The Processor Status register, abbreviated **P**, contains six persistent
+flags. Status bytes are conventionally displayed as `N V 1 B D I Z C`, from
+bit 7 down to bit 0:
 
-- **Updated** means the instruction recomputes the flag from its result; the flag may become set or clear.
-- **Set** or **cleared** means the instruction forces that value.
-- **Tested** means the current value controls the instruction but is not changed.
-- **Restored** means the value is loaded from the stack.
-- **None** means every status bit is left unchanged. Flags not named on a line are also unchanged.
+| Bit | Symbol | Name | Set (`1`) when |
+|---:|:---:|---|---|
+| 7 | `N` | Negative | The instruction-defined result has bit 7 set. |
+| 6 | `V` | Overflow | A signed addition or subtraction cannot be represented in the range -128 to 127, or `BIT` copied a set operand bit 6. |
+| 5 | `1` | Reserved | A status byte written to the stack or read on the data bus normally has this bit set. It is not a writable flag. |
+| 4 | `B` | Break marker | The stacked status came from `BRK` or `PHP`. It is not a flag stored in P. |
+| 3 | `D` | Decimal mode | `ADC` and `SBC` perform packed-BCD arithmetic. |
+| 2 | `I` | Interrupt disable | Maskable IRQ recognition is disabled. NMI is unaffected. |
+| 1 | `Z` | Zero | The instruction-defined result is zero. |
+| 0 | `C` | Carry | Addition produced a carry, subtraction required no borrow, or a shift/rotate moved out a one bit. |
 
-`U` and `B` need special care: they are represented as ordinary bits by this emulator even though an NMOS 6502 does not have a persistent break latch. The notes for stack and interrupt instructions explicitly describe the emulator's live and stacked values.
+Only `N`, `V`, `D`, `I`, `Z`, and `C` are persistent flags. The `B` symbol is
+useful when examining a status byte on the stack: `BRK` and `PHP` push it as
+one, while a hardware IRQ or NMI pushes it as zero. Bit 5 is pushed as one.
+`PLP` and `RTI` restore the six real flags; the pulled values in bits 5 and 4
+do not create reserved or break latches.
+
+Every instruction below has a **Processor Status (P)** note split into plain-language actions:
+
+- **Checks** means the instruction reads the flag's current value to decide what to do, but checking alone does not change it.
+- **Changes** means the instruction recalculates the flag; it may end up set or clear.
+- **Sets** or **clears** means the instruction forces that flag to one or zero.
+- **Restores** means a persistent flag is loaded from the hardware stack.
+- **No flags checked or changed** means the entire P register is left alone. Any flag not named in a note is also unchanged.
+
+For binary arithmetic, `ADC` sets `V` when its two inputs have the same sign
+and the result has the opposite sign. `SBC` sets `V` when A and the operand
+have different signs and the result's sign differs from A. In decimal mode,
+the 6502's `N`, `V`, and `Z` values come from intermediate binary results,
+not simply from the final BCD-adjusted accumulator; use `C` as the valid
+decimal carry/no-borrow indication.
+
+### Status-flag quick reference
+
+This table is an index; each instruction entry below gives the exact condition
+for setting or clearing every affected flag. A dash means no persistent flag
+changes.
+
+| Instructions | Flags read | Flags changed |
+|---|---|---|
+| `ADC`, `SBC` | `C`, `D` | `N`, `V`, `Z`, `C` |
+| `AND`, `EOR`, `ORA`, `LDA`, `LDX`, `LDY`, `TAX`, `TAY`, `TSX`, `TXA`, `TYA`, `DEC`, `DEX`, `DEY`, `INC`, `INX`, `INY`, `PLA` | — | `N`, `Z` |
+| `ASL`, `LSR` | — | `N`, `Z`, `C` |
+| `ROL`, `ROR` | `C` | `N`, `Z`, `C` |
+| `BIT` | — | `N`, `V`, `Z` |
+| `CMP`, `CPX`, `CPY` | — | `N`, `Z`, `C` |
+| `BCC`, `BCS` | `C` | — |
+| `BEQ`, `BNE` | `Z` | — |
+| `BMI`, `BPL` | `N` | — |
+| `BVC`, `BVS` | `V` | — |
+| `CLC`, `CLD`, `CLI`, `CLV` | — | clears `C`, `D`, `I`, or `V` respectively |
+| `SEC`, `SED`, `SEI` | — | sets `C`, `D`, or `I` respectively |
+| `BRK` | — | sets `I`; pushes status with `B=1` and bit 5 set |
+| `PHP` | — | pushes status with `B=1` and bit 5 set; no live flag changes |
+| `PLP`, `RTI` | — | restores `N`, `V`, `D`, `I`, `Z`, `C` |
+| `JMP`, `JSR`, `NOP`, `PHA`, `RTS`, `STA`, `STX`, `STY`, `TXS` | — | — |
 
 ## Addressing notation
 
@@ -44,7 +98,7 @@ The processor status register is shown as `N V U B D I Z C`: negative, overflow,
 
 Adds the operand and the carry flag to the accumulator. It updates carry, zero, negative, and overflow; decimal mode uses BCD arithmetic.
 
-**Status flags:** `C`, `Z`, `V`, and `N` updated; `C` and `D` tested. `C` is the carry out, `Z` tests the final A value, `N` copies final A bit 7, and `V` is recomputed by the emulator's signed-overflow test.
+**Processor Status (P):** Checks Carry (C), adding an extra 1 when it is set, and checks Decimal mode (D) to select binary or BCD arithmetic. Changes Carry (C), Zero (Z), Overflow (V), and Negative (N). In binary mode, Carry is set when the unsigned sum exceeds 255; Zero is set when the 8-bit result is zero; Negative copies result bit 7; Overflow is set when two operands with the same sign produce a result with the opposite sign. In decimal mode, see the decimal-flag warning above.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -61,7 +115,7 @@ Adds the operand and the carry flag to the accumulator. It updates carry, zero, 
 
 ANDs the operand with the accumulator and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the new A value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the new A value. Zero is set when A is zero; Negative copies A bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -78,7 +132,7 @@ ANDs the operand with the accumulator and updates zero and negative.
 
 Shifts the accumulator or memory left by one bit. Bit 7 moves into carry and zero/negative reflect the result.
 
-**Status flags:** `C`, `Z`, and `N` updated. `C` receives the old bit 7; `Z` and `N` reflect the shifted result.
+**Processor Status (P):** Changes Carry (C), Zero (Z), and Negative (N). Carry receives the old bit 7; Zero is set when the shifted result is zero; Negative copies result bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -92,7 +146,7 @@ Shifts the accumulator or memory left by one bit. Bit 7 moves into carry and zer
 
 Branches when the carry flag is clear.
 
-**Status flags:** `C` tested; no flags changed.
+**Processor Status (P):** Checks Carry (C). Branches when Carry is clear; changes no flags.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -102,7 +156,7 @@ Branches when the carry flag is clear.
 
 Branches when the carry flag is set.
 
-**Status flags:** `C` tested; no flags changed.
+**Processor Status (P):** Checks Carry (C). Branches when Carry is set; changes no flags.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -112,7 +166,7 @@ Branches when the carry flag is set.
 
 Branches when the zero flag is set.
 
-**Status flags:** `Z` tested; no flags changed.
+**Processor Status (P):** Checks Zero (Z). Branches when Zero is set; changes no flags.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -122,7 +176,7 @@ Branches when the zero flag is set.
 
 Tests the accumulator against memory without changing either value. Zero reflects `A AND operand`; bits 7 and 6 of memory become negative and overflow.
 
-**Status flags:** `Z`, `V`, and `N` updated. `Z` is set exactly when `A AND operand` is zero; `V` and `N` copy operand bits 6 and 7 respectively.
+**Processor Status (P):** Changes Zero (Z), Overflow (V), and Negative (N). Zero is set when `A AND operand` is zero; Overflow copies operand bit 6; Negative copies operand bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -133,7 +187,7 @@ Tests the accumulator against memory without changing either value. Zero reflect
 
 Branches when the negative flag is set.
 
-**Status flags:** `N` tested; no flags changed.
+**Processor Status (P):** Checks Negative (N). Branches when Negative is set; changes no flags.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -143,7 +197,7 @@ Branches when the negative flag is set.
 
 Branches when the zero flag is clear.
 
-**Status flags:** `Z` tested; no flags changed.
+**Processor Status (P):** Checks Zero (Z). Branches when Zero is clear; changes no flags.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -153,7 +207,7 @@ Branches when the zero flag is clear.
 
 Branches when the negative flag is clear.
 
-**Status flags:** `N` tested; no flags changed.
+**Processor Status (P):** Checks Negative (N). Branches when Negative is clear; changes no flags.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -161,9 +215,9 @@ Branches when the negative flag is clear.
 
 ### BRK — Software interrupt
 
-Pushes the return address and status, sets interrupt disable, and loads the IRQ/BRK vector. The pushed status has the break flag set.
+Pushes the address following `BRK`'s padding byte and a status byte, sets interrupt disable, and loads the IRQ/BRK vector from `$FFFE-$FFFF`. The pushed status has its break marker set.
 
-**Status flags:** live `B` and `I` set. The stacked status copy has `B` and `U` set; all other stacked bits retain their pre-`BRK` values because `I` is set only after the push.
+**Processor Status (P):** Sets Interrupt disable (I). The status byte pushed to the stack has `B=1` and bit 5 set; its six persistent flags have their pre-`BRK` values because Interrupt disable is set after the push. There is no live Break flag.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -173,7 +227,7 @@ Pushes the return address and status, sets interrupt disable, and loads the IRQ/
 
 Branches when the overflow flag is clear.
 
-**Status flags:** `V` tested; no flags changed.
+**Processor Status (P):** Checks Overflow (V). Branches when Overflow is clear; changes no flags.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -183,7 +237,7 @@ Branches when the overflow flag is clear.
 
 Branches when the overflow flag is set.
 
-**Status flags:** `V` tested; no flags changed.
+**Processor Status (P):** Checks Overflow (V). Branches when Overflow is set; changes no flags.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -193,7 +247,7 @@ Branches when the overflow flag is set.
 
 Clears the carry flag.
 
-**Status flags:** `C` cleared.
+**Processor Status (P):** Clears Carry (C). No other flags change.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -203,7 +257,7 @@ Clears the carry flag.
 
 Clears the decimal flag, selecting binary arithmetic for ADC and SBC.
 
-**Status flags:** `D` cleared.
+**Processor Status (P):** Clears Decimal mode (D). No other flags change.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -213,7 +267,7 @@ Clears the decimal flag, selecting binary arithmetic for ADC and SBC.
 
 Clears the interrupt-disable flag, allowing an asserted IRQ line to be serviced at an instruction boundary.
 
-**Status flags:** `I` cleared.
+**Processor Status (P):** Clears Interrupt disable (I). No other flags change.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -223,7 +277,7 @@ Clears the interrupt-disable flag, allowing an asserted IRQ line to be serviced 
 
 Clears the overflow flag.
 
-**Status flags:** `V` cleared.
+**Processor Status (P):** Clears Overflow (V). No other flags change.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -233,7 +287,7 @@ Clears the overflow flag.
 
 Subtracts the operand from the accumulator for flag purposes without storing the result. Carry means `A >= operand`; zero means equality.
 
-**Status flags:** `C`, `Z`, and `N` updated from `A - operand`. `C` is set when `A >= operand`, `Z` when the 8-bit difference is zero, and `N` copies difference bit 7.
+**Processor Status (P):** Changes Carry (C), Zero (Z), and Negative (N) as though `A - operand` were calculated. Carry is set when `A >= operand`; Zero is set when the 8-bit difference is zero; Negative copies difference bit 7. A itself is not changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -250,7 +304,7 @@ Subtracts the operand from the accumulator for flag purposes without storing the
 
 Compares X with the operand without changing X. Carry means `X >= operand`; zero means equality.
 
-**Status flags:** `C`, `Z`, and `N` updated from `X - operand`, with the same rules as `CMP`.
+**Processor Status (P):** Changes Carry (C), Zero (Z), and Negative (N) as though `X - operand` were calculated, using the same rules as `CMP`. X itself is not changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -262,7 +316,7 @@ Compares X with the operand without changing X. Carry means `X >= operand`; zero
 
 Compares Y with the operand without changing Y. Carry means `Y >= operand`; zero means equality.
 
-**Status flags:** `C`, `Z`, and `N` updated from `Y - operand`, with the same rules as `CMP`.
+**Processor Status (P):** Changes Carry (C), Zero (Z), and Negative (N) as though `Y - operand` were calculated, using the same rules as `CMP`. Y itself is not changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -274,7 +328,7 @@ Compares Y with the operand without changing Y. Carry means `Y >= operand`; zero
 
 Subtracts one from a memory byte and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the decremented byte.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the decremented byte. Zero is set when the result is zero; Negative copies result bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -287,7 +341,7 @@ Subtracts one from a memory byte and updates zero and negative.
 
 Subtracts one from X and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the new X value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the new X value. Zero is set when X is zero; Negative copies X bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -297,7 +351,7 @@ Subtracts one from X and updates zero and negative.
 
 Subtracts one from Y and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the new Y value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the new Y value. Zero is set when Y is zero; Negative copies Y bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -307,7 +361,7 @@ Subtracts one from Y and updates zero and negative.
 
 Exclusive-ORs the operand with the accumulator and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the new A value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the new A value. Zero is set when A is zero; Negative copies A bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -324,7 +378,7 @@ Exclusive-ORs the operand with the accumulator and updates zero and negative.
 
 Adds one to a memory byte and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the incremented byte.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the incremented byte. Zero is set when the result is zero; Negative copies result bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -337,7 +391,7 @@ Adds one to a memory byte and updates zero and negative.
 
 Adds one to X and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the new X value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the new X value. Zero is set when X is zero; Negative copies X bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -347,7 +401,7 @@ Adds one to X and updates zero and negative.
 
 Adds one to Y and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the new Y value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the new Y value. Zero is set when Y is zero; Negative copies Y bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -355,9 +409,9 @@ Adds one to Y and updates zero and negative.
 
 ### JMP — Jump
 
-Loads the program counter with the target address. Indirect JMP preserves the NMOS 6502 page-wrap behavior when the pointer ends in `$FF`.
+Loads the program counter with the target address. Indirect JMP uses the 6502 page-wrap behavior when the pointer ends in `$FF`.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -368,7 +422,7 @@ Loads the program counter with the target address. Indirect JMP preserves the NM
 
 Pushes the address immediately before the next instruction, then jumps to the absolute target. RTS returns to the following instruction.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -378,7 +432,7 @@ Pushes the address immediately before the next instruction, then jumps to the ab
 
 Loads the operand into A and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the loaded A value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the loaded A value. Zero is set when A is zero; Negative copies A bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -395,7 +449,7 @@ Loads the operand into A and updates zero and negative.
 
 Loads the operand into X and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the loaded X value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the loaded X value. Zero is set when X is zero; Negative copies X bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -409,7 +463,7 @@ Loads the operand into X and updates zero and negative.
 
 Loads the operand into Y and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the loaded Y value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the loaded Y value. Zero is set when Y is zero; Negative copies Y bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -423,7 +477,7 @@ Loads the operand into Y and updates zero and negative.
 
 Shifts the accumulator or memory right by one bit. Bit 0 moves into carry, bit 7 becomes zero, and zero/negative are updated.
 
-**Status flags:** `C` and `Z` updated; `N` cleared. `C` receives the old bit 0 and `Z` reflects the shifted result.
+**Processor Status (P):** Changes Carry (C) and Zero (Z), and clears Negative (N). Carry receives the old bit 0; Zero is set when the shifted result is zero. Negative is always clear because the shift inserts zero into result bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -437,7 +491,7 @@ Shifts the accumulator or memory right by one bit. Bit 0 moves into carry, bit 7
 
 Performs no state-changing operation.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -447,7 +501,7 @@ Performs no state-changing operation.
 
 ORs the operand with the accumulator and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the new A value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the new A value. Zero is set when A is zero; Negative copies A bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -464,7 +518,7 @@ ORs the operand with the accumulator and updates zero and negative.
 
 Pushes A onto the hardware stack and decrements the stack pointer.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -472,9 +526,9 @@ Pushes A onto the hardware stack and decrements the stack pointer.
 
 ### PHP — Push processor status
 
-Pushes the status register with the break and unused bits set in the stacked copy.
+Pushes a status byte with the break marker and reserved bit set.
 
-**Status flags:** no live flags changed. The stacked copy has `B` and `U` set; its other bits copy the live status register.
+**Processor Status (P):** Changes no live flags. In the copy pushed to the stack, `B=1` and bit 5 is set; every other bit copies its corresponding persistent flag.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -484,7 +538,7 @@ Pushes the status register with the break and unused bits set in the stacked cop
 
 Pulls A from the hardware stack and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the pulled A value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the value pulled into A. Zero is set when A is zero; Negative copies A bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -494,7 +548,7 @@ Pulls A from the hardware stack and updates zero and negative.
 
 Pulls the status register from the hardware stack.
 
-**Status flags:** all eight bits (`N V U B D I Z C`) restored verbatim from the pulled byte in this emulator.
+**Processor Status (P):** Restores Negative (N), Overflow (V), Decimal mode (D), Interrupt disable (I), Zero (Z), and Carry (C) from the pulled byte. Pulled bits 5 and 4 do not become persistent flags.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -504,7 +558,7 @@ Pulls the status register from the hardware stack.
 
 Rotates the accumulator or memory left through carry. Old bit 7 enters carry and the old carry enters bit 0.
 
-**Status flags:** `C` tested and updated; `Z` and `N` updated. The old `C` becomes result bit 0, the old operand bit 7 becomes the new `C`, and `Z`/`N` reflect the result.
+**Processor Status (P):** Checks the old Carry (C), then changes Carry (C), Zero (Z), and Negative (N). The old Carry enters result bit 0; the old operand bit 7 becomes the new Carry; Zero is set when the result is zero; Negative copies result bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -518,7 +572,7 @@ Rotates the accumulator or memory left through carry. Old bit 7 enters carry and
 
 Rotates the accumulator or memory right through carry. Old bit 0 enters carry and the old carry enters bit 7.
 
-**Status flags:** `C` tested and updated; `Z` and `N` updated. The old `C` becomes result bit 7, the old operand bit 0 becomes the new `C`, and `Z`/`N` reflect the result.
+**Processor Status (P):** Checks the old Carry (C), then changes Carry (C), Zero (Z), and Negative (N). The old Carry enters result bit 7; the old operand bit 0 becomes the new Carry; Zero is set when the result is zero; Negative copies result bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -532,7 +586,7 @@ Rotates the accumulator or memory right through carry. Old bit 0 enters carry an
 
 Pulls status and the program counter from the stack, resuming the interrupted program.
 
-**Status flags:** `N`, `V`, `U`, `D`, `I`, `Z`, and `C` restored from the pulled status byte; `B` is then cleared by this emulator.
+**Processor Status (P):** Restores Negative (N), Overflow (V), Decimal mode (D), Interrupt disable (I), Zero (Z), and Carry (C) from the pulled status byte. Pulled bits 5 and 4 do not become persistent flags.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -542,7 +596,7 @@ Pulls status and the program counter from the stack, resuming the interrupted pr
 
 Pulls the saved address from the stack, adds one, and resumes after the corresponding JSR.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -552,7 +606,7 @@ Pulls the saved address from the stack, adds one, and resumes after the correspo
 
 Subtracts the operand and inverse carry from the accumulator. It updates carry, zero, negative, and overflow; decimal mode uses BCD arithmetic.
 
-**Status flags:** `C`, `Z`, `V`, and `N` updated; `C` and `D` tested. `C` is set when no borrow is required, `Z` tests final A, `N` copies final A bit 7, and `V` is recomputed by the emulator's signed-overflow test.
+**Processor Status (P):** Checks Carry (C): a clear Carry subtracts one extra, while a set Carry does not. It checks Decimal mode (D) to select binary or BCD arithmetic. Changes Carry (C), Zero (Z), Overflow (V), and Negative (N). In binary mode, Carry is set when no borrow is required; Zero is set when the 8-bit result is zero; Negative copies result bit 7; Overflow is set when A and the operand have different signs and the result's sign differs from A. In decimal mode, see the decimal-flag warning above.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -569,7 +623,7 @@ Subtracts the operand and inverse carry from the accumulator. It updates carry, 
 
 Sets the carry flag.
 
-**Status flags:** `C` set.
+**Processor Status (P):** Sets Carry (C). No other flags change.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -579,7 +633,7 @@ Sets the carry flag.
 
 Sets the decimal flag, selecting BCD arithmetic for ADC and SBC.
 
-**Status flags:** `D` set.
+**Processor Status (P):** Sets Decimal mode (D). No other flags change.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -589,7 +643,7 @@ Sets the decimal flag, selecting BCD arithmetic for ADC and SBC.
 
 Sets the interrupt-disable flag so an asserted IRQ line is not serviced. NMI is unaffected.
 
-**Status flags:** `I` set.
+**Processor Status (P):** Sets Interrupt disable (I). No other flags change.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -599,7 +653,7 @@ Sets the interrupt-disable flag so an asserted IRQ line is not serviced. NMI is 
 
 Stores A in memory. Store instructions have fixed timing even when indexed addressing crosses a page.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -615,7 +669,7 @@ Stores A in memory. Store instructions have fixed timing even when indexed addre
 
 Stores X in memory.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -627,7 +681,7 @@ Stores X in memory.
 
 Stores Y in memory.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -639,7 +693,7 @@ Stores Y in memory.
 
 Copies A into X and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the new X value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the new X value. Zero is set when X is zero; Negative copies X bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -649,7 +703,7 @@ Copies A into X and updates zero and negative.
 
 Copies A into Y and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the new Y value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the new Y value. Zero is set when Y is zero; Negative copies Y bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -659,7 +713,7 @@ Copies A into Y and updates zero and negative.
 
 Copies the stack pointer into X and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the new X value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the new X value. Zero is set when X is zero; Negative copies X bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -669,7 +723,7 @@ Copies the stack pointer into X and updates zero and negative.
 
 Copies X into A and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the new A value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the new A value. Zero is set when A is zero; Negative copies A bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -679,7 +733,7 @@ Copies X into A and updates zero and negative.
 
 Copies X into the stack pointer. It does not update flags.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -689,7 +743,7 @@ Copies X into the stack pointer. It does not update flags.
 
 Copies Y into A and updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the new A value.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the new A value. Zero is set when A is zero; Negative copies A bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -697,14 +751,15 @@ Copies Y into A and updates zero and negative.
 
 ## Undocumented Instructions
 
-Undocumented instructions are explained below, use with care as not they are not guaranteed to work reliably on
-all 6502 CPU's - they do not work on later CPU's like the 65C02.
+These opcodes were not specified by MOS Technology. Names are community
+conventions, some behaviours depend on the chip revision and electrical
+conditions, and they are not guaranteed to behave identically on every 6502.
 
 ### ALR — AND then logical shift right (Undocumented)
 
 ANDs an immediate value with the accumulator, shifts the result right, and stores it in the accumulator. Bit 0 moves into carry.
 
-**Status flags:** `C` and `Z` updated; `N` cleared. `C` receives bit 0 of the intermediate `A AND operand` value and `Z` reflects the final A value.
+**Processor Status (P):** Changes Carry (C) and Zero (Z), and clears Negative (N). Carry receives bit 0 of the intermediate `A AND operand` value; Zero is set when final A is zero. Negative is always clear after the right shift.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -714,7 +769,7 @@ ANDs an immediate value with the accumulator, shifts the result right, and store
 
 ANDs an immediate value with the accumulator, then copies result bit 7 into both the negative and carry flags.
 
-**Status flags:** `C`, `Z`, and `N` updated. `C` and `N` both copy final A bit 7; `Z` tests final A.
+**Processor Status (P):** Changes Carry (C), Zero (Z), and Negative (N). Carry and Negative both copy final A bit 7; Zero is set when final A is zero.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -722,9 +777,9 @@ ANDs an immediate value with the accumulator, then copies result bit 7 into both
 
 ### ARR — AND then rotate right (Undocumented)
 
-ANDs an immediate value with the accumulator, then rotates right through carry. Carry and overflow are derived from the rotated value as implemented by this emulator.
+ANDs an immediate value with the accumulator, then rotates right through carry. In binary mode, carry and overflow are derived from the rotated value as described below. Decimal-mode behaviour is unusual and should not be treated as portable.
 
-**Status flags:** `C` tested; `C`, `Z`, `V`, and `N` updated. The old `C` enters result bit 7; the new `C` copies bit 6 of the intermediate `A AND operand` value; `V` is the XOR of result bits 5 and 6; `Z` and `N` reflect final A.
+**Processor Status (P):** Checks the old Carry (C) and Decimal mode (D), then changes Carry (C), Zero (Z), Overflow (V), and Negative (N). In binary mode, the old Carry enters result bit 7; the new Carry copies result bit 6; Overflow is the XOR of result bits 5 and 6; Zero and Negative reflect final A. Decimal-mode behaviour can be unpredictable.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -734,7 +789,7 @@ ANDs an immediate value with the accumulator, then rotates right through carry. 
 
 Decrements memory, then compares the new value with the accumulator as CMP would.
 
-**Status flags:** `C`, `Z`, and `N` updated from `A - decremented operand`, using the same rules as `CMP`. The decrement's own intermediate flags are not retained.
+**Processor Status (P):** Changes Carry (C), Zero (Z), and Negative (N) from `A - decremented operand`, using the same rules as `CMP`. Any flag results from the intermediate decrement are discarded.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -750,7 +805,7 @@ Decrements memory, then compares the new value with the accumulator as CMP would
 
 Consumes an immediate operand without otherwise changing CPU state.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -758,9 +813,9 @@ Consumes an immediate operand without otherwise changing CPU state.
 
 ### ISC — Increment then subtract with carry (Undocumented)
 
-Increments memory, then subtracts the new value from the accumulator using SBC-style binary arithmetic.
+Increments memory, then subtracts the new value from the accumulator as `SBC` would.
 
-**Status flags:** `C` tested; `C`, `Z`, `V`, and `N` updated by the subtraction. `D` is neither tested nor changed: this emulator always performs `ISC` in binary.
+**Processor Status (P):** Checks Carry (C) and Decimal mode (D), then changes Carry (C), Zero (Z), Overflow (V), and Negative (N) as `SBC` does. A clear Carry subtracts one extra; Carry is set when no borrow is required. In decimal mode, the caveat for `SBC` also applies.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -776,7 +831,7 @@ Increments memory, then subtracts the new value from the accumulator using SBC-s
 
 Loads the same operand into both A and X, then updates zero and negative.
 
-**Status flags:** `Z` and `N` updated from the value loaded into A and X.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the value loaded into A and X. Zero is set when the value is zero; Negative copies its bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -787,11 +842,11 @@ Loads the same operand into both A and X, then updates zero and negative.
 | `A3` | Indexed indirect | `LAX ($nn,X)` | 2 | 6 | None |
 | `B3` | Indirect indexed | `LAX ($nn),Y` | 2 | 5 | Page crossed: +1 |
 
-### NOP* — Single-byte no operation variants (Undocumented)
+### NOP* — Single-byte no operation opcodes (Undocumented)
 
-These opcodes behave like the documented NOP in this emulator.
+These opcodes behave like the documented `NOP` on the 6502.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -801,7 +856,7 @@ These opcodes behave like the documented NOP in this emulator.
 
 Rotates memory left through carry, then ANDs the new memory value into the accumulator.
 
-**Status flags:** `C` tested and updated by the rotate; `Z` and `N` updated from final A. The old `C` enters memory bit 0 and the old memory bit 7 becomes the new `C`.
+**Processor Status (P):** Checks the old Carry (C), then changes Carry (C), Zero (Z), and Negative (N). The old Carry enters memory bit 0; the old memory bit 7 becomes the new Carry; Zero and Negative reflect final A.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -817,7 +872,7 @@ Rotates memory left through carry, then ANDs the new memory value into the accum
 
 Rotates memory right through carry, then adds the new memory value to the accumulator.
 
-**Status flags:** `C` tested and updated; `Z`, `V`, and `N` updated from final A. The old `C` enters memory bit 7 and old memory bit 0 supplies the addition's carry-in. This implementation sets the final `C` exactly when the pre-add A value is greater than the final 8-bit A value. `D` is neither tested nor changed.
+**Processor Status (P):** Checks the old Carry (C) and Decimal mode (D), then changes Carry (C), Zero (Z), Overflow (V), and Negative (N). The old Carry enters memory bit 7, and old memory bit 0 becomes the subsequent addition's carry-in. The final flags follow `ADC`; the decimal-mode caveat therefore applies when D is set.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -833,7 +888,7 @@ Rotates memory right through carry, then adds the new memory value to the accumu
 
 Stores `A AND X` in memory without changing either register.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -846,7 +901,7 @@ Stores `A AND X` in memory without changing either register.
 
 Performs the same immediate subtract-with-carry operation as opcode `E9`.
 
-**Status flags:** `C`, `Z`, `V`, and `N` updated; `C` and `D` tested, exactly as for `SBC`.
+**Processor Status (P):** Checks Carry (C) and Decimal mode (D), then changes Carry (C), Zero (Z), Overflow (V), and Negative (N), exactly as documented for `SBC`.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -854,9 +909,9 @@ Performs the same immediate subtract-with-carry operation as opcode `E9`.
 
 ### SKB — Skip byte through zero page (Undocumented)
 
-Consumes a zero-page operand and otherwise behaves as a no operation in this emulator.
+Reads a zero-page operand and otherwise behaves as a no operation.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -864,9 +919,9 @@ Consumes a zero-page operand and otherwise behaves as a no operation in this emu
 
 ### SKW — Skip byte through zero page,X (Undocumented)
 
-Consumes a zero-page,X operand and otherwise behaves as a no operation in this emulator.
+Reads a zero-page,X operand and otherwise behaves as a no operation.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -876,7 +931,7 @@ Consumes a zero-page,X operand and otherwise behaves as a no operation in this e
 
 Shifts memory left, then ORs the new memory value into the accumulator.
 
-**Status flags:** `C` updated from the old memory bit 7; `Z` and `N` updated from final A.
+**Processor Status (P):** Changes Carry (C), Zero (Z), and Negative (N). Carry receives old memory bit 7; Zero is set when final A is zero; Negative copies final A bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -892,7 +947,7 @@ Shifts memory left, then ORs the new memory value into the accumulator.
 
 Shifts memory right, then exclusive-ORs the new memory value into the accumulator.
 
-**Status flags:** `C` updated from the old memory bit 0; `Z` and `N` updated from final A.
+**Processor Status (P):** Changes Carry (C), Zero (Z), and Negative (N). Carry receives old memory bit 0; Zero is set when final A is zero; Negative copies final A bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -906,20 +961,20 @@ Shifts memory right, then exclusive-ORs the new memory value into the accumulato
 
 ### TOP — Three-byte no operation (Undocumented)
 
-Consumes an absolute operand and otherwise behaves as a no operation. The absolute,X form has a fixed four-cycle cost in the current emulator.
+Reads an absolute operand and otherwise behaves as a no operation. The absolute,X forms take one extra cycle when indexing crosses a page.
 
-**Status flags:** None.
+**Processor Status (P):** No flags checked or changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `0C` | Absolute | `TOP $nnnn` | 3 | 4 | None |
-| `1C`, `3C`, `5C`, `7C`, `DC`, `FC` | Absolute,X | `TOP $nnnn,X` | 3 | 4 | None in current implementation |
+| `1C`, `3C`, `5C`, `7C`, `DC`, `FC` | Absolute,X | `TOP $nnnn,X` | 3 | 4 | Page crossed: +1 |
 
 ### XAA — Transfer X AND immediate to accumulator (Undocumented)
 
-ANDs X with an immediate value, stores the result in A, and updates zero and negative. Real-chip behavior is unstable; this describes the emulator’s deterministic implementation.
+On the 6502 this instruction combines X, an immediate operand, and an internal bus value, then stores the result in A. Its result is electrically unstable and can vary with chip revision, temperature, and supply voltage; no single deterministic formula is reliable.
 
-**Status flags:** `Z` and `N` updated from final A.
+**Processor Status (P):** Changes Zero (Z) and Negative (N) from the value placed in A. Zero is set when A is zero; Negative copies A bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|

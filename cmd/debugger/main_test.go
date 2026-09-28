@@ -1,8 +1,10 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/jrsteele09/go-6502-emulator/debugger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,4 +37,16 @@ func TestVerboseRegisterArguments(t *testing.T) {
 		require.True(t, isVerboseRegisterArgument(argument), argument)
 	}
 	require.False(t, isVerboseRegisterArgument("compact"))
+}
+
+func TestPromptShowsCurrentInstruction(t *testing.T) {
+	dbg := debugger.NewDebugger()
+	dbg.GetMemory().Write(0xC000, 0xA9, 0x42)
+	dbg.GetCPU().Registers().PC = 0xC000
+	repl := &DebuggerRepl{debugger: dbg}
+
+	prompt := repl.prompt()
+
+	require.Contains(t, prompt, "$C000: A9 42      LDA #$42")
+	require.True(t, strings.HasSuffix(prompt, Reset+" > "))
 }

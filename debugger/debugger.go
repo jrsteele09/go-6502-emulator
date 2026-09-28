@@ -142,7 +142,13 @@ func (d *Debugger) SetProgramCounter(value string) string {
 
 	d.cpu.Registers().PC = addr
 	d.lastDisasmAddr = addr
-	return fmt.Sprintf("PC set to %s\n", d.FormatAddress(addr))
+	return ""
+}
+
+// CurrentInstruction disassembles the instruction currently pointed to by PC.
+func (d *Debugger) CurrentInstruction() string {
+	instruction, _ := d.disassembler.Disassemble(d.cpu.Registers().PC)
+	return instruction
 }
 
 // formatAddress formats an address for display
@@ -159,8 +165,7 @@ func (d *Debugger) FormatByte(b uint8) string {
 func (d *Debugger) ShowRegisters() string {
 	regs := d.cpu.Registers()
 
-	result := "Registers:\n"
-	result += fmt.Sprintf("  A: %s  X: %s  Y: %s  PC: %s  S: %s\n",
+	result := fmt.Sprintf("  A: %s  X: %s  Y: %s  PC: %s  S: %s\n",
 		d.FormatByte(regs.A),
 		d.FormatByte(regs.X),
 		d.FormatByte(regs.Y),
@@ -224,7 +229,7 @@ func (d *Debugger) ShowRegistersVerbose() string {
 	regs := d.cpu.Registers()
 	status := regs.Status
 
-	result := "Registers (descriptive):\n"
+	result := "Registers:\n"
 	result += fmt.Sprintf("  %-20s %-4s %s  (%d)\n", "Accumulator", "A", d.FormatByte(regs.A), regs.A)
 	result += fmt.Sprintf("  %-20s %-4s %s  (%d)\n", "X index register", "X", d.FormatByte(regs.X), regs.X)
 	result += fmt.Sprintf("  %-20s %-4s %s  (%d)\n", "Y index register", "Y", d.FormatByte(regs.Y), regs.Y)
@@ -254,7 +259,6 @@ func (d *Debugger) ShowRegistersVerbose() string {
 		}
 		result += fmt.Sprintf("  %-20s %-4s %s\n", item.name, item.bit, state)
 	}
-
 	return result
 }
 
@@ -284,7 +288,7 @@ func (d *Debugger) Disassemble(args []string) string {
 		}
 	}
 
-	result := fmt.Sprintf("Disassembly from %s:\n\n", d.FormatAddress(startAddr))
+	result := "" //fmt.Sprintf("Disassembly from %s:\n\n", d.FormatAddress(startAddr))
 
 	addr := startAddr
 	for i := 0; i < count; i++ {
@@ -439,8 +443,6 @@ func (d *Debugger) Step(args []string) string {
 		// Only show step number if stepping multiple instructions
 		if count > 1 {
 			result += fmt.Sprintf("Step %d: %s\n", i+1, instruction)
-		} else {
-			result += fmt.Sprintf("Executing: %s\n", instruction)
 		}
 
 		completed := cpu.Completed(false)

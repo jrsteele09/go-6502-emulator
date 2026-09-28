@@ -78,7 +78,7 @@ func main() {
 func (r *DebuggerRepl) Run() {
 	r.printBanner()
 	r.showHelp()
-
+	fmt.Println()
 	for {
 		r.lineEditor.SetPrompt(r.prompt())
 		line, err := r.lineEditor.ReadLine()
@@ -130,10 +130,9 @@ func (r *DebuggerRepl) printBanner() {
 	fmt.Println()
 }
 
-// prompt returns the debugger prompt with the current program counter.
+// prompt shows the address, bytes, and decoded instruction at the current PC.
 func (r *DebuggerRepl) prompt() string {
-	pc := r.debugger.GetCPU().Registers().PC
-	return fmt.Sprintf("%s.%s $%04X%s> ", Bold, Green, pc, Reset)
+	return fmt.Sprintf("%s.%s %s%s > ", Bold, Green, r.debugger.CurrentInstruction(), Reset)
 }
 
 // processCommand processes a user command and returns true if exit is requested
@@ -154,7 +153,7 @@ func (r *DebuggerRepl) processCommand(input string) bool {
 
 	command := strings.ToUpper(parts[0])
 	args := parts[1:]
-
+	fmt.Println()
 	switch command {
 	case "H", "HELP", "?":
 		r.showHelp()
@@ -209,6 +208,7 @@ func (r *DebuggerRepl) processCommand(input string) bool {
 	default:
 		fmt.Printf("%sUnknown command: %s. Type 'H' for help.%s\n", Red, command, Reset)
 	}
+	fmt.Println()
 
 	return false
 }
@@ -267,7 +267,6 @@ func (r *DebuggerRepl) showHelp() {
 	fmt.Printf("  - Home/End or Ctrl+A/Ctrl+E jump to the start/end of the line\n")
 	fmt.Printf("  - Option+Left/Right or Alt+B/Alt+F move by one word\n")
 	fmt.Printf("  - Use Ctrl+C to stop a running program and return to the prompt\n")
-	fmt.Println()
 }
 
 // colorizeOutput adds color formatting to debugger output

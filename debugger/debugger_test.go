@@ -61,6 +61,22 @@ func TestSetProgramCounterRejectsInvalidAddress(t *testing.T) {
 	require.Equal(t, uint16(0x5678), dbg.GetLastDisasmAddr())
 }
 
+func TestCurrentInstruction(t *testing.T) {
+	dbg := NewDebugger()
+	dbg.GetMemory().Write(0xC000, 0xA9, 0x42)
+	dbg.GetCPU().Registers().PC = 0xC000
+
+	require.Equal(t, "$C000: A9 42      LDA #$42", dbg.CurrentInstruction())
+}
+
+func TestCurrentInstructionShowsUnknownOpcode(t *testing.T) {
+	dbg := NewDebugger()
+	dbg.GetMemory().Write(0xC000, 0x02)
+	dbg.GetCPU().Registers().PC = 0xC000
+
+	require.Equal(t, "$C000: 02         ???", dbg.CurrentInstruction())
+}
+
 func TestShowRegistersVerbose(t *testing.T) {
 	dbg := NewDebugger()
 	regs := dbg.GetCPU().Registers()

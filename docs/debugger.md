@@ -35,11 +35,16 @@ by the debugger.
 
 ## The prompt
 
-The prompt displays the current program counter:
+The prompt disassembles the instruction at the current program counter. It
+shows the address, raw instruction bytes, and decoded instruction:
 
 ```text
-. $1000>
+. $1000: A9 42      LDA #$42 >
 ```
+
+The prompt refreshes after every command, so changes made by stepping, running,
+loading a program, or assigning PC are immediately visible. An unrecognised
+opcode is shown as `???`.
 
 Commands and their long-form names are case-insensitive. The prompt provides
 shell-style line editing:
@@ -99,7 +104,7 @@ passed to `L`.
 Load a PRG after entering the debugger:
 
 ```text
-. $0000> L program.prg
+. $0000: 00         BRK > L program.prg
 Loaded PRG file: program.prg
   Segment 1: $1000 to $100A (11 bytes)
 Total: 11 bytes loaded
@@ -115,7 +120,7 @@ session when a completely clean machine state is required.
 Use `R` to display all registers:
 
 ```text
-. $1000> R
+. $1000: A9 42      LDA #$42 > R
 Registers:
   A: $00  X: $00  Y: $00  PC: $1000  S: $FF
   Flags: $24 (%00100100) (..1..I..)  NV1BDIZC
@@ -340,29 +345,29 @@ debug6502 loop.prg
 Inspect the program, stop at the loop, and step through an iteration:
 
 ```text
-. $1000> D $1000 6
-. $1000> B $1007
-. $1000> G
+. $1000: A9 42      LDA #$42 > D $1000 6
+. $1000: A9 42      LDA #$42 > B $1007
+. $1000: A9 42      LDA #$42 > G
 Breakpoint hit at $1007
 Next: $1007: CA         DEX
 
-. $1007> R
-. $1007> S
-. $1008> R
-. $1008> G
+. $1007: CA         DEX > R
+. $1007: CA         DEX > S
+. $1008: D0 FD      BNE $1007 > R
+. $1008: D0 FD      BNE $1007 > G
 Breakpoint hit at $1007
 ```
 
 Examine the value written by `STA $0200`:
 
 ```text
-. $1007> M $0200 1
+. $1007: CA         DEX > M $0200 1
 ```
 
 To run to the final `BRK`, replace the loop breakpoint with one at `$100A`:
 
 ```text
-. $1007> C $1007
-. $1007> B $100A
-. $1007> G
+. $1007: CA         DEX > C $1007
+. $1007: CA         DEX > B $100A
+. $1007: CA         DEX > G
 ```
