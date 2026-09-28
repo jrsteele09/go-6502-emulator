@@ -41,8 +41,23 @@ The prompt displays the current program counter:
 . $1000>
 ```
 
-Commands and their long-form names are case-insensitive. Pressing Enter on an
-empty line repeats the last non-empty command.
+Commands and their long-form names are case-insensitive. The prompt provides
+shell-style line editing:
+
+- Up and Down browse earlier and later command history.
+- Left and Right move within the current line.
+- Home and End, or Ctrl+A and Ctrl+E, jump to the beginning and end.
+- Option+Left and Option+Right move one word in terminals configured for
+  standard readline or "natural text editing" sequences; Alt+B and Alt+F are
+  reliable equivalents.
+- Ctrl+R searches command history.
+- Ctrl+W deletes the preceding word; Ctrl+U and Ctrl+K delete to the beginning
+  and end of the line.
+
+macOS Command+Arrow behavior is controlled by the terminal emulator. It works
+when the terminal maps those shortcuts to Home/End or Ctrl+A/Ctrl+E; otherwise
+use those portable bindings directly. Pressing Enter on an empty line repeats
+the last non-empty command.
 
 Addresses accept either `$`-prefixed hexadecimal or unsigned decimal:
 
@@ -62,11 +77,13 @@ in one byte.
 | `H` | `HELP`, `?` | Show command help. |
 | `Q` | `QUIT`, `EXIT` | Exit the debugger. |
 | `R` | `REGISTERS` | Display CPU registers and status flags. |
+| `RV`, `RD` | `REGISTERS-VERBOSE`, `REGISTERS-DESCRIPTIVE` | Display registers in a descriptive column and expand every status flag. |
+| `PC=address` | — | Set the program counter. `PC address` and `PC = address` are also accepted. |
 | `D [address] [count]` | `DISASSEMBLE` | Disassemble instructions. The default count is 10. |
 | `M [address] [count]` | `MEMORY` | Display a hexadecimal and ASCII memory dump. Defaults to `$0000` and 16 bytes. |
 | `L filename` | `LOAD` | Load a PRG file and set PC to its load address. |
 | `G [address]` | `GO` | Run from an address, or from the current PC when omitted. |
-| `S [count]` | `STEP` | Execute one or more instructions. The default count is 1. |
+| `S [count]` | `STEP` | Execute one or more instructions. Stops before `BRK` or a top-level `RTS`; the default count is 1. |
 | `B address` | `BREAK` | Set a breakpoint. |
 | `BR` | `BREAKPOINTS` | List active breakpoints. |
 | `C address` | `CLEAR` | Clear a breakpoint. |
@@ -117,8 +134,40 @@ The flag characters are shown in bit order:
 | `Z` | Zero |
 | `C` | Carry |
 
-A letter means the flag is set; a period means it is clear. There is currently
-no command for directly changing registers or flags.
+A letter means the flag is set; a period means it is clear. Set the program
+counter with monitor-style assignment syntax:
+
+```text
+PC=$C000
+```
+
+Spaces around the equals sign are optional. `PC $C000` and decimal addresses
+such as `PC=49152` are also accepted. Setting PC also resets the implicit
+starting position used by the next `D` command. There is currently no command
+for directly changing the other registers or flags.
+
+For a column-oriented view with full names, use `RV` or `RD`. The forms
+`R VERBOSE` and `R DESCRIPTIVE` are also accepted:
+
+```text
+Registers (descriptive):
+  Accumulator          A    $80  (128)
+  X index register     X    $10  (16)
+  Y index register     Y    $20  (32)
+  Stack pointer        S    $FD  (253)
+  Program counter      PC   $C000  (49152)
+  Processor status     P    $AA  (%10101010)
+
+Processor status flags:
+  Negative             N    set
+  Overflow             V    clear
+  Unused               U    set
+  Break                B    clear
+  Decimal mode         D    set
+  Interrupt disable    I    clear
+  Zero                 Z    set
+  Carry                C    clear
+```
 
 ## Disassembling memory
 
@@ -179,10 +228,16 @@ Execute several instructions:
 S 5
 ```
 
-Each step shows the instruction and the registers after it completes. During a
-multi-step command, execution stops early if the resulting PC has a
-breakpoint. A single `S` still executes when PC is currently on a breakpoint,
-which is useful for moving past one before continuing with `G`.
+Each completed step shows the instruction and the registers after it executes.
+During a multi-step command, execution stops early if the resulting PC has a
+breakpoint.
+
+Like `G`, `S` stops before executing `BRK` or a top-level `RTS` reached with an
+empty hardware stack (`S` is `$FF`). PC remains on the terminating instruction
+and the stack is unchanged. An `RTS` with a JSR return address on the stack is
+executed normally. A single `S` still executes an ordinary instruction when PC
+is currently on a breakpoint, which is useful for moving past one before
+continuing with `G`.
 
 ## Running and breakpoints
 
@@ -218,10 +273,15 @@ BR
 C $1007
 ```
 
-Running stops at a breakpoint or an execution error. Press Ctrl+C while `G` is
-running to request a stop. The current instruction completes, then control
-returns to the debugger prompt with CPU and memory state preserved. `BRK`,
-`RTS`, and an infinite loop do not automatically return to the prompt.
+Running and stepping stop at a breakpoint or execution error as appropriate,
+and both commands stop before a `BRK` or a top-level `RTS` reached while the
+hardware stack is empty (`S` is `$FF`). PC remains on the terminating
+instruction and the stack is unchanged. An `RTS` with a return address on the
+stack executes normally.
+
+Press Ctrl+C while `G` is running to request a stop. The current instruction
+completes, then control returns to the debugger prompt with CPU and memory
+state preserved. An infinite loop does not automatically return to the prompt.
 
 ## Editing memory
 

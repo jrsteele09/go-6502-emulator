@@ -11,6 +11,12 @@ import (
 	"github.com/jrsteele09/go-6502-emulator/memory"
 )
 
+const (
+	brkOpcode         byte = 0x00
+	rtsOpcode         byte = 0x60
+	emptyStackPointer byte = 0xFF
+)
+
 // Debugger represents the 6502 debugger core functionality
 type Debugger struct {
 	cpu            cpu.CPU6502
@@ -127,6 +133,18 @@ func (d *Debugger) ParseValue(val string) (uint8, error) {
 	}
 }
 
+// SetProgramCounter changes the address of the next instruction to execute.
+func (d *Debugger) SetProgramCounter(value string) string {
+	addr, err := d.ParseAddress(value)
+	if err != nil {
+		return fmt.Sprintf("Error setting PC: %v\n", err)
+	}
+
+	d.cpu.Registers().PC = addr
+	d.lastDisasmAddr = addr
+	return fmt.Sprintf("PC set to %s\n", d.FormatAddress(addr))
+}
+
 // formatAddress formats an address for display
 func (d *Debugger) FormatAddress(addr uint16) string {
 	return fmt.Sprintf("$%04X", addr)
@@ -197,6 +215,45 @@ func (d *Debugger) ShowRegisters() string {
 
 	result += fmt.Sprintf("  Flags: %s (%%%s) (%s)  NV1BDIZC\n",
 		d.FormatByte(status), binary, flags)
+
+	return result
+}
+
+// ShowRegistersVerbose displays each CPU register and status flag by name.
+func (d *Debugger) ShowRegistersVerbose() string {
+	regs := d.cpu.Registers()
+	status := regs.Status
+
+	result := "Registers (descriptive):\n"
+	result += fmt.Sprintf("  %-20s %-4s %s  (%d)\n", "Accumulator", "A", d.FormatByte(regs.A), regs.A)
+	result += fmt.Sprintf("  %-20s %-4s %s  (%d)\n", "X index register", "X", d.FormatByte(regs.X), regs.X)
+	result += fmt.Sprintf("  %-20s %-4s %s  (%d)\n", "Y index register", "Y", d.FormatByte(regs.Y), regs.Y)
+	result += fmt.Sprintf("  %-20s %-4s %s  (%d)\n", "Stack pointer", "S", d.FormatByte(regs.S), regs.S)
+	result += fmt.Sprintf("  %-20s %-4s %s  (%d)\n", "Program counter", "PC", d.FormatAddress(regs.PC), regs.PC)
+	result += fmt.Sprintf("  %-20s %-4s %s  (%%%08b)\n", "Processor status", "P", d.FormatByte(status), status)
+
+	result += "\nProcessor status flags:\n"
+	flags := []struct {
+		name string
+		bit  string
+		flag cpu.StatusFlag
+	}{
+		{name: "Negative", bit: "N", flag: cpu.NegativeFlag},
+		{name: "Overflow", bit: "V", flag: cpu.OverflowFlag},
+		{name: "Unused", bit: "U", flag: cpu.UnusedFlag},
+		{name: "Break", bit: "B", flag: cpu.BreakFlag},
+		{name: "Decimal mode", bit: "D", flag: cpu.DecimalFlag},
+		{name: "Interrupt disable", bit: "I", flag: cpu.InterruptDisableFlag},
+		{name: "Zero", bit: "Z", flag: cpu.ZeroFlag},
+		{name: "Carry", bit: "C", flag: cpu.CarryFlag},
+	}
+	for _, item := range flags {
+		state := "clear"
+		if status&byte(item.flag) != 0 {
+			state = "set"
+		}
+		result += fmt.Sprintf("  %-20s %-4s %s\n", item.name, item.bit, state)
+	}
 
 	return result
 }
@@ -369,6 +426,15 @@ func (d *Debugger) Step(args []string) string {
 	for i := 0; i < count; i++ {
 		pc := d.cpu.Registers().PC
 		instruction, _ := d.disassembler.Disassemble(pc)
+		stopMessage := d.executionTerminatorMessage(pc)
+		if stopMessage != "" {
+			if count > 1 {
+				result += fmt.Sprintf("Step %d: %s\n", i+1, instruction)
+			}
+			result += stopMessage + "\n"
+			result += d.ShowRegisters()
+			break
+		}
 
 		// Only show step number if stepping multiple instructions
 		if count > 1 {
@@ -405,6 +471,20 @@ func (d *Debugger) Step(args []string) string {
 	return result
 }
 
+// executionTerminatorMessage describes instructions that return control to the
+// debugger instead of being executed by Go or Step.
+func (d *Debugger) executionTerminatorMessage(pc uint16) string {
+	switch d.memory.Read(pc) {
+	case brkOpcode:
+		return fmt.Sprintf("BRK encountered at %s; execution stopped before the instruction.", d.FormatAddress(pc))
+	case rtsOpcode:
+		if d.cpu.Registers().S == emptyStackPointer {
+			return fmt.Sprintf("Top-level RTS encountered at %s; execution stopped before the instruction.", d.FormatAddress(pc))
+		}
+	}
+	return ""
+}
+
 // Go runs the program from the specified address
 func (d *Debugger) Go(args []string) string {
 	if len(args) > 0 {
@@ -419,6 +499,7 @@ func (d *Debugger) Go(args []string) string {
 	result := fmt.Sprintf("Running from %s... (Ctrl+C to stop)\n", d.FormatAddress(startPC))
 
 	d.running.Store(true)
+	defer d.running.Store(false)
 	instructionCount := 0
 	stoppedWithMessage := false
 
@@ -434,6 +515,13 @@ runLoop:
 			d.running.Store(false)
 			stoppedWithMessage = true
 			break
+		}
+
+		if stopMessage := d.executionTerminatorMessage(pc); stopMessage != "" {
+			result += "\n" + stopMessage + "\n"
+			d.running.Store(false)
+			stoppedWithMessage = true
+			break runLoop
 		}
 
 		for {

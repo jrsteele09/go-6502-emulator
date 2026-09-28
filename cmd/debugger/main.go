@@ -1,12 +1,14 @@
 package main
 
 import (
-	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strings"
 
+	"github.com/ergochat/readline"
 	"github.com/jrsteele09/go-6502-emulator/debugger"
 )
 
@@ -26,19 +28,35 @@ const (
 
 type DebuggerRepl struct {
 	debugger    *debugger.Debugger
-	scanner     *bufio.Scanner
+	lineEditor  *readline.Instance
 	lastCommand string
 }
 
-func NewDebuggerRepl() *DebuggerRepl {
-	return &DebuggerRepl{
-		debugger: debugger.NewDebugger(),
-		scanner:  bufio.NewScanner(os.Stdin),
+func NewDebuggerRepl() (*DebuggerRepl, error) {
+	lineEditor, err := readline.NewFromConfig(&readline.Config{
+		HistoryLimit:      500,
+		HistorySearchFold: true,
+		InterruptPrompt:   "^C",
+		EOFPrompt:         "^D",
+	})
+	if err != nil {
+		return nil, err
 	}
+
+	return &DebuggerRepl{
+		debugger:   debugger.NewDebugger(),
+		lineEditor: lineEditor,
+	}, nil
 }
 
 func main() {
-	repl := NewDebuggerRepl()
+	repl, err := NewDebuggerRepl()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to initialise debugger input: %v\n", err)
+		os.Exit(1)
+	}
+	defer repl.lineEditor.Close()
+
 	interrupts := make(chan os.Signal, 1)
 	signal.Notify(interrupts, os.Interrupt)
 	defer signal.Stop(interrupts)
@@ -62,13 +80,20 @@ func (r *DebuggerRepl) Run() {
 	r.showHelp()
 
 	for {
-		r.printPrompt()
-
-		if !r.scanner.Scan() {
-			break // EOF or error
+		r.lineEditor.SetPrompt(r.prompt())
+		line, err := r.lineEditor.ReadLine()
+		if errors.Is(err, readline.ErrInterrupt) {
+			continue
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			fmt.Printf("%sInput error: %v%s\n", Red, err, Reset)
+			break
 		}
 
-		input := strings.TrimSpace(r.scanner.Text())
+		input := strings.TrimSpace(line)
 		if input == "" {
 			input = r.lastCommand // Repeat last command
 		} else {
@@ -105,14 +130,23 @@ func (r *DebuggerRepl) printBanner() {
 	fmt.Println()
 }
 
-// printPrompt displays the debugger prompt
-func (r *DebuggerRepl) printPrompt() {
+// prompt returns the debugger prompt with the current program counter.
+func (r *DebuggerRepl) prompt() string {
 	pc := r.debugger.GetCPU().Registers().PC
-	fmt.Printf("%s.%s $%04X%s> ", Bold, Green, pc, Reset)
+	return fmt.Sprintf("%s.%s $%04X%s> ", Bold, Green, pc, Reset)
 }
 
 // processCommand processes a user command and returns true if exit is requested
 func (r *DebuggerRepl) processCommand(input string) bool {
+	if value, matched := parseProgramCounterCommand(input); matched {
+		if value == "" {
+			fmt.Printf("%sUsage: PC=$C000%s\n", Red, Reset)
+		} else {
+			fmt.Print(colorizeOutput(r.debugger.SetProgramCounter(value)))
+		}
+		return false
+	}
+
 	parts := strings.Fields(input)
 	if len(parts) == 0 {
 		return false
@@ -134,6 +168,12 @@ func (r *DebuggerRepl) processCommand(input string) bool {
 		fmt.Print(colorizeOutput(output))
 	case "R", "REGISTERS":
 		output := r.debugger.ShowRegisters()
+		if len(args) > 0 && isVerboseRegisterArgument(args[0]) {
+			output = r.debugger.ShowRegistersVerbose()
+		}
+		fmt.Print(colorizeOutput(output))
+	case "RV", "RD", "REGISTERS-VERBOSE", "REGISTERS-DESCRIPTIVE":
+		output := r.debugger.ShowRegistersVerbose()
 		fmt.Print(colorizeOutput(output))
 	case "L", "LOAD":
 		if len(args) == 0 {
@@ -173,17 +213,46 @@ func (r *DebuggerRepl) processCommand(input string) bool {
 	return false
 }
 
+func isVerboseRegisterArgument(argument string) bool {
+	switch strings.ToUpper(argument) {
+	case "V", "VERBOSE", "D", "DESCRIPTIVE", "DETAILED":
+		return true
+	default:
+		return false
+	}
+}
+
+// parseProgramCounterCommand accepts monitor-style PC=$C000 assignments as
+// well as the whitespace variants PC = $C000 and PC $C000.
+func parseProgramCounterCommand(input string) (string, bool) {
+	input = strings.TrimSpace(input)
+	if len(input) < 2 || !strings.EqualFold(input[:2], "PC") {
+		return "", false
+	}
+	if len(input) > 2 && input[2] != '=' && input[2] != ' ' && input[2] != '\t' {
+		return "", false
+	}
+
+	value := strings.TrimSpace(input[2:])
+	if strings.HasPrefix(value, "=") {
+		value = strings.TrimSpace(value[1:])
+	}
+	return value, true
+}
+
 // showHelp displays available commands
 func (r *DebuggerRepl) showHelp() {
 	fmt.Printf("%s%sAvailable Commands:%s\n", Bold, Yellow, Reset)
 	fmt.Printf("%s  H, HELP, ?%s        - Show this help\n", Cyan, Reset)
 	fmt.Printf("%s  Q, QUIT, EXIT%s     - Exit debugger\n", Cyan, Reset)
 	fmt.Printf("%s  R, REGISTERS%s      - Show CPU registers\n", Cyan, Reset)
+	fmt.Printf("%s  RV, RD%s            - Show descriptive registers and named status flags\n", Cyan, Reset)
+	fmt.Printf("%s  PC=<address>%s      - Set the program counter (for example PC=$C000)\n", Cyan, Reset)
 	fmt.Printf("%s  D [addr] [count]%s  - Disassemble memory (default: PC, 10 instructions)\n", Cyan, Reset)
 	fmt.Printf("%s  M [addr] [count]%s  - Memory hex dump (default: $0000, 16 bytes)\n", Cyan, Reset)
 	fmt.Printf("%s  L <filename>%s      - Load PRG file into memory\n", Cyan, Reset)
 	fmt.Printf("%s  G [addr]%s          - Go/Run from address (default: current PC)\n", Cyan, Reset)
-	fmt.Printf("%s  S [count]%s         - Step instruction(s) (default: 1)\n", Cyan, Reset)
+	fmt.Printf("%s  S [count]%s         - Step instruction(s); stop before BRK/top-level RTS\n", Cyan, Reset)
 	fmt.Printf("%s  B <addr>%s          - Set breakpoint at address\n", Cyan, Reset)
 	fmt.Printf("%s  BR, BREAKPOINTS%s   - List all breakpoints\n", Cyan, Reset)
 	fmt.Printf("%s  C <addr>%s          - Clear breakpoint at address\n", Cyan, Reset)
@@ -194,6 +263,9 @@ func (r *DebuggerRepl) showHelp() {
 	fmt.Printf("%s%sNotes:%s\n", Bold, Yellow, Reset)
 	fmt.Printf("  - Addresses can be in hex ($1000) or decimal (4096)\n")
 	fmt.Printf("  - Press Enter to repeat last command\n")
+	fmt.Printf("  - Up/Down browse command history; Left/Right edit the current line\n")
+	fmt.Printf("  - Home/End or Ctrl+A/Ctrl+E jump to the start/end of the line\n")
+	fmt.Printf("  - Option+Left/Right or Alt+B/Alt+F move by one word\n")
 	fmt.Printf("  - Use Ctrl+C to stop a running program and return to the prompt\n")
 	fmt.Println()
 }
@@ -207,7 +279,7 @@ func colorizeOutput(output string) string {
 			lines[i] = Red + line + Reset
 		} else if strings.Contains(line, "Loaded") || strings.Contains(line, "set") || strings.Contains(line, "cleared") {
 			lines[i] = Green + line + Reset
-		} else if strings.Contains(line, "Registers:") || strings.Contains(line, "Disassembly") || strings.Contains(line, "Memory dump") {
+		} else if strings.HasPrefix(line, "Registers") || strings.Contains(line, "Disassembly") || strings.Contains(line, "Memory dump") {
 			lines[i] = Bold + Yellow + line + Reset
 		} else if strings.Contains(line, ">") {
 			// Current PC marker

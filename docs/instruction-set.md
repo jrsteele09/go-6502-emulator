@@ -8,6 +8,18 @@ Cycle counts are the base values used by the emulator. A value in **Extra cycles
 - **Branch taken: +1; page crossed: +2 total** — a taken branch costs one extra cycle, or two when its destination is on another page.
 - **None** — the instruction has a fixed cycle count in this implementation.
 
+## Status flag notation
+
+The processor status register is shown as `N V U B D I Z C`: negative, overflow, unused, break, decimal, interrupt disable, zero, and carry. Each instruction below has a **Status flags** line describing its exact effect in this emulator:
+
+- **Updated** means the instruction recomputes the flag from its result; the flag may become set or clear.
+- **Set** or **cleared** means the instruction forces that value.
+- **Tested** means the current value controls the instruction but is not changed.
+- **Restored** means the value is loaded from the stack.
+- **None** means every status bit is left unchanged. Flags not named on a line are also unchanged.
+
+`U` and `B` need special care: they are represented as ordinary bits by this emulator even though an NMOS 6502 does not have a persistent break latch. The notes for stack and interrupt instructions explicitly describe the emulator's live and stacked values.
+
 ## Addressing notation
 
 | Notation | Addressing mode | Meaning |
@@ -32,6 +44,8 @@ Cycle counts are the base values used by the emulator. A value in **Extra cycles
 
 Adds the operand and the carry flag to the accumulator. It updates carry, zero, negative, and overflow; decimal mode uses BCD arithmetic.
 
+**Status flags:** `C`, `Z`, `V`, and `N` updated; `C` and `D` tested. `C` is the carry out, `Z` tests the final A value, `N` copies final A bit 7, and `V` is recomputed by the emulator's signed-overflow test.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `69` | Immediate | `ADC #$nn` | 2 | 2 | None |
@@ -46,6 +60,8 @@ Adds the operand and the carry flag to the accumulator. It updates carry, zero, 
 ### AND — Logical AND
 
 ANDs the operand with the accumulator and updates zero and negative.
+
+**Status flags:** `Z` and `N` updated from the new A value.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -62,6 +78,8 @@ ANDs the operand with the accumulator and updates zero and negative.
 
 Shifts the accumulator or memory left by one bit. Bit 7 moves into carry and zero/negative reflect the result.
 
+**Status flags:** `C`, `Z`, and `N` updated. `C` receives the old bit 7; `Z` and `N` reflect the shifted result.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `0A` | Accumulator | `ASL A` | 1 | 2 | None |
@@ -74,6 +92,8 @@ Shifts the accumulator or memory left by one bit. Bit 7 moves into carry and zer
 
 Branches when the carry flag is clear.
 
+**Status flags:** `C` tested; no flags changed.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `90` | Relative | `BCC $relative` | 2 | 2 | Branch taken: +1; page crossed: +2 total |
@@ -81,6 +101,8 @@ Branches when the carry flag is clear.
 ### BCS — Branch if carry set
 
 Branches when the carry flag is set.
+
+**Status flags:** `C` tested; no flags changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -90,6 +112,8 @@ Branches when the carry flag is set.
 
 Branches when the zero flag is set.
 
+**Status flags:** `Z` tested; no flags changed.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `F0` | Relative | `BEQ $relative` | 2 | 2 | Branch taken: +1; page crossed: +2 total |
@@ -97,6 +121,8 @@ Branches when the zero flag is set.
 ### BIT — Bit test
 
 Tests the accumulator against memory without changing either value. Zero reflects `A AND operand`; bits 7 and 6 of memory become negative and overflow.
+
+**Status flags:** `Z`, `V`, and `N` updated. `Z` is set exactly when `A AND operand` is zero; `V` and `N` copy operand bits 6 and 7 respectively.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -107,6 +133,8 @@ Tests the accumulator against memory without changing either value. Zero reflect
 
 Branches when the negative flag is set.
 
+**Status flags:** `N` tested; no flags changed.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `30` | Relative | `BMI $relative` | 2 | 2 | Branch taken: +1; page crossed: +2 total |
@@ -114,6 +142,8 @@ Branches when the negative flag is set.
 ### BNE — Branch if not equal
 
 Branches when the zero flag is clear.
+
+**Status flags:** `Z` tested; no flags changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -123,6 +153,8 @@ Branches when the zero flag is clear.
 
 Branches when the negative flag is clear.
 
+**Status flags:** `N` tested; no flags changed.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `10` | Relative | `BPL $relative` | 2 | 2 | Branch taken: +1; page crossed: +2 total |
@@ -130,6 +162,8 @@ Branches when the negative flag is clear.
 ### BRK — Software interrupt
 
 Pushes the return address and status, sets interrupt disable, and loads the IRQ/BRK vector. The pushed status has the break flag set.
+
+**Status flags:** live `B` and `I` set. The stacked status copy has `B` and `U` set; all other stacked bits retain their pre-`BRK` values because `I` is set only after the push.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -139,6 +173,8 @@ Pushes the return address and status, sets interrupt disable, and loads the IRQ/
 
 Branches when the overflow flag is clear.
 
+**Status flags:** `V` tested; no flags changed.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `50` | Relative | `BVC $relative` | 2 | 2 | Branch taken: +1; page crossed: +2 total |
@@ -146,6 +182,8 @@ Branches when the overflow flag is clear.
 ### BVS — Branch if overflow set
 
 Branches when the overflow flag is set.
+
+**Status flags:** `V` tested; no flags changed.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -155,6 +193,8 @@ Branches when the overflow flag is set.
 
 Clears the carry flag.
 
+**Status flags:** `C` cleared.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `18` | Implied | `CLC` | 1 | 2 | None |
@@ -162,6 +202,8 @@ Clears the carry flag.
 ### CLD — Clear decimal mode
 
 Clears the decimal flag, selecting binary arithmetic for ADC and SBC.
+
+**Status flags:** `D` cleared.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -171,6 +213,8 @@ Clears the decimal flag, selecting binary arithmetic for ADC and SBC.
 
 Clears the interrupt-disable flag, allowing an asserted IRQ line to be serviced at an instruction boundary.
 
+**Status flags:** `I` cleared.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `58` | Implied | `CLI` | 1 | 2 | None |
@@ -179,6 +223,8 @@ Clears the interrupt-disable flag, allowing an asserted IRQ line to be serviced 
 
 Clears the overflow flag.
 
+**Status flags:** `V` cleared.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `B8` | Implied | `CLV` | 1 | 2 | None |
@@ -186,6 +232,8 @@ Clears the overflow flag.
 ### CMP — Compare accumulator
 
 Subtracts the operand from the accumulator for flag purposes without storing the result. Carry means `A >= operand`; zero means equality.
+
+**Status flags:** `C`, `Z`, and `N` updated from `A - operand`. `C` is set when `A >= operand`, `Z` when the 8-bit difference is zero, and `N` copies difference bit 7.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -202,6 +250,8 @@ Subtracts the operand from the accumulator for flag purposes without storing the
 
 Compares X with the operand without changing X. Carry means `X >= operand`; zero means equality.
 
+**Status flags:** `C`, `Z`, and `N` updated from `X - operand`, with the same rules as `CMP`.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `E0` | Immediate | `CPX #$nn` | 2 | 2 | None |
@@ -212,6 +262,8 @@ Compares X with the operand without changing X. Carry means `X >= operand`; zero
 
 Compares Y with the operand without changing Y. Carry means `Y >= operand`; zero means equality.
 
+**Status flags:** `C`, `Z`, and `N` updated from `Y - operand`, with the same rules as `CMP`.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `C0` | Immediate | `CPY #$nn` | 2 | 2 | None |
@@ -221,6 +273,8 @@ Compares Y with the operand without changing Y. Carry means `Y >= operand`; zero
 ### DEC — Decrement memory
 
 Subtracts one from a memory byte and updates zero and negative.
+
+**Status flags:** `Z` and `N` updated from the decremented byte.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -233,6 +287,8 @@ Subtracts one from a memory byte and updates zero and negative.
 
 Subtracts one from X and updates zero and negative.
 
+**Status flags:** `Z` and `N` updated from the new X value.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `CA` | Implied | `DEX` | 1 | 2 | None |
@@ -241,6 +297,8 @@ Subtracts one from X and updates zero and negative.
 
 Subtracts one from Y and updates zero and negative.
 
+**Status flags:** `Z` and `N` updated from the new Y value.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `88` | Implied | `DEY` | 1 | 2 | None |
@@ -248,6 +306,8 @@ Subtracts one from Y and updates zero and negative.
 ### EOR — Exclusive OR
 
 Exclusive-ORs the operand with the accumulator and updates zero and negative.
+
+**Status flags:** `Z` and `N` updated from the new A value.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -264,6 +324,8 @@ Exclusive-ORs the operand with the accumulator and updates zero and negative.
 
 Adds one to a memory byte and updates zero and negative.
 
+**Status flags:** `Z` and `N` updated from the incremented byte.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `E6` | Zero page | `INC $nn` | 2 | 5 | None |
@@ -275,6 +337,8 @@ Adds one to a memory byte and updates zero and negative.
 
 Adds one to X and updates zero and negative.
 
+**Status flags:** `Z` and `N` updated from the new X value.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `E8` | Implied | `INX` | 1 | 2 | None |
@@ -283,6 +347,8 @@ Adds one to X and updates zero and negative.
 
 Adds one to Y and updates zero and negative.
 
+**Status flags:** `Z` and `N` updated from the new Y value.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `C8` | Implied | `INY` | 1 | 2 | None |
@@ -290,6 +356,8 @@ Adds one to Y and updates zero and negative.
 ### JMP — Jump
 
 Loads the program counter with the target address. Indirect JMP preserves the NMOS 6502 page-wrap behavior when the pointer ends in `$FF`.
+
+**Status flags:** None.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -300,6 +368,8 @@ Loads the program counter with the target address. Indirect JMP preserves the NM
 
 Pushes the address immediately before the next instruction, then jumps to the absolute target. RTS returns to the following instruction.
 
+**Status flags:** None.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `20` | Absolute | `JSR $nnnn` | 3 | 6 | None |
@@ -307,6 +377,8 @@ Pushes the address immediately before the next instruction, then jumps to the ab
 ### LDA — Load accumulator
 
 Loads the operand into A and updates zero and negative.
+
+**Status flags:** `Z` and `N` updated from the loaded A value.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -323,6 +395,8 @@ Loads the operand into A and updates zero and negative.
 
 Loads the operand into X and updates zero and negative.
 
+**Status flags:** `Z` and `N` updated from the loaded X value.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `A2` | Immediate | `LDX #$nn` | 2 | 2 | None |
@@ -334,6 +408,8 @@ Loads the operand into X and updates zero and negative.
 ### LDY — Load Y
 
 Loads the operand into Y and updates zero and negative.
+
+**Status flags:** `Z` and `N` updated from the loaded Y value.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -347,6 +423,8 @@ Loads the operand into Y and updates zero and negative.
 
 Shifts the accumulator or memory right by one bit. Bit 0 moves into carry, bit 7 becomes zero, and zero/negative are updated.
 
+**Status flags:** `C` and `Z` updated; `N` cleared. `C` receives the old bit 0 and `Z` reflects the shifted result.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `4A` | Accumulator | `LSR A` | 1 | 2 | None |
@@ -359,6 +437,8 @@ Shifts the accumulator or memory right by one bit. Bit 0 moves into carry, bit 7
 
 Performs no state-changing operation.
 
+**Status flags:** None.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `EA` | Implied | `NOP` | 1 | 2 | None |
@@ -366,6 +446,8 @@ Performs no state-changing operation.
 ### ORA — Logical inclusive OR
 
 ORs the operand with the accumulator and updates zero and negative.
+
+**Status flags:** `Z` and `N` updated from the new A value.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -382,6 +464,8 @@ ORs the operand with the accumulator and updates zero and negative.
 
 Pushes A onto the hardware stack and decrements the stack pointer.
 
+**Status flags:** None.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `48` | Implied | `PHA` | 1 | 3 | None |
@@ -389,6 +473,8 @@ Pushes A onto the hardware stack and decrements the stack pointer.
 ### PHP — Push processor status
 
 Pushes the status register with the break and unused bits set in the stacked copy.
+
+**Status flags:** no live flags changed. The stacked copy has `B` and `U` set; its other bits copy the live status register.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -398,6 +484,8 @@ Pushes the status register with the break and unused bits set in the stacked cop
 
 Pulls A from the hardware stack and updates zero and negative.
 
+**Status flags:** `Z` and `N` updated from the pulled A value.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `68` | Implied | `PLA` | 1 | 4 | None |
@@ -406,6 +494,8 @@ Pulls A from the hardware stack and updates zero and negative.
 
 Pulls the status register from the hardware stack.
 
+**Status flags:** all eight bits (`N V U B D I Z C`) restored verbatim from the pulled byte in this emulator.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `28` | Implied | `PLP` | 1 | 4 | None |
@@ -413,6 +503,8 @@ Pulls the status register from the hardware stack.
 ### ROL — Rotate left
 
 Rotates the accumulator or memory left through carry. Old bit 7 enters carry and the old carry enters bit 0.
+
+**Status flags:** `C` tested and updated; `Z` and `N` updated. The old `C` becomes result bit 0, the old operand bit 7 becomes the new `C`, and `Z`/`N` reflect the result.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -426,6 +518,8 @@ Rotates the accumulator or memory left through carry. Old bit 7 enters carry and
 
 Rotates the accumulator or memory right through carry. Old bit 0 enters carry and the old carry enters bit 7.
 
+**Status flags:** `C` tested and updated; `Z` and `N` updated. The old `C` becomes result bit 7, the old operand bit 0 becomes the new `C`, and `Z`/`N` reflect the result.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `6A` | Accumulator | `ROR A` | 1 | 2 | None |
@@ -438,6 +532,8 @@ Rotates the accumulator or memory right through carry. Old bit 0 enters carry an
 
 Pulls status and the program counter from the stack, resuming the interrupted program.
 
+**Status flags:** `N`, `V`, `U`, `D`, `I`, `Z`, and `C` restored from the pulled status byte; `B` is then cleared by this emulator.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `40` | Implied | `RTI` | 1 | 6 | None |
@@ -446,6 +542,8 @@ Pulls status and the program counter from the stack, resuming the interrupted pr
 
 Pulls the saved address from the stack, adds one, and resumes after the corresponding JSR.
 
+**Status flags:** None.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `60` | Implied | `RTS` | 1 | 6 | None |
@@ -453,6 +551,8 @@ Pulls the saved address from the stack, adds one, and resumes after the correspo
 ### SBC — Subtract with carry
 
 Subtracts the operand and inverse carry from the accumulator. It updates carry, zero, negative, and overflow; decimal mode uses BCD arithmetic.
+
+**Status flags:** `C`, `Z`, `V`, and `N` updated; `C` and `D` tested. `C` is set when no borrow is required, `Z` tests final A, `N` copies final A bit 7, and `V` is recomputed by the emulator's signed-overflow test.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -469,6 +569,8 @@ Subtracts the operand and inverse carry from the accumulator. It updates carry, 
 
 Sets the carry flag.
 
+**Status flags:** `C` set.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `38` | Implied | `SEC` | 1 | 2 | None |
@@ -476,6 +578,8 @@ Sets the carry flag.
 ### SED — Set decimal mode
 
 Sets the decimal flag, selecting BCD arithmetic for ADC and SBC.
+
+**Status flags:** `D` set.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -485,6 +589,8 @@ Sets the decimal flag, selecting BCD arithmetic for ADC and SBC.
 
 Sets the interrupt-disable flag so an asserted IRQ line is not serviced. NMI is unaffected.
 
+**Status flags:** `I` set.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `78` | Implied | `SEI` | 1 | 2 | None |
@@ -492,6 +598,8 @@ Sets the interrupt-disable flag so an asserted IRQ line is not serviced. NMI is 
 ### STA — Store accumulator
 
 Stores A in memory. Store instructions have fixed timing even when indexed addressing crosses a page.
+
+**Status flags:** None.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -507,6 +615,8 @@ Stores A in memory. Store instructions have fixed timing even when indexed addre
 
 Stores X in memory.
 
+**Status flags:** None.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `86` | Zero page | `STX $nn` | 2 | 3 | None |
@@ -516,6 +626,8 @@ Stores X in memory.
 ### STY — Store Y
 
 Stores Y in memory.
+
+**Status flags:** None.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -527,6 +639,8 @@ Stores Y in memory.
 
 Copies A into X and updates zero and negative.
 
+**Status flags:** `Z` and `N` updated from the new X value.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `AA` | Implied | `TAX` | 1 | 2 | None |
@@ -534,6 +648,8 @@ Copies A into X and updates zero and negative.
 ### TAY — Transfer accumulator to Y
 
 Copies A into Y and updates zero and negative.
+
+**Status flags:** `Z` and `N` updated from the new Y value.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -543,6 +659,8 @@ Copies A into Y and updates zero and negative.
 
 Copies the stack pointer into X and updates zero and negative.
 
+**Status flags:** `Z` and `N` updated from the new X value.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `BA` | Implied | `TSX` | 1 | 2 | None |
@@ -550,6 +668,8 @@ Copies the stack pointer into X and updates zero and negative.
 ### TXA — Transfer X to accumulator
 
 Copies X into A and updates zero and negative.
+
+**Status flags:** `Z` and `N` updated from the new A value.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -559,6 +679,8 @@ Copies X into A and updates zero and negative.
 
 Copies X into the stack pointer. It does not update flags.
 
+**Status flags:** None.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `9A` | Implied | `TXS` | 1 | 2 | None |
@@ -566,6 +688,8 @@ Copies X into the stack pointer. It does not update flags.
 ### TYA — Transfer Y to accumulator
 
 Copies Y into A and updates zero and negative.
+
+**Status flags:** `Z` and `N` updated from the new A value.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -580,6 +704,8 @@ all 6502 CPU's - they do not work on later CPU's like the 65C02.
 
 ANDs an immediate value with the accumulator, shifts the result right, and stores it in the accumulator. Bit 0 moves into carry.
 
+**Status flags:** `C` and `Z` updated; `N` cleared. `C` receives bit 0 of the intermediate `A AND operand` value and `Z` reflects the final A value.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `4B` | Immediate | `ALR #$nn` | 2 | 2 | None |
@@ -587,6 +713,8 @@ ANDs an immediate value with the accumulator, shifts the result right, and store
 ### ANC — AND and copy negative to carry (Undocumented)
 
 ANDs an immediate value with the accumulator, then copies result bit 7 into both the negative and carry flags.
+
+**Status flags:** `C`, `Z`, and `N` updated. `C` and `N` both copy final A bit 7; `Z` tests final A.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -596,6 +724,8 @@ ANDs an immediate value with the accumulator, then copies result bit 7 into both
 
 ANDs an immediate value with the accumulator, then rotates right through carry. Carry and overflow are derived from the rotated value as implemented by this emulator.
 
+**Status flags:** `C` tested; `C`, `Z`, `V`, and `N` updated. The old `C` enters result bit 7; the new `C` copies bit 6 of the intermediate `A AND operand` value; `V` is the XOR of result bits 5 and 6; `Z` and `N` reflect final A.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `6B` | Immediate | `ARR #$nn` | 2 | 2 | None |
@@ -603,6 +733,8 @@ ANDs an immediate value with the accumulator, then rotates right through carry. 
 ### DCP — Decrement then compare (Undocumented)
 
 Decrements memory, then compares the new value with the accumulator as CMP would.
+
+**Status flags:** `C`, `Z`, and `N` updated from `A - decremented operand`, using the same rules as `CMP`. The decrement's own intermediate flags are not retained.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -618,6 +750,8 @@ Decrements memory, then compares the new value with the accumulator as CMP would
 
 Consumes an immediate operand without otherwise changing CPU state.
 
+**Status flags:** None.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `80`, `82`, `C2`, `E2` | Immediate | `DOP #$nn` | 2 | 2 | None |
@@ -625,6 +759,8 @@ Consumes an immediate operand without otherwise changing CPU state.
 ### ISC — Increment then subtract with carry (Undocumented)
 
 Increments memory, then subtracts the new value from the accumulator using SBC-style binary arithmetic.
+
+**Status flags:** `C` tested; `C`, `Z`, `V`, and `N` updated by the subtraction. `D` is neither tested nor changed: this emulator always performs `ISC` in binary.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -640,6 +776,8 @@ Increments memory, then subtracts the new value from the accumulator using SBC-s
 
 Loads the same operand into both A and X, then updates zero and negative.
 
+**Status flags:** `Z` and `N` updated from the value loaded into A and X.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `A7` | Zero page | `LAX $nn` | 2 | 3 | None |
@@ -653,6 +791,8 @@ Loads the same operand into both A and X, then updates zero and negative.
 
 These opcodes behave like the documented NOP in this emulator.
 
+**Status flags:** None.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `1A`, `3A`, `5A`, `7A`, `DA`, `FA` | Implied | `NOP*` | 1 | 2 | None |
@@ -660,6 +800,8 @@ These opcodes behave like the documented NOP in this emulator.
 ### RLA — Rotate left then AND (Undocumented)
 
 Rotates memory left through carry, then ANDs the new memory value into the accumulator.
+
+**Status flags:** `C` tested and updated by the rotate; `Z` and `N` updated from final A. The old `C` enters memory bit 0 and the old memory bit 7 becomes the new `C`.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -675,6 +817,8 @@ Rotates memory left through carry, then ANDs the new memory value into the accum
 
 Rotates memory right through carry, then adds the new memory value to the accumulator.
 
+**Status flags:** `C` tested and updated; `Z`, `V`, and `N` updated from final A. The old `C` enters memory bit 7 and old memory bit 0 supplies the addition's carry-in. This implementation sets the final `C` exactly when the pre-add A value is greater than the final 8-bit A value. `D` is neither tested nor changed.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `67` | Zero page | `RRA $nn` | 2 | 5 | None |
@@ -689,6 +833,8 @@ Rotates memory right through carry, then adds the new memory value to the accumu
 
 Stores `A AND X` in memory without changing either register.
 
+**Status flags:** None.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `87` | Zero page | `SAX $nn` | 2 | 3 | None |
@@ -700,6 +846,8 @@ Stores `A AND X` in memory without changing either register.
 
 Performs the same immediate subtract-with-carry operation as opcode `E9`.
 
+**Status flags:** `C`, `Z`, `V`, and `N` updated; `C` and `D` tested, exactly as for `SBC`.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `EB` | Immediate | `SBC* #$nn` | 2 | 2 | None |
@@ -707,6 +855,8 @@ Performs the same immediate subtract-with-carry operation as opcode `E9`.
 ### SKB — Skip byte through zero page (Undocumented)
 
 Consumes a zero-page operand and otherwise behaves as a no operation in this emulator.
+
+**Status flags:** None.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -716,6 +866,8 @@ Consumes a zero-page operand and otherwise behaves as a no operation in this emu
 
 Consumes a zero-page,X operand and otherwise behaves as a no operation in this emulator.
 
+**Status flags:** None.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `14`, `34`, `54`, `74`, `D4`, `F4` | Zero page,X | `SKW $nn,X` | 2 | 4 | None |
@@ -723,6 +875,8 @@ Consumes a zero-page,X operand and otherwise behaves as a no operation in this e
 ### SLO — Shift left then OR (Undocumented)
 
 Shifts memory left, then ORs the new memory value into the accumulator.
+
+**Status flags:** `C` updated from the old memory bit 7; `Z` and `N` updated from final A.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -738,6 +892,8 @@ Shifts memory left, then ORs the new memory value into the accumulator.
 
 Shifts memory right, then exclusive-ORs the new memory value into the accumulator.
 
+**Status flags:** `C` updated from the old memory bit 0; `Z` and `N` updated from final A.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `47` | Zero page | `SRE $nn` | 2 | 5 | None |
@@ -752,6 +908,8 @@ Shifts memory right, then exclusive-ORs the new memory value into the accumulato
 
 Consumes an absolute operand and otherwise behaves as a no operation. The absolute,X form has a fixed four-cycle cost in the current emulator.
 
+**Status flags:** None.
+
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `0C` | Absolute | `TOP $nnnn` | 3 | 4 | None |
@@ -760,6 +918,8 @@ Consumes an absolute operand and otherwise behaves as a no operation. The absolu
 ### XAA — Transfer X AND immediate to accumulator (Undocumented)
 
 ANDs X with an immediate value, stores the result in A, and updates zero and negative. Real-chip behavior is unstable; this describes the emulator’s deterministic implementation.
+
+**Status flags:** `Z` and `N` updated from final A.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
