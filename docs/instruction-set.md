@@ -1,10 +1,10 @@
 # 6502 instruction reference
 
-This reference covers the NMOS MOS 6502 instruction set, including commonly
-used names for undocumented instructions.
+This reference covers the original NMOS 6502 instruction set, including
+commonly used names for undocumented instructions.
 
-Cycle counts are base NMOS 6502 timings. A value in **Extra cycles** describes
-the condition that adds cycles:
+Cycle counts are the base timings for the original NMOS 6502. A value in
+**Extra cycles** describes the condition that adds cycles:
 
 - **Page crossed: +1** — indexed address calculation moved into another 256-byte page.
 - **Branch taken: +1; page crossed: +2 total** — a taken branch costs one extra cycle, or two when its destination is on another page.
