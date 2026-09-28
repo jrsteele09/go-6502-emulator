@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
 
 	"github.com/jrsteele09/go-6502-emulator/debugger"
@@ -38,6 +39,16 @@ func NewDebuggerRepl() *DebuggerRepl {
 
 func main() {
 	repl := NewDebuggerRepl()
+	interrupts := make(chan os.Signal, 1)
+	signal.Notify(interrupts, os.Interrupt)
+	defer signal.Stop(interrupts)
+
+	go func() {
+		for range interrupts {
+			repl.debugger.Stop()
+		}
+	}()
+
 	// Auto-load any files passed on the command line
 	if len(os.Args) > 1 {
 		repl.AutoLoad(os.Args[1:])
@@ -183,7 +194,7 @@ func (r *DebuggerRepl) showHelp() {
 	fmt.Printf("%s%sNotes:%s\n", Bold, Yellow, Reset)
 	fmt.Printf("  - Addresses can be in hex ($1000) or decimal (4096)\n")
 	fmt.Printf("  - Press Enter to repeat last command\n")
-	fmt.Printf("  - Use Ctrl+C to break running program\n")
+	fmt.Printf("  - Use Ctrl+C to stop a running program and return to the prompt\n")
 	fmt.Println()
 }
 

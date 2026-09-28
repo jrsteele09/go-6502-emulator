@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/jrsteele09/go-6502-emulator/assembler/output"
 	"github.com/jrsteele09/go-6502-emulator/cpu"
@@ -16,7 +17,7 @@ type Debugger struct {
 	memory         *memory.Memory[uint16]
 	disassembler   *Disassembler
 	breakpoints    map[uint16]bool
-	running        bool
+	running        atomic.Bool
 	lastDisasmAddr uint16
 }
 
@@ -32,7 +33,6 @@ func NewDebugger() *Debugger {
 		memory:         mem,
 		disassembler:   disasm,
 		breakpoints:    make(map[uint16]bool),
-		running:        false,
 		lastDisasmAddr: 0,
 	}
 }
@@ -54,12 +54,17 @@ func (d *Debugger) GetBreakpoints() map[uint16]bool {
 
 // IsRunning returns whether the debugger is currently running
 func (d *Debugger) IsRunning() bool {
-	return d.running
+	return d.running.Load()
 }
 
 // SetRunning sets the running state
 func (d *Debugger) SetRunning(running bool) {
-	d.running = running
+	d.running.Store(running)
+}
+
+// Stop requests that a running program return control to the debugger.
+func (d *Debugger) Stop() {
+	d.running.Store(false)
 }
 
 // GetLastDisasmAddr returns the last disassembly address
@@ -411,12 +416,14 @@ func (d *Debugger) Go(args []string) string {
 	}
 
 	startPC := d.cpu.Registers().PC
-	result := fmt.Sprintf("Running from %s... (Ctrl+C to break)\n", d.FormatAddress(startPC))
+	result := fmt.Sprintf("Running from %s... (Ctrl+C to stop)\n", d.FormatAddress(startPC))
 
-	d.running = true
+	d.running.Store(true)
 	instructionCount := 0
+	stoppedWithMessage := false
 
-	for d.running {
+runLoop:
+	for d.running.Load() {
 		pc := d.cpu.Registers().PC
 
 		// Check for breakpoint
@@ -424,33 +431,34 @@ func (d *Debugger) Go(args []string) string {
 			result += fmt.Sprintf("\nBreakpoint hit at %s\n", d.FormatAddress(pc))
 			instruction, _ := d.disassembler.Disassemble(pc)
 			result += fmt.Sprintf("Next: %s\n", instruction)
-			d.running = false
+			d.running.Store(false)
+			stoppedWithMessage = true
 			break
 		}
 
-		completed, err := d.cpu.Execute()
-		if err != nil {
-			result += fmt.Sprintf("\nExecution error at %s: %v\n", d.FormatAddress(pc), err)
-			d.running = false
-			break
-		}
-
-		if !bool(completed) {
-			// Instruction needs more cycles, continue
-			continue
+		for {
+			completed, err := d.cpu.Execute()
+			if err != nil {
+				result += fmt.Sprintf("\nExecution error at %s: %v\n", d.FormatAddress(pc), err)
+				d.running.Store(false)
+				stoppedWithMessage = true
+				break runLoop
+			}
+			if bool(completed) {
+				break
+			}
 		}
 
 		instructionCount++
 
 		// Check for infinite loops or runaway execution
 		if instructionCount%100000 == 0 {
-			result += fmt.Sprintf("\nExecuted %d instructions. Press Ctrl+C to break.\n", instructionCount)
+			result += fmt.Sprintf("\nExecuted %d instructions.\n", instructionCount)
 		}
 	}
 
-	if d.running {
-		d.running = false
-		result += "\nExecution stopped\n"
+	if !stoppedWithMessage {
+		result += fmt.Sprintf("\nExecution stopped at %s\n", d.FormatAddress(d.cpu.Registers().PC))
 	}
 
 	return result
