@@ -87,7 +87,7 @@ func New(opcodes []cpu.OpCodeDef) *Assembler {
 	instructionSet := make(map[string]map[cpu.AddressingModeType]Instruction)
 	for opcode := range opcodes {
 		opCodeDef := &opcodes[opcode]
-		if opCodeDef.GetInstructionFunc == nil {
+		if opCodeDef.Execute == nil {
 			continue
 		}
 		if _, found := instructionSet[opCodeDef.Mnemonic]; !found {

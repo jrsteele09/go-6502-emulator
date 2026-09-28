@@ -5,220 +5,6 @@ package cpu
 func addIllegalOpCodes(p *CPU) {
 	id := NewInstruction(getAddressingMode)
 
-	// Helpers implementing illegal ops inline using existing addressing mode loaders/stores
-	lax := func(op OpCodeDef) InstructionFunc {
-		load := op.AddressingMode.Load(p, false)
-		return func() (Completed, error) {
-			b, completed := load()
-			if !completed {
-				return false, nil
-			}
-			p.Reg.A = b
-			p.Reg.X = b
-			p.Reg.SetZeroFlag(b)
-			p.Reg.SetNegativeFlag(b)
-			return true, nil
-		}
-	}
-
-	sax := func(op OpCodeDef) InstructionFunc {
-		store := op.AddressingMode.Store(p, true)
-		return func() (Completed, error) {
-			store(p.Reg.A & p.Reg.X)
-			return true, nil
-		}
-	}
-
-	// Read-Modify-Write combos
-	slo := func(op OpCodeDef) InstructionFunc { // ASL mem, then ORA
-		load := op.AddressingMode.Load(p, true)
-		store := op.AddressingMode.Store(p, true)
-		return func() (Completed, error) {
-			b, _ := load()
-			res := b << 1
-			p.Reg.SetCarryFlag(b, res)
-			store(res)
-			p.Reg.A = p.Reg.A | res
-			p.Reg.SetZeroFlag(p.Reg.A)
-			p.Reg.SetNegativeFlag(p.Reg.A)
-			return true, nil
-		}
-	}
-
-	rla := func(op OpCodeDef) InstructionFunc { // ROL mem, then AND
-		load := op.AddressingMode.Load(p, true)
-		store := op.AddressingMode.Store(p, true)
-		return func() (Completed, error) {
-			b, _ := load()
-			carry := (b & 0x80) != 0
-			res := (b << 1)
-			if p.Reg.IsSet(CarryFlag) {
-				res |= 0x01
-			}
-			p.Reg.SetStatus(CarryFlag, carry)
-			store(res)
-			p.Reg.A = p.Reg.A & res
-			p.Reg.SetZeroFlag(p.Reg.A)
-			p.Reg.SetNegativeFlag(p.Reg.A)
-			return true, nil
-		}
-	}
-
-	sre := func(op OpCodeDef) InstructionFunc { // LSR mem, then EOR
-		load := op.AddressingMode.Load(p, true)
-		store := op.AddressingMode.Store(p, true)
-		return func() (Completed, error) {
-			b, _ := load()
-			bit0 := b & 0x01
-			res := b >> 1
-			p.Reg.SetStatus(CarryFlag, bit0 == 1)
-			store(res)
-			p.Reg.A = p.Reg.A ^ res
-			p.Reg.SetZeroFlag(p.Reg.A)
-			p.Reg.SetNegativeFlag(p.Reg.A)
-			return true, nil
-		}
-	}
-
-	rra := func(op OpCodeDef) InstructionFunc { // ROR mem, then ADC
-		load := op.AddressingMode.Load(p, true)
-		store := op.AddressingMode.Store(p, true)
-		return func() (Completed, error) {
-			b, _ := load()
-			carryOut := (b & 0x01) != 0
-			res := b >> 1
-			if p.Reg.IsSet(CarryFlag) {
-				res |= 0x80
-			}
-			p.Reg.SetStatus(CarryFlag, carryOut)
-			store(res)
-
-			// ADC in binary (most emulators ignore BCD here)
-			m := p.Reg.A
-			r := m + res
-			if p.Reg.IsSet(CarryFlag) {
-				r++
-			}
-			p.Reg.A = r
-			p.Reg.SetCarryFlag(m, p.Reg.A)
-			p.Reg.SetZeroFlag(p.Reg.A)
-			p.Reg.SetOverflowFlag(m, res, p.Reg.A, true)
-			p.Reg.SetNegativeFlag(p.Reg.A)
-			return true, nil
-		}
-	}
-
-	dcp := func(op OpCodeDef) InstructionFunc { // DEC mem, then CMP
-		load := op.AddressingMode.Load(p, true)
-		store := op.AddressingMode.Store(p, true)
-		return func() (Completed, error) {
-			b, _ := load()
-			b--
-			store(b)
-			// CMP A, b
-			result := p.Reg.A - b
-			p.Reg.SetStatus(ZeroFlag, result == 0)
-			p.Reg.SetStatus(NegativeFlag, (result&0x80) != 0)
-			p.Reg.SetStatus(CarryFlag, p.Reg.A >= b)
-			return true, nil
-		}
-	}
-
-	isc := func(op OpCodeDef) InstructionFunc { // INC mem, then SBC
-		load := op.AddressingMode.Load(p, true)
-		store := op.AddressingMode.Store(p, true)
-		return func() (Completed, error) {
-			b, _ := load()
-			b++
-			store(b)
-			// SBC in binary
-			m := p.Reg.A
-			c := byte(0)
-			if p.Reg.IsSet(CarryFlag) {
-				c = 1
-			}
-			r := m - b - (1 - c)
-			p.Reg.A = r
-			p.Reg.SetStatus(CarryFlag, m >= (b+(1-c)))
-			p.Reg.SetZeroFlag(p.Reg.A)
-			p.Reg.SetNegativeFlag(p.Reg.A)
-			p.Reg.SetOverflowFlag(m, b, p.Reg.A, false)
-			return true, nil
-		}
-	}
-
-	anc := func(op OpCodeDef) InstructionFunc { // AND imm, C = bit7
-		load := op.AddressingMode.Load(p, false)
-		return func() (Completed, error) {
-			b, completed := load()
-			if !completed {
-				return false, nil
-			}
-			p.Reg.A = p.Reg.A & b
-			p.Reg.SetZeroFlag(p.Reg.A)
-			p.Reg.SetNegativeFlag(p.Reg.A)
-			p.Reg.SetStatus(CarryFlag, (p.Reg.A&0x80) != 0)
-			return true, nil
-		}
-	}
-
-	alr := func(op OpCodeDef) InstructionFunc { // AND imm, then LSR A
-		load := op.AddressingMode.Load(p, false)
-		return func() (Completed, error) {
-			b, completed := load()
-			if !completed {
-				return false, nil
-			}
-			m := p.Reg.A & b
-			carry := (m & 0x01) != 0
-			m = m >> 1
-			p.Reg.A = m
-			p.Reg.SetStatus(CarryFlag, carry)
-			p.Reg.SetZeroFlag(p.Reg.A)
-			p.Reg.SetNegativeFlag(p.Reg.A)
-			return true, nil
-		}
-	}
-
-	arr := func(op OpCodeDef) InstructionFunc { // AND imm, then ROR A (approx flags)
-		load := op.AddressingMode.Load(p, false)
-		return func() (Completed, error) {
-			b, completed := load()
-			if !completed {
-				return false, nil
-			}
-			m := p.Reg.A & b
-			carryIn := byte(0)
-			if p.Reg.IsSet(CarryFlag) {
-				carryIn = 0x80
-			}
-			res := (m >> 1) | carryIn
-			p.Reg.A = res
-			// C approximated as bit 6 of m
-			p.Reg.SetStatus(CarryFlag, (m&0x40) != 0)
-			// V approximated from bits 5^6 of result
-			v := ((res >> 5) & 1) ^ ((res >> 6) & 1)
-			p.Reg.SetStatus(OverflowFlag, v == 1)
-			p.Reg.SetZeroFlag(p.Reg.A)
-			p.Reg.SetNegativeFlag(p.Reg.A)
-			return true, nil
-		}
-	}
-
-	xaa := func(op OpCodeDef) InstructionFunc { // A = X & imm (very unstable on real HW)
-		load := op.AddressingMode.Load(p, false)
-		return func() (Completed, error) {
-			b, completed := load()
-			if !completed {
-				return false, nil
-			}
-			p.Reg.A = p.Reg.X & b
-			p.Reg.SetZeroFlag(p.Reg.A)
-			p.Reg.SetNegativeFlag(p.Reg.A)
-			return true, nil
-		}
-	}
-
 	// LAX
 	p.opCodes[0xA7] = id.Instruction(Mnemonic("LAX", ZeropageModeStr), 3, lax)
 	p.opCodes[0xB7] = id.Instruction(Mnemonic("LAX", ZeropageYModeStr), 4, lax)
@@ -291,28 +77,28 @@ func addIllegalOpCodes(p *CPU) {
 	p.opCodes[0x8B] = id.Instruction(Mnemonic("XAA", ImmediateModeStr), 2, xaa)
 
 	// SBC immediate alias (illegal) - keep distinct mnemonic to avoid overriding standard SBC # at 0xE9
-	p.opCodes[0xEB] = id.Instruction(Mnemonic("SBC*", ImmediateModeStr), 2, p.sbc)
+	p.opCodes[0xEB] = id.Instruction(Mnemonic("SBC*", ImmediateModeStr), 2, sbc)
 
 	// Multi-byte NOPs and variants (use distinct mnemonics to avoid overriding canonical NOP 0xEA)
 	// Single-byte NOP variants (implied)
 	for _, opc := range []byte{0x1A, 0x3A, 0x5A, 0x7A, 0xDA, 0xFA} {
-		p.opCodes[opc] = id.Instruction(Mnemonic("NOP*", ImpliedModeStr), 2, p.nop)
+		p.opCodes[opc] = id.Instruction(Mnemonic("NOP*", ImpliedModeStr), 2, nop)
 	}
 	// Two-byte NOPs (aka DOP) with immediate operand
 	for _, opc := range []byte{0x80, 0x82, 0xC2, 0xE2} {
-		p.opCodes[opc] = id.Instruction(Mnemonic("DOP", ImmediateModeStr), 2, p.nop)
+		p.opCodes[opc] = id.Instruction(Mnemonic("DOP", ImmediateModeStr), 2, nop)
 	}
 	// Three-byte NOPs on ABS
-	p.opCodes[0x0C] = id.Instruction(Mnemonic("TOP", AbsoluteModeStr), 4, p.nop)
+	p.opCodes[0x0C] = id.Instruction(Mnemonic("TOP", AbsoluteModeStr), 4, nop)
 	// Three-byte NOPs on ABS,X (aka TOP)
 	for _, opc := range []byte{0x1C, 0x3C, 0x5C, 0x7C, 0xDC, 0xFC} {
-		p.opCodes[opc] = id.Instruction(Mnemonic("TOP", AbsoluteIndexedXModeStr), 4, p.nop)
+		p.opCodes[opc] = id.Instruction(Mnemonic("TOP", AbsoluteIndexedXModeStr), 4, nop)
 	}
 	// Zero-page and Zero-page,X NOP-like
 	for _, opc := range []byte{0x04, 0x44, 0x64} {
-		p.opCodes[opc] = id.Instruction(Mnemonic("SKB", ZeropageModeStr), 3, p.nop)
+		p.opCodes[opc] = id.Instruction(Mnemonic("SKB", ZeropageModeStr), 3, nop)
 	}
 	for _, opc := range []byte{0x14, 0x34, 0x54, 0x74, 0xD4, 0xF4} {
-		p.opCodes[opc] = id.Instruction(Mnemonic("SKW", ZeropageXModeStr), 4, p.nop)
+		p.opCodes[opc] = id.Instruction(Mnemonic("SKW", ZeropageXModeStr), 4, nop)
 	}
 }

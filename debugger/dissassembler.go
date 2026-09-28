@@ -32,7 +32,7 @@ func (d *Disassembler) Disassemble(address uint16) (string, int) {
 	b := d.mem.Read(address)
 	opCode := &d.opCodes[b]
 
-	if opCode.GetInstructionFunc == nil {
+	if opCode.Execute == nil {
 		return strings.TrimSpace(fmt.Sprintf(disassemblyFormat,
 			fmt.Sprintf("$%04X:", address),
 			strings.ToUpper(d.operandsToByteString(b, []byte{}, 1)),

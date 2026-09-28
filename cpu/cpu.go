@@ -23,6 +23,7 @@ type CPU6502 interface {
 	Execute() (Completed, error)
 	Nmi()
 	Irq()
+	SetIRQ(asserted bool)
 	Reset()
 	Push(b byte)
 	Pop() byte
@@ -48,17 +49,42 @@ type HaltExecution interface {
 
 // CPU represents the 6502 CPU with registers, memory, and opcode definitions.
 type CPU struct {
-	Reg               *Registers
-	mem               memory.Operations[uint16]
-	opCodes           [256]OpCodeDef
-	cycles            uint64
+	Reg    *Registers
+	mem    memory.Operations[uint16]
+	cycles uint64
+
+	// Keep the mutable execution state together on the hot side of CPU. The
+	// much larger, read-mostly opcode metadata table is deliberately last.
+	execute executionState
+	irq     bool
+	nmi     bool
+	halted  bool
+	opCodes [256]OpCodeDef
+}
+
+type executionStage byte
+
+const (
+	executionFetch executionStage = iota
+	executionInstruction
+	executionInterrupt
+)
+
+// executionState contains all transient state for the instruction currently
+// being executed. Selecting a new instruction replaces this value, ensuring
+// scratch state cannot leak between instructions or survive Reset.
+type executionState struct {
+	opcode            *OpCodeDef
 	instructionCycles int
-	instructionFunc   InstructionFunc
-	operands          [maxInstructionBytes]byte
-	operandLength     uint8
-	irq               bool
-	nmi               bool
-	halted            bool
+	address           uint16
+
+	// Everything below is instruction-local scratch space. selectInstruction,
+	// interrupt selection, and Reset replace the whole structure.
+	operands      [maxInstructionBytes - 1]byte
+	stage         executionStage
+	operandLength uint8
+	phase         uint8
+	pageCrossed   bool
 }
 
 // Ensure Cpu implements the Cpu6502 interface.
@@ -67,13 +93,12 @@ var _ CPU6502 = &CPU{}
 // NewCPU creates a new Cpu instance with the provided memory functions.
 func NewCPU(m memory.Operations[uint16], useIllegalOpCodes bool) *CPU {
 	cpu := &CPU{mem: m, Reg: NewRegisters()}
-	cpu.opCodes = createOpCodes(cpu)
+	cpu.opCodes = createOpCodes()
 
 	if useIllegalOpCodes {
 		// Attach undocumented/illegal opcodes
 		addIllegalOpCodes(cpu)
 	}
-
 	cpu.Reg.SetStatus(UnusedFlag, true)
 	cpu.Reg.S = 0xff
 	cpu.irq = false
@@ -99,7 +124,7 @@ func (p *CPU) Memory() memory.Operations[uint16] {
 // Operands returns a view of the operands for the current instruction.
 // The returned slice is reused when the next opcode is decoded and must not be retained.
 func (p *CPU) Operands() []byte {
-	return p.operands[:p.operandLength]
+	return p.execute.operands[:p.execute.operandLength]
 }
 
 // Stop halts the CPU's execution.
@@ -118,24 +143,44 @@ func (p *CPU) Execute() (Completed, error) {
 		return false, nil
 	}
 	p.cycles++
-	if p.instructionCycles > 0 {
-		p.instructionCycles--
+	if p.execute.instructionCycles > 0 {
+		p.execute.instructionCycles--
 		return false, nil
 	}
-	completed, err := p.instructionFunc()
-	if !completed {
+	completed, err := p.executionStage()
+	if err != nil {
 		return completed, err
 	}
+	if !completed {
+		return false, nil
+	}
 	if p.checkInterrupts() {
-		p.instructionFunc = p.interruptInstruction
-		p.instructionCycles = 7
+		p.execute = executionState{stage: executionInterrupt, instructionCycles: 7}
 	} else {
-		p.instructionFunc = p.readOpCode
-		p.instructionCycles = 0
+		p.execute = executionState{stage: executionFetch}
+	}
+	return true, nil
+}
+
+//go:inline
+func (p *CPU) executionStage() (Completed, error) {
+	var completed Completed
+	var err error
+	switch p.execute.stage {
+	case executionFetch:
+		completed, err = p.readOpCode()
+	case executionInstruction:
+		completed, err = p.execute.opcode.Execute(p, p.execute.opcode)
+	case executionInterrupt:
+		completed, err = p.interruptInstruction()
+	}
+	if err != nil {
+		return completed, err
 	}
 	return completed, nil
 }
 
+//go:inline
 func (p *CPU) checkInterrupts() bool {
 	if p.nmi {
 		return true
@@ -145,23 +190,32 @@ func (p *CPU) checkInterrupts() bool {
 	return false
 }
 
+//go:inline
 func (p *CPU) readOpCode() (Completed, error) {
 	opCode := p.NextByte()
 	opCodeDef := &p.opCodes[opCode]
-	if opCodeDef.GetInstructionFunc == nil {
+	if opCodeDef.Execute == nil {
 		return true, fmt.Errorf("unknown opCode: %x", opCode)
 	}
-	p.operandLength = uint8(opCodeDef.Bytes)
-	clear(p.operands[:])
-	p.instructionCycles = (opCodeDef.Cycles - 2) // Take two off for reading op code + next cycle
+	p.setExecutionState(opCodeDef)
 
 	for i := 0; i < opCodeDef.Bytes-1; i++ {
-		p.operands[i] = p.NextByte()
+		p.execute.operands[i] = p.NextByte()
 	}
-	p.instructionFunc = opCodeDef.GetInstructionFunc(*opCodeDef)
 	return false, nil
 }
 
+//go:inline
+func (p *CPU) setExecutionState(opCodeDef *OpCodeDef) {
+	p.execute = executionState{
+		opcode:            opCodeDef,
+		stage:             executionInstruction,
+		instructionCycles: opCodeDef.Cycles - 2, // Subtract 2 cycles for the fetch and decode stages
+		operandLength:     uint8(opCodeDef.Bytes - 1),
+	}
+}
+
+//go:inline
 func (p *CPU) interruptInstruction() (Completed, error) {
 	p.interruptStackPush()
 	p.Reg.SetStatus(InterruptDisableFlag, true)
@@ -169,11 +223,9 @@ func (p *CPU) interruptInstruction() (Completed, error) {
 	var PCL byte
 	if p.nmi {
 		p.nmi = false
-		p.irq = false
 		PCL = p.mem.Read(uint16(nmiVector))
 		PCH = p.mem.Read(uint16(nmiVector + 1))
 	} else if p.irq {
-		p.irq = false
 		PCL = p.mem.Read(uint16(irqVector))
 		PCH = p.mem.Read(uint16(irqVector + 1))
 	}
@@ -181,15 +233,17 @@ func (p *CPU) interruptInstruction() (Completed, error) {
 	return true, nil
 }
 
+//go:inline
 func (p *CPU) interruptStackPush() {
 	p.Push(byte(p.Reg.PC >> 8))
 	p.Push(byte(p.Reg.PC & 0xff))
 	p.Reg.SetStatus(BreakFlag, false)
 	p.Push(p.Reg.Status | byte(UnusedFlag))
-	p.Reg.SetStatus(InterruptDisableFlag, true)
 }
 
 // NextByte reads the next byte from memory and increments the program counter.
+//
+//go:inline
 func (p *CPU) NextByte() byte {
 	b := p.mem.Read(uint16(p.Reg.PC))
 	p.Reg.PC++
@@ -197,6 +251,8 @@ func (p *CPU) NextByte() byte {
 }
 
 // Push pushes a byte onto the stack.
+//
+//go:inline
 func (p *CPU) Push(b byte) {
 	a := stackPageAddress + uint16(p.Reg.S)
 	p.mem.Write(uint16(a), b)
@@ -204,6 +260,8 @@ func (p *CPU) Push(b byte) {
 }
 
 // Pop pops a byte from the stack.
+//
+//go:inline
 func (p *CPU) Pop() byte {
 	p.Reg.S++
 	a := stackPageAddress + uint16(p.Reg.S)
@@ -212,21 +270,33 @@ func (p *CPU) Pop() byte {
 }
 
 // Nmi triggers a non-maskable interrupt.
+//
+//go:inline
 func (p *CPU) Nmi() {
 	p.nmi = true
 }
 
 // Irq triggers an interrupt request.
+//
+//go:inline
 func (p *CPU) Irq() {
-	p.irq = !p.Reg.IsSet(InterruptDisableFlag)
+	p.SetIRQ(true)
+}
+
+// SetIRQ sets the level of the maskable interrupt input. The line remains at
+// this level until the caller changes it; the interrupt-disable flag only
+// controls whether an asserted line can be serviced.
+func (p *CPU) SetIRQ(asserted bool) {
+	p.irq = asserted
 }
 
 // Reset resets the CPU to its initial state.
+//
+//go:inline
 func (p *CPU) Reset() {
 	p.Reg.SetStatus(InterruptDisableFlag, true)
 	resetVecLow := p.mem.Read(uint16(resetVectorAddr))
 	resetVecHigh := p.mem.Read(uint16(resetVectorAddr + 1))
 	p.Reg.PC = (uint16(resetVecHigh) << 8) | uint16(resetVecLow)
-	p.instructionFunc = p.readOpCode
-	p.instructionCycles = 0
+	p.execute = executionState{stage: executionFetch}
 }

@@ -36,6 +36,17 @@ type Registers struct {
 	Status     byte
 }
 
+type RegisterEnum byte
+
+const (
+	AReg RegisterEnum = iota
+	XReg
+	YReg
+	SReg
+	PCReg
+	StatusReg
+)
+
 // NewRegisters creates a new Registers instance.
 func NewRegisters() *Registers {
 	return &Registers{}

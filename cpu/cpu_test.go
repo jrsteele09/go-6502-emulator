@@ -78,6 +78,66 @@ func TestNmiInterruptHandling(t *testing.T) {
 	assert.Equal(t, false, cpu.irq)
 }
 
+func TestIrqAssertedWhileMaskedIsServicedAfterCLI(t *testing.T) {
+	m := memory.NewMemory[addressSize](64 * 1024)
+	cpu := NewCPU(m, false)
+	cpu.Reg.PC = startAddress
+	cpu.mem.Write(startAddress, 0xA9, 0x05, 0x58) // LDA #$05; CLI
+	cpu.mem.Write(irqVector, 0xAD, 0xDE)
+
+	cpu.Irq()
+	require.True(t, cpu.irq)
+
+	for range 2 {
+		complete := Completed(false)
+		for !complete {
+			var err error
+			complete, err = cpu.Execute()
+			require.NoError(t, err)
+		}
+	}
+
+	require.Equal(t, executionInterrupt, cpu.execute.stage)
+	complete := Completed(false)
+	for !complete {
+		var err error
+		complete, err = cpu.Execute()
+		require.NoError(t, err)
+	}
+	require.Equal(t, uint16(0xDEAD), cpu.Reg.PC)
+	require.True(t, cpu.irq)
+
+	cpu.SetIRQ(false)
+	require.False(t, cpu.irq)
+}
+
+func TestNmiDoesNotClearAssertedIrq(t *testing.T) {
+	m := memory.NewMemory[addressSize](64 * 1024)
+	cpu := NewCPU(m, false)
+	cpu.Reg.PC = startAddress
+	cpu.mem.Write(startAddress, 0xEA)
+	cpu.mem.Write(nmiVector, 0xAD, 0xDE)
+	cpu.SetIRQ(true)
+	cpu.Nmi()
+
+	complete := Completed(false)
+	for !complete {
+		var err error
+		complete, err = cpu.Execute()
+		require.NoError(t, err)
+	}
+	complete = false
+	for !complete {
+		var err error
+		complete, err = cpu.Execute()
+		require.NoError(t, err)
+	}
+
+	require.Equal(t, uint16(0xDEAD), cpu.Reg.PC)
+	require.False(t, cpu.nmi)
+	require.True(t, cpu.irq)
+}
+
 func TestIrqInterruptHandling(t *testing.T) {
 	m := memory.NewMemory[addressSize](64 * 1024)
 	cpu := NewCPU(m, false)
@@ -113,6 +173,8 @@ func TestIrqInterruptHandling(t *testing.T) {
 	assert.Equal(t, uint8(0x02), cpu.mem.Read(stackAddress-1))
 	assert.Equal(t, true, cpu.Reg.IsSet(InterruptDisableFlag))
 	assert.Equal(t, false, cpu.nmi)
+	assert.Equal(t, true, cpu.irq)
+	cpu.SetIRQ(false)
 	assert.Equal(t, false, cpu.irq)
 }
 
