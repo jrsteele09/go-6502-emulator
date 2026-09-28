@@ -1,14 +1,12 @@
 # 6502 instruction reference
 
-This reference covers the original NMOS 6502 instruction set, including
-commonly used names for undocumented instructions.
+This reference documents the 6502 instruction set, it includes common undocumented instructions.
 
-Cycle counts are the base timings for the original NMOS 6502. A value in
-**Extra cycles** describes the condition that adds cycles:
+Cycle counts are the base values used by the emulator. A value in **Extra cycles** describes the condition that adds cycles:
 
 - **Page crossed: +1** — indexed address calculation moved into another 256-byte page.
 - **Branch taken: +1; page crossed: +2 total** — a taken branch costs one extra cycle, or two when its destination is on another page.
-- **None** — the instruction has a fixed cycle count.
+- **None** — the instruction has a fixed cycle count in this implementation.
 
 ## Addressing notation
 
@@ -28,12 +26,7 @@ Cycle counts are the base timings for the original NMOS 6502. A value in
 | `($nnnn)` | Indirect | Read the jump target through a 16-bit pointer. |
 | `$relative` | Relative | A signed 8-bit displacement from the address following the instruction. |
 
-Undocumented instructions are marked **Undocumented**. They were not specified
-by MOS Technology, and their behaviour can vary with chip revision, process,
-temperature, and other electrical conditions. They should not be assumed to
-behave identically on CMOS derivatives such as the 65C02.
-
-## Documented mnemonics
+## Instruction Set
 
 ### ADC — Add with carry
 
@@ -578,7 +571,10 @@ Copies Y into A and updates zero and negative.
 |---:|---|---|---:|---:|---|
 | `98` | Implied | `TYA` | 1 | 2 | None |
 
-## Undocumented mnemonics
+## Undocumented Instructions
+
+Undocumented instructions are explained below, use with care as not they are not guaranteed to work reliably on
+all 6502 CPU's - they do not work on later CPU's like the 65C02.
 
 ### ALR — AND then logical shift right (Undocumented)
 
@@ -598,10 +594,7 @@ ANDs an immediate value with the accumulator, then copies result bit 7 into both
 
 ### ARR — AND then rotate right (Undocumented)
 
-ANDs an immediate value with the accumulator, then rotates right through
-carry. In binary mode, carry commonly receives result bit 6 and overflow is
-the exclusive OR of result bits 6 and 5. Decimal-mode behaviour is irregular
-and should not be considered portable.
+ANDs an immediate value with the accumulator, then rotates right through carry. Carry and overflow are derived from the rotated value as implemented by this emulator.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -658,8 +651,7 @@ Loads the same operand into both A and X, then updates zero and negative.
 
 ### NOP* — Single-byte no operation variants (Undocumented)
 
-These opcodes behave like the documented implied NOP on common NMOS 6502
-parts.
+These opcodes behave like the documented NOP in this emulator.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -714,7 +706,7 @@ Performs the same immediate subtract-with-carry operation as opcode `E9`.
 
 ### SKB — Skip byte through zero page (Undocumented)
 
-Consumes a zero-page operand and otherwise behaves as a no operation.
+Consumes a zero-page operand and otherwise behaves as a no operation in this emulator.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -722,7 +714,7 @@ Consumes a zero-page operand and otherwise behaves as a no operation.
 
 ### SKW — Skip byte through zero page,X (Undocumented)
 
-Consumes a zero-page,X operand and otherwise behaves as a no operation.
+Consumes a zero-page,X operand and otherwise behaves as a no operation in this emulator.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
@@ -758,20 +750,16 @@ Shifts memory right, then exclusive-ORs the new memory value into the accumulato
 
 ### TOP — Three-byte no operation (Undocumented)
 
-Consumes an absolute operand and otherwise behaves as a no operation. The
-absolute,X variants take an additional cycle when indexing crosses a page.
+Consumes an absolute operand and otherwise behaves as a no operation. The absolute,X form has a fixed four-cycle cost in the current emulator.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `0C` | Absolute | `TOP $nnnn` | 3 | 4 | None |
-| `1C`, `3C`, `5C`, `7C`, `DC`, `FC` | Absolute,X | `TOP $nnnn,X` | 3 | 4 | Page crossed: +1 |
+| `1C`, `3C`, `5C`, `7C`, `DC`, `FC` | Absolute,X | `TOP $nnnn,X` | 3 | 4 | None in current implementation |
 
 ### XAA — Transfer X AND immediate to accumulator (Undocumented)
 
-XAA is unstable on real NMOS parts: its result can depend on the individual
-chip and electrical conditions. It is often approximated as storing `X AND
-operand` in A and updating zero and negative, but software should not rely on
-that result being portable.
+ANDs X with an immediate value, stores the result in A, and updates zero and negative. Real-chip behavior is unstable; this describes the emulator’s deterministic implementation.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
