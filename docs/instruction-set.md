@@ -28,7 +28,7 @@ Cycle counts are the base values used by the emulator. A value in **Extra cycles
 
 Undocumented instructions are marked **Undocumented**. Their behavior can vary between 6502-family chips; the explanations below describe this emulator.
 
-## Mnemonics
+## Documented mnemonics
 
 ### ADC — Add with carry
 
@@ -45,22 +45,6 @@ Adds the operand and the carry flag to the accumulator. It updates carry, zero, 
 | `61` | Indexed indirect | `ADC ($nn,X)` | 2 | 6 | None |
 | `71` | Indirect indexed | `ADC ($nn),Y` | 2 | 5 | Page crossed: +1 |
 
-### ALR — AND then logical shift right (Undocumented)
-
-ANDs an immediate value with the accumulator, shifts the result right, and stores it in the accumulator. Bit 0 moves into carry.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `4B` | Immediate | `ALR #$nn` | 2 | 2 | None |
-
-### ANC — AND and copy negative to carry (Undocumented)
-
-ANDs an immediate value with the accumulator, then copies result bit 7 into both the negative and carry flags.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `0B`, `2B` | Immediate | `ANC #$nn` | 2 | 2 | None |
-
 ### AND — Logical AND
 
 ANDs the operand with the accumulator and updates zero and negative.
@@ -75,14 +59,6 @@ ANDs the operand with the accumulator and updates zero and negative.
 | `39` | Absolute,Y | `AND $nnnn,Y` | 3 | 4 | Page crossed: +1 |
 | `21` | Indexed indirect | `AND ($nn,X)` | 2 | 6 | None |
 | `31` | Indirect indexed | `AND ($nn),Y` | 2 | 5 | Page crossed: +1 |
-
-### ARR — AND then rotate right (Undocumented)
-
-ANDs an immediate value with the accumulator, then rotates right through carry. Carry and overflow are derived from the rotated value as implemented by this emulator.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `6B` | Immediate | `ARR #$nn` | 2 | 2 | None |
 
 ### ASL — Arithmetic shift left
 
@@ -244,20 +220,6 @@ Compares Y with the operand without changing Y. Carry means `Y >= operand`; zero
 | `C4` | Zero page | `CPY $nn` | 2 | 3 | None |
 | `CC` | Absolute | `CPY $nnnn` | 3 | 4 | None |
 
-### DCP — Decrement then compare (Undocumented)
-
-Decrements memory, then compares the new value with the accumulator as CMP would.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `C7` | Zero page | `DCP $nn` | 2 | 5 | None |
-| `D7` | Zero page,X | `DCP $nn,X` | 2 | 6 | None |
-| `CF` | Absolute | `DCP $nnnn` | 3 | 6 | None |
-| `DF` | Absolute,X | `DCP $nnnn,X` | 3 | 7 | None |
-| `DB` | Absolute,Y | `DCP $nnnn,Y` | 3 | 7 | None |
-| `C3` | Indexed indirect | `DCP ($nn,X)` | 2 | 8 | None |
-| `D3` | Indirect indexed | `DCP ($nn),Y` | 2 | 8 | None |
-
 ### DEC — Decrement memory
 
 Subtracts one from a memory byte and updates zero and negative.
@@ -284,14 +246,6 @@ Subtracts one from Y and updates zero and negative.
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `88` | Implied | `DEY` | 1 | 2 | None |
-
-### DOP — Two-byte no operation (Undocumented)
-
-Consumes an immediate operand without otherwise changing CPU state.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `80`, `82`, `C2`, `E2` | Immediate | `DOP #$nn` | 2 | 2 | None |
 
 ### EOR — Exclusive OR
 
@@ -335,20 +289,6 @@ Adds one to Y and updates zero and negative.
 |---:|---|---|---:|---:|---|
 | `C8` | Implied | `INY` | 1 | 2 | None |
 
-### ISC — Increment then subtract with carry (Undocumented)
-
-Increments memory, then subtracts the new value from the accumulator using SBC-style binary arithmetic.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `E7` | Zero page | `ISC $nn` | 2 | 5 | None |
-| `F7` | Zero page,X | `ISC $nn,X` | 2 | 6 | None |
-| `EF` | Absolute | `ISC $nnnn` | 3 | 6 | None |
-| `FF` | Absolute,X | `ISC $nnnn,X` | 3 | 7 | None |
-| `FB` | Absolute,Y | `ISC $nnnn,Y` | 3 | 7 | None |
-| `E3` | Indexed indirect | `ISC ($nn,X)` | 2 | 8 | None |
-| `F3` | Indirect indexed | `ISC ($nn),Y` | 2 | 8 | None |
-
 ### JMP — Jump
 
 Loads the program counter with the target address. Indirect JMP preserves the NMOS 6502 page-wrap behavior when the pointer ends in `$FF`.
@@ -365,19 +305,6 @@ Pushes the address immediately before the next instruction, then jumps to the ab
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `20` | Absolute | `JSR $nnnn` | 3 | 6 | None |
-
-### LAX — Load accumulator and X (Undocumented)
-
-Loads the same operand into both A and X, then updates zero and negative.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `A7` | Zero page | `LAX $nn` | 2 | 3 | None |
-| `B7` | Zero page,Y | `LAX $nn,Y` | 2 | 4 | None |
-| `AF` | Absolute | `LAX $nnnn` | 3 | 4 | None |
-| `BF` | Absolute,Y | `LAX $nnnn,Y` | 3 | 4 | Page crossed: +1 |
-| `A3` | Indexed indirect | `LAX ($nn,X)` | 2 | 6 | None |
-| `B3` | Indirect indexed | `LAX ($nn),Y` | 2 | 5 | Page crossed: +1 |
 
 ### LDA — Load accumulator
 
@@ -432,12 +359,11 @@ Shifts the accumulator or memory right by one bit. Bit 0 moves into carry, bit 7
 
 ### NOP — No operation
 
-Performs no state-changing operation. The undocumented single-byte variants behave the same way in this emulator.
+Performs no state-changing operation.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `EA` | Implied | `NOP` | 1 | 2 | None |
-| `1A`, `3A`, `5A`, `7A`, `DA`, `FA` | Implied | `NOP*` | 1 | 2 | None |
 
 ### ORA — Logical inclusive OR
 
@@ -486,20 +412,6 @@ Pulls the status register from the hardware stack.
 |---:|---|---|---:|---:|---|
 | `28` | Implied | `PLP` | 1 | 4 | None |
 
-### RLA — Rotate left then AND (Undocumented)
-
-Rotates memory left through carry, then ANDs the new memory value into the accumulator.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `27` | Zero page | `RLA $nn` | 2 | 5 | None |
-| `37` | Zero page,X | `RLA $nn,X` | 2 | 6 | None |
-| `2F` | Absolute | `RLA $nnnn` | 3 | 6 | None |
-| `3F` | Absolute,X | `RLA $nnnn,X` | 3 | 7 | None |
-| `3B` | Absolute,Y | `RLA $nnnn,Y` | 3 | 7 | None |
-| `23` | Indexed indirect | `RLA ($nn,X)` | 2 | 8 | None |
-| `33` | Indirect indexed | `RLA ($nn),Y` | 2 | 8 | None |
-
 ### ROL — Rotate left
 
 Rotates the accumulator or memory left through carry. Old bit 7 enters carry and the old carry enters bit 0.
@@ -524,20 +436,6 @@ Rotates the accumulator or memory right through carry. Old bit 0 enters carry an
 | `6E` | Absolute | `ROR $nnnn` | 3 | 6 | None |
 | `7E` | Absolute,X | `ROR $nnnn,X` | 3 | 7 | None |
 
-### RRA — Rotate right then add with carry (Undocumented)
-
-Rotates memory right through carry, then adds the new memory value to the accumulator.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `67` | Zero page | `RRA $nn` | 2 | 5 | None |
-| `77` | Zero page,X | `RRA $nn,X` | 2 | 6 | None |
-| `6F` | Absolute | `RRA $nnnn` | 3 | 6 | None |
-| `7F` | Absolute,X | `RRA $nnnn,X` | 3 | 7 | None |
-| `7B` | Absolute,Y | `RRA $nnnn,Y` | 3 | 7 | None |
-| `63` | Indexed indirect | `RRA ($nn,X)` | 2 | 8 | None |
-| `73` | Indirect indexed | `RRA ($nn),Y` | 2 | 8 | None |
-
 ### RTI — Return from interrupt
 
 Pulls status and the program counter from the stack, resuming the interrupted program.
@@ -554,24 +452,13 @@ Pulls the saved address from the stack, adds one, and resumes after the correspo
 |---:|---|---|---:|---:|---|
 | `60` | Implied | `RTS` | 1 | 6 | None |
 
-### SAX — Store A AND X (Undocumented)
-
-Stores `A AND X` in memory without changing either register.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `87` | Zero page | `SAX $nn` | 2 | 3 | None |
-| `97` | Zero page,Y | `SAX $nn,Y` | 2 | 4 | None |
-| `8F` | Absolute | `SAX $nnnn` | 3 | 4 | None |
-| `83` | Indexed indirect | `SAX ($nn,X)` | 2 | 6 | None |
-
 ### SBC — Subtract with carry
 
-Subtracts the operand and inverse carry from the accumulator. It updates carry, zero, negative, and overflow; decimal mode uses BCD arithmetic. Opcode `EB` is an undocumented immediate alias.
+Subtracts the operand and inverse carry from the accumulator. It updates carry, zero, negative, and overflow; decimal mode uses BCD arithmetic.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
-| `E9`, `EB` | Immediate | `SBC #$nn` | 2 | 2 | None |
+| `E9` | Immediate | `SBC #$nn` | 2 | 2 | None |
 | `E5` | Zero page | `SBC $nn` | 2 | 3 | None |
 | `F5` | Zero page,X | `SBC $nn,X` | 2 | 4 | None |
 | `ED` | Absolute | `SBC $nnnn` | 3 | 4 | None |
@@ -603,50 +490,6 @@ Sets the interrupt-disable flag so an asserted IRQ line is not serviced. NMI is 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `78` | Implied | `SEI` | 1 | 2 | None |
-
-### SKB — Skip byte through zero page (Undocumented)
-
-Consumes a zero-page operand and otherwise behaves as a no operation in this emulator.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `04`, `44`, `64` | Zero page | `SKB $nn` | 2 | 3 | None |
-
-### SKW — Skip byte through zero page,X (Undocumented)
-
-Consumes a zero-page,X operand and otherwise behaves as a no operation in this emulator.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `14`, `34`, `54`, `74`, `D4`, `F4` | Zero page,X | `SKW $nn,X` | 2 | 4 | None |
-
-### SLO — Shift left then OR (Undocumented)
-
-Shifts memory left, then ORs the new memory value into the accumulator.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `07` | Zero page | `SLO $nn` | 2 | 5 | None |
-| `17` | Zero page,X | `SLO $nn,X` | 2 | 6 | None |
-| `0F` | Absolute | `SLO $nnnn` | 3 | 6 | None |
-| `1F` | Absolute,X | `SLO $nnnn,X` | 3 | 7 | None |
-| `1B` | Absolute,Y | `SLO $nnnn,Y` | 3 | 7 | None |
-| `03` | Indexed indirect | `SLO ($nn,X)` | 2 | 8 | None |
-| `13` | Indirect indexed | `SLO ($nn),Y` | 2 | 8 | None |
-
-### SRE — Shift right then exclusive OR (Undocumented)
-
-Shifts memory right, then exclusive-ORs the new memory value into the accumulator.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `47` | Zero page | `SRE $nn` | 2 | 5 | None |
-| `57` | Zero page,X | `SRE $nn,X` | 2 | 6 | None |
-| `4F` | Absolute | `SRE $nnnn` | 3 | 6 | None |
-| `5F` | Absolute,X | `SRE $nnnn,X` | 3 | 7 | None |
-| `5B` | Absolute,Y | `SRE $nnnn,Y` | 3 | 7 | None |
-| `43` | Indexed indirect | `SRE ($nn,X)` | 2 | 8 | None |
-| `53` | Indirect indexed | `SRE ($nn),Y` | 2 | 8 | None |
 
 ### STA — Store accumulator
 
@@ -698,15 +541,6 @@ Copies A into Y and updates zero and negative.
 |---:|---|---|---:|---:|---|
 | `A8` | Implied | `TAY` | 1 | 2 | None |
 
-### TOP — Three-byte no operation (Undocumented)
-
-Consumes an absolute operand and otherwise behaves as a no operation. The absolute,X form has a fixed four-cycle cost in the current emulator.
-
-| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
-|---:|---|---|---:|---:|---|
-| `0C` | Absolute | `TOP $nnnn` | 3 | 4 | None |
-| `1C`, `3C`, `5C`, `7C`, `DC`, `FC` | Absolute,X | `TOP $nnnn,X` | 3 | 4 | None in current implementation |
-
 ### TSX — Transfer stack pointer to X
 
 Copies the stack pointer into X and updates zero and negative.
@@ -738,6 +572,189 @@ Copies Y into A and updates zero and negative.
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
 |---:|---|---|---:|---:|---|
 | `98` | Implied | `TYA` | 1 | 2 | None |
+
+## Undocumented mnemonics
+
+### ALR — AND then logical shift right (Undocumented)
+
+ANDs an immediate value with the accumulator, shifts the result right, and stores it in the accumulator. Bit 0 moves into carry.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `4B` | Immediate | `ALR #$nn` | 2 | 2 | None |
+
+### ANC — AND and copy negative to carry (Undocumented)
+
+ANDs an immediate value with the accumulator, then copies result bit 7 into both the negative and carry flags.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `0B`, `2B` | Immediate | `ANC #$nn` | 2 | 2 | None |
+
+### ARR — AND then rotate right (Undocumented)
+
+ANDs an immediate value with the accumulator, then rotates right through carry. Carry and overflow are derived from the rotated value as implemented by this emulator.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `6B` | Immediate | `ARR #$nn` | 2 | 2 | None |
+
+### DCP — Decrement then compare (Undocumented)
+
+Decrements memory, then compares the new value with the accumulator as CMP would.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `C7` | Zero page | `DCP $nn` | 2 | 5 | None |
+| `D7` | Zero page,X | `DCP $nn,X` | 2 | 6 | None |
+| `CF` | Absolute | `DCP $nnnn` | 3 | 6 | None |
+| `DF` | Absolute,X | `DCP $nnnn,X` | 3 | 7 | None |
+| `DB` | Absolute,Y | `DCP $nnnn,Y` | 3 | 7 | None |
+| `C3` | Indexed indirect | `DCP ($nn,X)` | 2 | 8 | None |
+| `D3` | Indirect indexed | `DCP ($nn),Y` | 2 | 8 | None |
+
+### DOP — Two-byte no operation (Undocumented)
+
+Consumes an immediate operand without otherwise changing CPU state.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `80`, `82`, `C2`, `E2` | Immediate | `DOP #$nn` | 2 | 2 | None |
+
+### ISC — Increment then subtract with carry (Undocumented)
+
+Increments memory, then subtracts the new value from the accumulator using SBC-style binary arithmetic.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `E7` | Zero page | `ISC $nn` | 2 | 5 | None |
+| `F7` | Zero page,X | `ISC $nn,X` | 2 | 6 | None |
+| `EF` | Absolute | `ISC $nnnn` | 3 | 6 | None |
+| `FF` | Absolute,X | `ISC $nnnn,X` | 3 | 7 | None |
+| `FB` | Absolute,Y | `ISC $nnnn,Y` | 3 | 7 | None |
+| `E3` | Indexed indirect | `ISC ($nn,X)` | 2 | 8 | None |
+| `F3` | Indirect indexed | `ISC ($nn),Y` | 2 | 8 | None |
+
+### LAX — Load accumulator and X (Undocumented)
+
+Loads the same operand into both A and X, then updates zero and negative.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `A7` | Zero page | `LAX $nn` | 2 | 3 | None |
+| `B7` | Zero page,Y | `LAX $nn,Y` | 2 | 4 | None |
+| `AF` | Absolute | `LAX $nnnn` | 3 | 4 | None |
+| `BF` | Absolute,Y | `LAX $nnnn,Y` | 3 | 4 | Page crossed: +1 |
+| `A3` | Indexed indirect | `LAX ($nn,X)` | 2 | 6 | None |
+| `B3` | Indirect indexed | `LAX ($nn),Y` | 2 | 5 | Page crossed: +1 |
+
+### NOP* — Single-byte no operation variants (Undocumented)
+
+These opcodes behave like the documented NOP in this emulator.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `1A`, `3A`, `5A`, `7A`, `DA`, `FA` | Implied | `NOP*` | 1 | 2 | None |
+
+### RLA — Rotate left then AND (Undocumented)
+
+Rotates memory left through carry, then ANDs the new memory value into the accumulator.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `27` | Zero page | `RLA $nn` | 2 | 5 | None |
+| `37` | Zero page,X | `RLA $nn,X` | 2 | 6 | None |
+| `2F` | Absolute | `RLA $nnnn` | 3 | 6 | None |
+| `3F` | Absolute,X | `RLA $nnnn,X` | 3 | 7 | None |
+| `3B` | Absolute,Y | `RLA $nnnn,Y` | 3 | 7 | None |
+| `23` | Indexed indirect | `RLA ($nn,X)` | 2 | 8 | None |
+| `33` | Indirect indexed | `RLA ($nn),Y` | 2 | 8 | None |
+
+### RRA — Rotate right then add with carry (Undocumented)
+
+Rotates memory right through carry, then adds the new memory value to the accumulator.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `67` | Zero page | `RRA $nn` | 2 | 5 | None |
+| `77` | Zero page,X | `RRA $nn,X` | 2 | 6 | None |
+| `6F` | Absolute | `RRA $nnnn` | 3 | 6 | None |
+| `7F` | Absolute,X | `RRA $nnnn,X` | 3 | 7 | None |
+| `7B` | Absolute,Y | `RRA $nnnn,Y` | 3 | 7 | None |
+| `63` | Indexed indirect | `RRA ($nn,X)` | 2 | 8 | None |
+| `73` | Indirect indexed | `RRA ($nn),Y` | 2 | 8 | None |
+
+### SAX — Store A AND X (Undocumented)
+
+Stores `A AND X` in memory without changing either register.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `87` | Zero page | `SAX $nn` | 2 | 3 | None |
+| `97` | Zero page,Y | `SAX $nn,Y` | 2 | 4 | None |
+| `8F` | Absolute | `SAX $nnnn` | 3 | 4 | None |
+| `83` | Indexed indirect | `SAX ($nn,X)` | 2 | 6 | None |
+
+### SBC* — Immediate SBC alias (Undocumented)
+
+Performs the same immediate subtract-with-carry operation as opcode `E9`.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `EB` | Immediate | `SBC* #$nn` | 2 | 2 | None |
+
+### SKB — Skip byte through zero page (Undocumented)
+
+Consumes a zero-page operand and otherwise behaves as a no operation in this emulator.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `04`, `44`, `64` | Zero page | `SKB $nn` | 2 | 3 | None |
+
+### SKW — Skip byte through zero page,X (Undocumented)
+
+Consumes a zero-page,X operand and otherwise behaves as a no operation in this emulator.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `14`, `34`, `54`, `74`, `D4`, `F4` | Zero page,X | `SKW $nn,X` | 2 | 4 | None |
+
+### SLO — Shift left then OR (Undocumented)
+
+Shifts memory left, then ORs the new memory value into the accumulator.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `07` | Zero page | `SLO $nn` | 2 | 5 | None |
+| `17` | Zero page,X | `SLO $nn,X` | 2 | 6 | None |
+| `0F` | Absolute | `SLO $nnnn` | 3 | 6 | None |
+| `1F` | Absolute,X | `SLO $nnnn,X` | 3 | 7 | None |
+| `1B` | Absolute,Y | `SLO $nnnn,Y` | 3 | 7 | None |
+| `03` | Indexed indirect | `SLO ($nn,X)` | 2 | 8 | None |
+| `13` | Indirect indexed | `SLO ($nn),Y` | 2 | 8 | None |
+
+### SRE — Shift right then exclusive OR (Undocumented)
+
+Shifts memory right, then exclusive-ORs the new memory value into the accumulator.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `47` | Zero page | `SRE $nn` | 2 | 5 | None |
+| `57` | Zero page,X | `SRE $nn,X` | 2 | 6 | None |
+| `4F` | Absolute | `SRE $nnnn` | 3 | 6 | None |
+| `5F` | Absolute,X | `SRE $nnnn,X` | 3 | 7 | None |
+| `5B` | Absolute,Y | `SRE $nnnn,Y` | 3 | 7 | None |
+| `43` | Indexed indirect | `SRE ($nn,X)` | 2 | 8 | None |
+| `53` | Indirect indexed | `SRE ($nn),Y` | 2 | 8 | None |
+
+### TOP — Three-byte no operation (Undocumented)
+
+Consumes an absolute operand and otherwise behaves as a no operation. The absolute,X form has a fixed four-cycle cost in the current emulator.
+
+| Opcode | Addressing mode | Syntax | Bytes | Cycles | Extra cycles |
+|---:|---|---|---:|---:|---|
+| `0C` | Absolute | `TOP $nnnn` | 3 | 4 | None |
+| `1C`, `3C`, `5C`, `7C`, `DC`, `FC` | Absolute,X | `TOP $nnnn,X` | 3 | 4 | None in current implementation |
 
 ### XAA — Transfer X AND immediate to accumulator (Undocumented)
 
