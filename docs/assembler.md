@@ -1,9 +1,8 @@
-# 6502 assembler language reference
+# 6502 Assembler User Manual
 
-This document describes the syntax the assembler currently accepts. It is a
-reference to implemented behaviour, rather than a list of syntax that might be
-added later. For the available instructions, opcodes, byte counts, and cycle
-counts, see the [6502 instruction set](instruction-set.md).
+This manual describes the accepted source syntax and command-line behaviour.
+For instruction meanings, opcodes, byte counts, and cycle counts, see the
+[6502 instruction set](instruction-set.md).
 
 ## Quick example
 
@@ -29,8 +28,8 @@ start:
 ```
 
 Mnemonics, directives, macro names, and preprocessor keywords are
-case-insensitive. Named labels and constants are case-sensitive, so `Loop` and
-`loop` are different symbols.
+case-insensitive. Named labels, constants, and variables are case-sensitive,
+so `Loop` and `loop` are different symbols.
 
 ## Source lines and comments
 
@@ -57,10 +56,9 @@ Comment markers inside quoted text are not treated as comments.
 
 ## Instructions and addressing
 
-The assembler's instruction set is constructed from the CPU opcode table.
-The command-line assembler enables the full table, including the undocumented
-opcodes implemented by the emulator. Instruction mnemonics are
-case-insensitive.
+The assembler accepts the documented 6502 instructions and the undocumented
+instructions listed in the [instruction-set reference](instruction-set.md).
+Instruction mnemonics are case-insensitive.
 
 | Addressing mode | Example |
 | --- | --- |
@@ -78,11 +76,27 @@ case-insensitive.
 | Indirect | `jmp ($c000)` |
 | Relative | `bne loop` |
 
-For a known numeric address at or below `$ff`, the assembler chooses a
-zero-page form when that mnemonic provides one. Otherwise it chooses the
-absolute form. A forward-referenced named label is conservatively sized as a
-16-bit address during layout, except for branch instructions, which are always
-relative.
+An immediate operand must be from -128 through 255 and always emits one byte.
+For a non-immediate numeric expression, values from -128 through 255 select an
+8-bit operand and values from -32768 through 65535 select a 16-bit operand. An
+8-bit address operand is only valid when the instruction has a matching
+zero-page addressing mode. There is no syntax for forcing an absolute encoding
+of a small numeric value.
+
+For a named label that is already known, an address at or below `$ff` selects
+zero-page addressing when the instruction provides it; otherwise it selects
+absolute addressing. Branch labels always select relative addressing.
+
+When an address expression begins with a named symbol, operand width is chosen
+from that symbol's value before any following arithmetic. Keep such arithmetic
+within the same 8-bit or 16-bit range. If it crosses `$ff`, beginning the
+expression with a literal, such as `0 + BASE + 1`, makes the final expression
+value determine the width.
+
+Avoid forward references to labels that will reside in zero page. Their
+address is initially calculated using an absolute-size instruction, but the
+final instruction can select the shorter zero-page form. Define zero-page
+addresses before use, normally with `=` or `EQU`.
 
 Branch displacements must fit in the 6502's signed 8-bit range, from -128 to
 +127 bytes relative to the instruction following the branch.
@@ -91,8 +105,8 @@ Branch displacements must fit in the 6502's signed 8-bit range, from -128 to
 
 ### Named labels
 
-A named label starts with a letter or underscore and may then contain letters,
-digits, or underscores. Both colon and colonless forms are accepted:
+A named label starts with an ASCII letter or underscore and may then contain
+letters, digits, or underscores. Both colon and colonless forms are accepted:
 
 ```asm
 start:
@@ -124,7 +138,7 @@ table:
 ```
 
 A named label may only be defined once and may not use the same name as a
-constant.
+constant or variable.
 
 ### Anonymous `+` and `-` labels
 
@@ -166,34 +180,28 @@ here = *
 Branches also accept explicit relative displacements such as `bne *+4` and
 `bne *-6`.
 
-### `!1`-style local labels
+## Constants and Variables
 
-`!1`, `!1+`, and `!1-` local-label syntax is **not currently supported**.
-Although `!` is recognised as a lexer token, the assembler does not define or
-resolve bang-number labels. Use a named label or the supported `+`/`-`
-anonymous labels instead.
-
-Do not confuse `!1` with `\1`: the latter is a positional macro argument and
-is supported inside a macro body.
-
-## Constants and `EQU`
-
-All of the following constant forms are supported:
+Constants can be defined using any of the supported `EQU` forms:
 
 ```asm
-BASE = $40
-FIRST EQU BASE + 1
+FIRST EQU $41
 SECOND .EQU FIRST + 1
 .EQU THIRD, SECOND + 1
 .EQU FOURTH = THIRD + 1
+.EQU FIFTH FOURTH + 1
 ```
 
-`EQU` and `.EQU` are case-insensitive. Constant names follow the same
-identifier spelling rules as named labels. Constants are processed in source
-order, so a constant expression should only refer to constants already
-defined.
+`EQU` and `.EQU` are case-insensitive. Variables use assignment syntax, either
+directly or through the `var` directive:
 
-Constants are reassignable. This is useful for source-time counters:
+```asm
+BASE = $40
+var VALUE = $42
+.var OTHER = VALUE + 1
+```
+
+Variables are reassignable, which is useful for source-time counters:
 
 ```asm
 test_number = 0
@@ -202,20 +210,23 @@ test_number = test_number + 1
 db test_number
 ```
 
-The following equivalent variable directive is also accepted:
+Constant and variable names follow the same identifier spelling rules as named
+labels. Definitions are processed in source order, so an expression should
+only refer to symbols already defined. Constants, variables, and labels share
+a namespace: a constant or variable name cannot also be used as a label.
 
-```asm
-var VALUE = $42
-.var OTHER = VALUE + 1
-```
+Despite the conventional distinction, all constant and variable forms can be
+redefined. Use `EQU` to communicate that a value is intended to remain fixed,
+and use `=` or `var` when reassignment is intended.
 
-Constants and labels share a namespace during assembly and cannot be defined
-with the same spelling.
+An `EQU` expression may use literals and earlier symbols declared with `EQU`
+or bare `=`. It cannot refer to a label or to a symbol declared only with
+`var`/`.var`. The `=` and `var` forms may use a previously defined label.
 
 ## Expressions
 
-Expressions are accepted in instruction operands, constants, conditionals,
-origins, and numeric data directives.
+Expressions are accepted in instruction operands, constants, variables,
+conditionals, origins, and numeric data directives.
 
 ### Literals and symbols
 
@@ -225,7 +236,7 @@ origins, and numeric data directives.
 | Hexadecimal | `$` prefix | `$c000` |
 | Binary | `%` prefix | `%10101010` |
 | Character | Single quoted character | `'A'` |
-| Symbol | Constant or label | `table` |
+| Symbol | Constant, variable, or label | `table` |
 | Current address | Current program counter | `*` |
 
 Character literals support `\n`, `\r`, `\t`, `\\`, and `\'` escapes.
@@ -313,10 +324,10 @@ When named parameters are declared, the invocation must provide exactly that
 many arguments. When no parameters are declared, the highest positional
 reference determines the minimum required argument count.
 
-Macro names are case-insensitive. Expansions may invoke other macros and may
-contain constants, includes, and conditionals. Recursive/nested expansion is
-limited to 32 levels. Variadic parameters and macro-local label syntax are not
-implemented.
+Macro names are case-insensitive; parameter names are case-sensitive.
+Expansions may invoke other macros and may contain constants, variables,
+includes, and conditionals. Recursive/nested expansion is limited to 32
+levels. Variadic parameters and macro-local label syntax are not supported.
 
 ## Conditional assembly
 
@@ -335,9 +346,8 @@ endif
 Conditions use the normal expression syntax. Zero is false and any non-zero
 value is true. Conditionals may be nested.
 
-Constants are evaluated during source preprocessing. A condition may also use
-a label that has already been assigned when the layout pass reaches the
-condition:
+Conditions may use constants, variables, and labels defined earlier in the
+source:
 
 ```asm
 org $1000
@@ -347,10 +357,9 @@ if start = $1000
 endif
 ```
 
-A forward label cannot be used to decide a conditional because the selected
-branch could itself change that label's address; it is reported as undefined.
-Content inside an inactive branch is not expanded, and an include in an
-inactive branch is not opened.
+A forward label cannot be used to decide a conditional and is reported as
+undefined. Content inside an inactive branch is ignored: macros and symbols in
+it are not defined, and included files in it are not opened.
 
 Only the bare forms `if`, `else`, and `endif` are supported. `.if`, `ifdef`,
 `ifndef`, and `elseif` are not implemented.
@@ -369,11 +378,10 @@ leading period and are case-insensitive.
 | Text | `text`, `string`, `str`, `asc` and dotted forms | Emit the bytes of one quoted string without a terminator. |
 | Zero-terminated text | `asciiz`, `.asciiz` | Emit one quoted string followed by `$00`. |
 | Data space | `ds`, `.ds` | Reserve the requested number of bytes, emitted as zeroes. |
-| Variable | `var`, `.var` | Define or update a constant using `NAME = expression`. |
+| Variable | `var`, `.var` | Define or update a variable using `NAME = expression`. |
 | End marker | `end`, `.end` | Accept and ignore the rest of this source line. |
-| Constant | `EQU` variants | Define a source constant; see [Constants and `EQU`](#constants-and-equ). |
-| Include | `#include`, `.include` | Include another source file; only available through file assembly. |
-| Import once | `#importonce` | Prevent subsequent processing of the current included file. |
+| Constant | `EQU` variants | Define a source constant; see [Constants and Variables](#constants-and-variables). |
+| Include | `#include`, `.include`, `#import` | Include another source file; only available through file assembly. |
 
 ### Numeric data
 
@@ -400,7 +408,8 @@ asciiz "DONE"
 ```
 
 The first four forms are aliases and do not append a terminator. `asciiz`
-appends one zero byte.
+appends one zero byte. Text is emitted as its raw UTF-8 bytes; no ASCII-to-
+PETSCII conversion is performed.
 
 ### Origins, segments, and storage
 
@@ -419,10 +428,8 @@ segment; it is not an uninitialised linker reservation. Origins must fit in the
 16-bit address space, and `ds` rejects negative sizes.
 
 There is no separate linker, relocation system, or named section system.
-Words such as `BSS` and `CODE` are **not directives**: when used alone as in
-the Klaus decimal test, they are accepted as ordinary colonless labels. The
-following `org` directives are what actually create its `$0000` and `$0200`
-segments.
+Words such as `BSS` and `CODE` are **not directives**. When used alone, they
+are ordinary colonless labels. Use `org` to start data at a different address.
 
 ### `END`
 
@@ -430,22 +437,23 @@ segments.
 of its line but does not stop reading the file and does not record an entry
 point. Thus the operand in `end start` is currently ignored.
 
-Because colonless labels are supported, `end` is treated as a label when it is
-followed by another statement on the same line; otherwise it is the directive.
+Because colonless labels are supported, bare `end` is treated as a label when
+it is followed by another statement on the same line; otherwise it is the
+directive. `.end` is always the directive.
 
-## Includes and `#importonce`
+## Includes
 
-Includes support either spelling and quoted or unquoted paths:
+Includes support three directive spellings and quoted or unquoted paths:
 
 ```asm
 #include "constants.asm"
 .include 'macros.asm'
-.include data/tables.asm
+#import data/tables.asm
 ```
 
-Includes are expanded in source order. Included files share the caller's macro
-and constant context, so a macro defined in an included file is available
-after the include in the parent file.
+Includes are expanded in source order. Included files share macros, constants,
+and variables with the including file, so definitions from an included file
+are available after the include.
 
 ```asm
 // macros.asm
@@ -458,53 +466,31 @@ endm
 EMIT $42
 ```
 
-Place `#importonce` in an included file to skip later includes of the same
-resolved path. Circular includes are rejected, and include nesting is limited
-to 10 levels.
+Relative include paths are resolved from the directory containing the main
+input file, including paths written inside nested includes. Circular includes
+are rejected, and include nesting is limited to 10 levels.
 
-Includes require `Assembler.AssembleFile` and a `utils.FileResolver`. The
-reader-based `Assembler.Assemble` method has no resolver and therefore does not
-expand includes.
-
-## Klaus decimal-mode source compatibility
-
-The repository's Klaus/Bruce Clark decimal-mode source is assembled as an
-integration test. Its relevant syntax is supported as follows:
-
-| Source construct | Behaviour |
-| --- | --- |
-| `name = value` | Reassignable source constant |
-| `end_of_test macro ... endm` | Parameterless macro |
-| `if cputype != 1 ... endif` | Conditional expression |
-| `BSS` and `CODE` | Ordinary labels, not section directives |
-| `org 0` and `org $200` | Create the data and code segments |
-| `N1 ds 1` | Colonless label plus zero-filled storage |
-| `TEST ldy #1` | Colonless label plus instruction |
-| `N2H+1`, `N2H,x` | Label arithmetic and indexed addressing |
-| `end TEST` | Compatibility end marker; `TEST` is ignored |
-
-The test expects a 17-byte zero-filled segment at `$0000` and a code segment at
-`$0200`, then executes the assembled test against the emulator.
-
-## Explicitly unsupported syntax
-
-The following commonly seen assembler features are not currently implemented:
-
-- `!1`, `!1+`, or `!1-` local labels
-- `.if`, `ifdef`, `ifndef`, and `elseif`
-- variadic macros or macro-local label declarations
-- named sections such as true `BSS`, `CODE`, or `.segment` directives
-- `.align`, `.fill`, `.res`, and `.incbin`
-- relocation, linking, exports, and imports of symbols
-- a modulo operator
+`#importonce` may be placed inside an included file to ensure that file is
+processed only once. After its first inclusion, later `#include`, `.include`,
+or `#import` directives using the same path spelling are skipped. Equivalent
+spellings such as `library.asm` and `./library.asm` are treated as different
+paths.
 
 ## Command-line use
 
-Build and invoke the assembler from the repository root:
+Assemble a source file with:
 
 ```bash
-go build -o asm6502 ./cmd/assembler
 ./asm6502 -i program.asm
+```
+
+Without `-o`, this produces `program.prg`. Use `-f` to select another output
+container:
+
+```bash
+./asm6502 -i program.asm -o game.prg
+./asm6502 -i program.asm -f d64 -n GAME
+./asm6502 -i program.asm -f t64 -n GAME
 ```
 
 | Option | Purpose |
@@ -518,33 +504,6 @@ go build -o asm6502 ./cmd/assembler
 | `-version` | Show the assembler version |
 
 PRG output currently accepts one segment. D64 and T64 output combine multiple
-segments into one loadable image and zero-fill gaps. Those two container
-writers do not currently diagnose overlapping segments; later segment data is
-copied over earlier data in the overlap.
-
-## Go API
-
-Create an assembler from the CPU opcode table:
-
-```go
-mem := memory.NewMemory[uint16](64 * 1024)
-processor := cpu.NewCPU(mem, true)
-asm := assembler.New(processor.OpCodes())
-```
-
-Use `Assemble` for an `io.Reader` that has no includes:
-
-```go
-segments, err := asm.Assemble(strings.NewReader(source), "program.asm")
-```
-
-Use `AssembleFile` with a resolver for include support:
-
-```go
-resolver := utils.NewOSFileResolver("./asm")
-segments, err := asm.AssembleFile("main.asm", resolver)
-```
-
-Both methods reset the label, constant, anonymous-label, and program-counter
-state before each assembly. The result is a slice of `AssembledData`, with a
-start address and byte buffer for each origin-created segment.
+segments into one loadable image and zero-fill gaps. D64 and T64 do not reject
+overlapping segments; data from a later segment replaces earlier data in the
+overlapping range.

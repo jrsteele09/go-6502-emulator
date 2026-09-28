@@ -91,7 +91,7 @@ func main() {
 }
 ```
 
-Use `AssembleFile` when the source uses `#include` or `.include`. The resolver
+Use `AssembleFile` when the source uses `#include`, `.include`, or `#import`. The resolver
 determines where included files are loaded from:
 
 ```go
@@ -153,7 +153,7 @@ Common directives include:
 | Words | `word`, `.word`, `dw`, or `.dw` |
 | Text | `text`, `string`, `str`, `asc`, `asciiz`, with optional leading `.` |
 | Space | `ds` or `.ds` |
-| Include | `#include "file.asm"` or `.include "file.asm"` |
+| Include | `#include "file.asm"`, `.include "file.asm"`, or `#import "file.asm"` |
 | Conditional | `if`, `else`, and `endif` |
 | Macro | `NAME macro ... endm` or `macro NAME ... endm` |
 

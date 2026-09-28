@@ -165,11 +165,13 @@ func (p *AssemblerLexer) preprocessReader(input io.Reader, filename string, dept
 	return processSourceLines(strings.Split(string(data), "\n"), filename, macros, constants, 0, include, directive)
 }
 
-// extractIncludePath supports both #include and .include syntax.
+// extractIncludePath supports #include, .include, and #import syntax.
 func extractIncludePath(line string) string {
 	line = strings.TrimSpace(line)
 	words := strings.Fields(line)
-	if len(words) < 2 || (!strings.EqualFold(words[0], "#include") && !strings.EqualFold(words[0], ".include")) {
+	if len(words) < 2 || (!strings.EqualFold(words[0], "#include") &&
+		!strings.EqualFold(words[0], ".include") &&
+		!strings.EqualFold(words[0], "#import")) {
 		return ""
 	}
 	return extractQuotedPath(strings.TrimSpace(strings.TrimPrefix(line, words[0])))

@@ -183,6 +183,21 @@ func TestAssemble_MacroDefinedInIncludeIsAvailableToParent(t *testing.T) {
 	require.Equal(t, []byte{0x42}, segments[0].Data.Bytes())
 }
 
+func TestAssemble_HashImportIncludesSource(t *testing.T) {
+	_, cpu := createHardware()
+	asm := assembler.New(cpu.OpCodes())
+	resolver := utils.NewMemoryFileResolver(map[string]string{
+		"main.asm": "org $1000\n#import \"data.asm\"\n",
+		"data.asm": "db $42\n",
+	})
+
+	segments, err := asm.AssembleFile("main.asm", resolver)
+
+	require.NoError(t, err)
+	require.Len(t, segments, 1)
+	require.Equal(t, []byte{0x42}, segments[0].Data.Bytes())
+}
+
 func TestAssemble_InactiveIncludeIsNotResolved(t *testing.T) {
 	_, cpu := createHardware()
 	asm := assembler.New(cpu.OpCodes())
