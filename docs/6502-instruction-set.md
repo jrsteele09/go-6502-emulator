@@ -2,20 +2,29 @@
 
 A complete reference to the 6502 instructions, status flags, opcodes, addressing modes, sizes, and cycle counts, including common undocumented opcodes.
 
-## On this page
+## Contents
 
-| Section | Subsections |
+| Section | Description |
 |---|---|
-| [Processor status register](#processor-status-register) | Flag names, bit positions, and stack behaviour |
+| [CPU registers](#cpu-registers) | The accumulator, index registers, stack pointer, program counter, and processor status register |
 | [Addressing notation](#addressing-notation) | Operand syntax and addressing modes |
-| [Instructions: A–C](#instruction-set) | [ADC](#adc--add-with-carry) · [AND](#and--logical-and) · [ASL](#asl--arithmetic-shift-left) · [BCC](#bcc--branch-if-carry-clear) · [BCS](#bcs--branch-if-carry-set) · [BEQ](#beq--branch-if-equal) · [BIT](#bit--bit-test) · [BMI](#bmi--branch-if-minus) · [BNE](#bne--branch-if-not-equal) · [BPL](#bpl--branch-if-plus) · [BRK](#brk--software-interrupt) · [BVC](#bvc--branch-if-overflow-clear) · [BVS](#bvs--branch-if-overflow-set) · [CLC](#clc--clear-carry) · [CLD](#cld--clear-decimal-mode) · [CLI](#cli--clear-interrupt-disable) · [CLV](#clv--clear-overflow) · [CMP](#cmp--compare-accumulator) · [CPX](#cpx--compare-x-register) · [CPY](#cpy--compare-y-register) |
-| [Instructions: D–L](#instruction-set) | [DEC](#dec--decrement-memory) · [DEX](#dex--decrement-x) · [DEY](#dey--decrement-y) · [EOR](#eor--exclusive-or) · [INC](#inc--increment-memory) · [INX](#inx--increment-x) · [INY](#iny--increment-y) · [JMP](#jmp--jump) · [JSR](#jsr--jump-to-subroutine) · [LDA](#lda--load-accumulator) · [LDX](#ldx--load-x) · [LDY](#ldy--load-y) · [LSR](#lsr--logical-shift-right) |
-| [Instructions: N–S](#instruction-set) | [NOP](#nop--no-operation) · [ORA](#ora--logical-inclusive-or) · [PHA](#pha--push-accumulator) · [PHP](#php--push-processor-status) · [PLA](#pla--pull-accumulator) · [PLP](#plp--pull-processor-status) · [ROL](#rol--rotate-left) · [ROR](#ror--rotate-right) · [RTI](#rti--return-from-interrupt) · [RTS](#rts--return-from-subroutine) · [SBC](#sbc--subtract-with-carry) · [SEC](#sec--set-carry) · [SED](#sed--set-decimal-mode) · [SEI](#sei--set-interrupt-disable) · [STA](#sta--store-accumulator) · [STX](#stx--store-x) · [STY](#sty--store-y) |
-| [Instructions: T–Z](#instruction-set) | [TAX](#tax--transfer-accumulator-to-x) · [TAY](#tay--transfer-accumulator-to-y) · [TSX](#tsx--transfer-stack-pointer-to-x) · [TXA](#txa--transfer-x-to-accumulator) · [TXS](#txs--transfer-x-to-stack-pointer) · [TYA](#tya--transfer-y-to-accumulator) |
-| [Undocumented instructions: A–L](#undocumented-instructions) | [ALR](#alr--and-then-logical-shift-right-undocumented) · [ANC](#anc--and-and-copy-negative-to-carry-undocumented) · [ARR](#arr--and-then-rotate-right-undocumented) · [DCP](#dcp--decrement-then-compare-undocumented) · [DOP](#dop--two-byte-no-operation-undocumented) · [ISC](#isc--increment-then-subtract-with-carry-undocumented) · [LAX](#lax--load-accumulator-and-x-undocumented) |
-| [Undocumented instructions: N–X](#undocumented-instructions) | [NOP*](#nop--single-byte-no-operation-opcodes-undocumented) · [RLA](#rla--rotate-left-then-and-undocumented) · [RRA](#rra--rotate-right-then-add-with-carry-undocumented) · [SAX](#sax--store-a-and-x-undocumented) · [SBC*](#sbc--immediate-sbc-alias-undocumented) · [SKB](#skb--skip-byte-through-zero-page-undocumented) · [SKW](#skw--skip-byte-through-zero-pagex-undocumented) · [SLO](#slo--shift-left-then-or-undocumented) · [SRE](#sre--shift-right-then-exclusive-or-undocumented) · [TOP](#top--three-byte-no-operation-undocumented) · [XAA](#xaa--transfer-x-and-immediate-to-accumulator-undocumented) |
+| [Instructions](#instructions) | Documented instructions, status effects, opcodes, sizes, and cycle counts |
+| [Undocumented instructions](#undocumented-instructions) | Common undocumented opcodes |
 
-## Processor status register
+## CPU registers
+
+The 6502 has six programmer-visible registers:
+
+| Register | Name | Size | Purpose |
+|:---:|---|---:|---|
+| `A` | Accumulator | 8 bits | Holds operands and results for arithmetic, logic, load, store, and shift operations. |
+| `X` | X index register | 8 bits | Supplies an index for indexed addressing and can be used as a counter or temporary value. |
+| `Y` | Y index register | 8 bits | Supplies an index for indexed addressing and can be used as a counter or temporary value. |
+| `S` | Stack pointer | 8 bits | Selects the next location in the hardware stack at `$0100`–`$01FF`. |
+| `PC` | Program counter | 16 bits | Holds the address of the next instruction byte to fetch. |
+| `P` | Processor status | 8 bits | Holds the condition and control flags described below. |
+
+### Processor status register
 
 The processor status register, **P**, contains six flags. Status bytes are
 shown as `N V 1 B D I Z C`, from bit 7 to bit 0:
@@ -57,7 +66,16 @@ restores, or stacks a flag. Only flags used by the instruction are listed.
 | `($nnnn)` | Indirect | Read the jump target through a 16-bit pointer. |
 | `$relative` | Relative | A signed 8-bit displacement from the address following the instruction. |
 
-## Instruction Set
+## Instructions
+
+### Instruction index
+
+| Range | Instructions |
+|---|---|
+| A–C | [ADC](#adc--add-with-carry) · [AND](#and--logical-and) · [ASL](#asl--arithmetic-shift-left) · [BCC](#bcc--branch-if-carry-clear) · [BCS](#bcs--branch-if-carry-set) · [BEQ](#beq--branch-if-equal) · [BIT](#bit--bit-test) · [BMI](#bmi--branch-if-minus) · [BNE](#bne--branch-if-not-equal) · [BPL](#bpl--branch-if-plus) · [BRK](#brk--software-interrupt) · [BVC](#bvc--branch-if-overflow-clear) · [BVS](#bvs--branch-if-overflow-set) · [CLC](#clc--clear-carry) · [CLD](#cld--clear-decimal-mode) · [CLI](#cli--clear-interrupt-disable) · [CLV](#clv--clear-overflow) · [CMP](#cmp--compare-accumulator) · [CPX](#cpx--compare-x-register) · [CPY](#cpy--compare-y-register) |
+| D–L | [DEC](#dec--decrement-memory) · [DEX](#dex--decrement-x) · [DEY](#dey--decrement-y) · [EOR](#eor--exclusive-or) · [INC](#inc--increment-memory) · [INX](#inx--increment-x) · [INY](#iny--increment-y) · [JMP](#jmp--jump) · [JSR](#jsr--jump-to-subroutine) · [LDA](#lda--load-accumulator) · [LDX](#ldx--load-x) · [LDY](#ldy--load-y) · [LSR](#lsr--logical-shift-right) |
+| N–S | [NOP](#nop--no-operation) · [ORA](#ora--logical-inclusive-or) · [PHA](#pha--push-accumulator) · [PHP](#php--push-processor-status) · [PLA](#pla--pull-accumulator) · [PLP](#plp--pull-processor-status) · [ROL](#rol--rotate-left) · [ROR](#ror--rotate-right) · [RTI](#rti--return-from-interrupt) · [RTS](#rts--return-from-subroutine) · [SBC](#sbc--subtract-with-carry) · [SEC](#sec--set-carry) · [SED](#sed--set-decimal-mode) · [SEI](#sei--set-interrupt-disable) · [STA](#sta--store-accumulator) · [STX](#stx--store-x) · [STY](#sty--store-y) |
+| T–Z | [TAX](#tax--transfer-accumulator-to-x) · [TAY](#tay--transfer-accumulator-to-y) · [TSX](#tsx--transfer-stack-pointer-to-x) · [TXA](#txa--transfer-x-to-accumulator) · [TXS](#txs--transfer-x-to-stack-pointer) · [TYA](#tya--transfer-y-to-accumulator) |
 
 ### ADC — Add with carry
 
@@ -1106,6 +1124,13 @@ Copies Y into A and updates zero and negative.
 | `98` | Implied | `TYA` | 1 | 2 |  |
 
 ## Undocumented Instructions
+
+### Undocumented instruction index
+
+| Range | Instructions |
+|---|---|
+| A–L | [ALR](#alr--and-then-logical-shift-right-undocumented) · [ANC](#anc--and-and-copy-negative-to-carry-undocumented) · [ARR](#arr--and-then-rotate-right-undocumented) · [DCP](#dcp--decrement-then-compare-undocumented) · [DOP](#dop--two-byte-no-operation-undocumented) · [ISC](#isc--increment-then-subtract-with-carry-undocumented) · [LAX](#lax--load-accumulator-and-x-undocumented) |
+| N–X | [NOP*](#nop--single-byte-no-operation-opcodes-undocumented) · [RLA](#rla--rotate-left-then-and-undocumented) · [RRA](#rra--rotate-right-then-add-with-carry-undocumented) · [SAX](#sax--store-a-and-x-undocumented) · [SBC*](#sbc--immediate-sbc-alias-undocumented) · [SKB](#skb--skip-byte-through-zero-page-undocumented) · [SKW](#skw--skip-byte-through-zero-pagex-undocumented) · [SLO](#slo--shift-left-then-or-undocumented) · [SRE](#sre--shift-right-then-exclusive-or-undocumented) · [TOP](#top--three-byte-no-operation-undocumented) · [XAA](#xaa--transfer-x-and-immediate-to-accumulator-undocumented) |
 
 These opcodes were not specified by MOS Technology. Names are community
 conventions, some behaviours depend on the chip revision and electrical
