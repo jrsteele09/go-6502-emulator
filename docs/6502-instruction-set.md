@@ -372,15 +372,15 @@ Clears the overflow flag.
 
 ### CMP — Compare accumulator
 
-Subtracts the operand from the accumulator for flag purposes without storing the result. Carry means `A >= operand`; zero means equality.
+Subtracts the operand from the accumulator for flag purposes without storing the result. For unsigned values, carry means `A >= operand`; zero means equality.
 
 #### Status register
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `N` | Negative | Set or cleared | Set when bit 7 of the 8-bit result of A minus the operand is set; otherwise cleared. |
+| `N` | Negative | Set or cleared | Copies bit 7 of the 8-bit `A - operand` result; it is not a less-than flag. |
 | `Z` | Zero | Set or cleared | Set when A equals the operand; otherwise cleared. |
-| `C` | Carry | Set or cleared | Set when A is greater than or equal to the operand; cleared when a borrow is required. |
+| `C` | Carry | Set or cleared | For unsigned values, set when A is greater than or equal to the operand; otherwise cleared. |
 
 #### Opcodes
 
@@ -397,15 +397,15 @@ Subtracts the operand from the accumulator for flag purposes without storing the
 
 ### CPX — Compare X register
 
-Compares X with the operand without changing X. Carry means `X >= operand`; zero means equality.
+Compares X with the operand without changing X. For unsigned values, carry means `X >= operand`; zero means equality.
 
 #### Status register
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `N` | Negative | Set or cleared | Set when bit 7 of the 8-bit result of X minus the operand is set; otherwise cleared. |
+| `N` | Negative | Set or cleared | Copies bit 7 of the 8-bit `X - operand` result; it is not a less-than flag. |
 | `Z` | Zero | Set or cleared | Set when X equals the operand; otherwise cleared. |
-| `C` | Carry | Set or cleared | Set when X is greater than or equal to the operand; cleared when a borrow is required. |
+| `C` | Carry | Set or cleared | For unsigned values, set when X is greater than or equal to the operand; otherwise cleared. |
 
 #### Opcodes
 
@@ -417,15 +417,15 @@ Compares X with the operand without changing X. Carry means `X >= operand`; zero
 
 ### CPY — Compare Y register
 
-Compares Y with the operand without changing Y. Carry means `Y >= operand`; zero means equality.
+Compares Y with the operand without changing Y. For unsigned values, carry means `Y >= operand`; zero means equality.
 
 #### Status register
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `N` | Negative | Set or cleared | Set when bit 7 of the 8-bit result of Y minus the operand is set; otherwise cleared. |
+| `N` | Negative | Set or cleared | Copies bit 7 of the 8-bit `Y - operand` result; it is not a less-than flag. |
 | `Z` | Zero | Set or cleared | Set when Y equals the operand; otherwise cleared. |
-| `C` | Carry | Set or cleared | Set when Y is greater than or equal to the operand; cleared when a borrow is required. |
+| `C` | Carry | Set or cleared | For unsigned values, set when Y is greater than or equal to the operand; otherwise cleared. |
 
 #### Opcodes
 
@@ -1190,9 +1190,9 @@ Decrements memory, then compares the new value with the accumulator as CMP would
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `N` | Negative | Set or cleared | Set when bit 7 of A minus the decremented memory value is set; otherwise cleared. |
+| `N` | Negative | Set or cleared | Copies bit 7 of the 8-bit subtraction result; it is not a less-than flag. |
 | `Z` | Zero | Set or cleared | Set when A equals the decremented memory value; otherwise cleared. |
-| `C` | Carry | Set or cleared | Set when A is greater than or equal to the decremented memory value; otherwise cleared. |
+| `C` | Carry | Set or cleared | For unsigned values, set when A is greater than or equal to the decremented memory value; otherwise cleared. |
 
 #### Opcodes
 
