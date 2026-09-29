@@ -24,19 +24,19 @@ A complete reference to the 6502 instructions, status flags, opcodes, addressing
 
 ### Processor status register
 
-The processor status register, **P**, stores the `N`, `V`, `D`, `I`, `Z`, and
-`C` flags. When P is represented as an 8-bit status byte, it uses this layout:
+The processor status register, **P**, stores six flags. Its 8-bit status-byte
+layout is:
 
 | Bit | Symbol | Name | Notes |
 |---:|:---:|---|---|
-| 7 | `N` | Negative | The result of an instruction has bit 7 set. |
-| 6 | `V` | Overflow | A signed addition or subtraction cannot be represented in the range -128 to 127. |
+| 7 | `N` | Negative | Copies bit 7 of the result. |
+| 6 | `V` | Overflow | `ADC` and `SBC`: signed overflow. `BIT`: copies bit 6 of the tested memory value. |
 | 5 | — | Unused |  |
-| 4 | `B` | Break | Written as 1 in status bytes pushed by `PHP` and `BRK`. An interrupt handler can use it to distinguish `BRK` from IRQ or NMI. |
-| 3 | `D` | Decimal mode | `ADC` and `SBC` perform BCD arithmetic. |
-| 2 | `I` | Interrupt disable | IRQ interrupts are disabled. NMI is unaffected. |
-| 1 | `Z` | Zero | The instruction-defined result is zero. |
-| 0 | `C` | Carry | Addition produced a carry, subtraction required no borrow, or a shift/rotate moved out a one bit. |
+| 4 | `B` | Break | Not stored in P. `PHP` and `BRK` push B=1; IRQ and NMI push B=0. |
+| 3 | `D` | Decimal mode | `SED` sets D=1; `CLD` sets D=0. `ADC` and `SBC` use BCD when D=1 and binary when D=0. |
+| 2 | `I` | Interrupt disable | `SEI` sets I=1; `CLI` sets I=0. IRQ is disabled when I=1 and enabled when I=0; NMI is unaffected. |
+| 1 | `Z` | Zero | Set when the result is zero. |
+| 0 | `C` | Carry | Addition: carry out. Subtraction: no borrow. Shifts and rotates: bit shifted out. |
 
 ## Addressing notation
 
