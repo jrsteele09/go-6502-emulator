@@ -50,12 +50,12 @@ The assembler will continue to evolve over time, but the vision is to be compati
 ```bash
 git clone https://github.com/jrsteele09/go-6502-emulator.git
 cd go-6502-emulator
-go build -o asm6502 ./cmd/assembler
-go build -o debug6502 ./cmd/debugger
+./build.sh
 ```
 
-Place them in an appropriate location for your system and add that location to
-your command path.
+The build reads the shared version from `VERSION`, injects it into both command
+binaries, and writes them to `bin/`. Place the binaries in an appropriate
+location for your system and add that location to your command path.
 
 ## License
 

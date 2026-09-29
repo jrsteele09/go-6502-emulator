@@ -499,9 +499,9 @@ container:
 | `-o` | Output filename; defaults from the input name |
 | `-f` | Output format: `prg`, `d64`, or `t64` |
 | `-n` | Program name stored in D64 or T64 output |
-| `-v` | Print segment and output details |
+| `-verbose` | Print segment and output details |
 | `-h` | Show help |
-| `-version` | Show the assembler version |
+| `-v`, `-version` | Show the assembler version |
 
 PRG output currently accepts one segment. D64 and T64 output combine multiple
 segments into one loadable image and zero-fill gaps. D64 and T64 do not reject

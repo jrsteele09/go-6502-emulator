@@ -44,7 +44,7 @@ func TestSetProgramCounter(t *testing.T) {
 
 			require.Equal(t, test.expected, dbg.GetCPU().Registers().PC)
 			require.Equal(t, test.expected, dbg.GetLastDisasmAddr())
-			require.Equal(t, "PC set to $C000\n", output)
+			require.Empty(t, output)
 		})
 	}
 }

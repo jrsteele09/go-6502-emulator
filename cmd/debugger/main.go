@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/ergochat/readline"
 	"github.com/jrsteele09/go-6502-emulator/debugger"
+	"github.com/jrsteele09/go-6502-emulator/internal/buildinfo"
 )
 
 // ANSI color codes
@@ -50,6 +52,13 @@ func NewDebuggerRepl() (*DebuggerRepl, error) {
 }
 
 func main() {
+	showVersion := flag.Bool("version", false, "Show version")
+	flag.Parse()
+	if *showVersion {
+		fmt.Printf("6502 Debugger v%s\n", buildinfo.Version)
+		return
+	}
+
 	repl, err := NewDebuggerRepl()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialise debugger input: %v\n", err)
@@ -68,8 +77,8 @@ func main() {
 	}()
 
 	// Auto-load any files passed on the command line
-	if len(os.Args) > 1 {
-		repl.AutoLoad(os.Args[1:])
+	if flag.NArg() > 0 {
+		repl.AutoLoad(flag.Args())
 	}
 	repl.Run()
 }
@@ -122,10 +131,15 @@ func (r *DebuggerRepl) AutoLoad(files []string) {
 
 // printBanner displays the debugger banner
 func (r *DebuggerRepl) printBanner() {
+	title := fmt.Sprintf("6502 Debugger v%s", buildinfo.Version)
+	bannerWidth := max(62, len(title))
+	leftPadding := (bannerWidth - len(title)) / 2
+	rightPadding := bannerWidth - len(title) - leftPadding
+
 	fmt.Printf("%s%s", Bold, Cyan)
-	fmt.Println("╔══════════════════════════════════════════════════════════════╗")
-	fmt.Println("║                     6502 Debugger v0.6                       ║")
-	fmt.Println("╚══════════════════════════════════════════════════════════════╝")
+	fmt.Printf("╔%s╗\n", strings.Repeat("═", bannerWidth))
+	fmt.Printf("║%s%s%s║\n", strings.Repeat(" ", leftPadding), title, strings.Repeat(" ", rightPadding))
+	fmt.Printf("╚%s╝\n", strings.Repeat("═", bannerWidth))
 	fmt.Printf("%s", Reset)
 	fmt.Println()
 }

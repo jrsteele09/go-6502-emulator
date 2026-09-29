@@ -24,6 +24,12 @@ debug6502 program.prg
 debug6502 code.prg data.prg
 ```
 
+Display the version injected when the command was built:
+
+```bash
+debug6502 -version
+```
+
 Files are loaded from left to right. Each file's two-byte PRG load address
 determines where its payload is placed. After loading, the program counter is
 set to that file's load address, so with multiple files it finishes at the
@@ -46,23 +52,33 @@ The prompt refreshes after every command, so changes made by stepping, running,
 loading a program, or assigning PC are immediately visible. An unrecognised
 opcode is shown as `???`.
 
-Commands and their long-form names are case-insensitive. The prompt provides
-shell-style line editing:
+Commands and their long-form names are case-insensitive. The prompt keeps up
+to 500 commands in memory for the current session and provides these editing
+keys:
 
-- Up and Down browse earlier and later command history.
-- Left and Right move within the current line.
-- Home and End, or Ctrl+A and Ctrl+E, jump to the beginning and end.
-- Option+Left and Option+Right move one word in terminals configured for
-  standard readline or "natural text editing" sequences; Alt+B and Alt+F are
-  reliable equivalents.
-- Ctrl+R searches command history.
-- Ctrl+W deletes the preceding word; Ctrl+U and Ctrl+K delete to the beginning
-  and end of the line.
+| Key | Action |
+| --- | --- |
+| Up or Ctrl+P | Show the previous command in history. |
+| Down or Ctrl+N | Show the next command in history. |
+| Left or Ctrl+B | Move left one character. |
+| Right or Ctrl+F | Move right one character. |
+| Home or Ctrl+A | Move to the beginning of the line. |
+| End or Ctrl+E | Move to the end of the line. |
+| Option/Alt+Left or Alt+B | Move left one word. |
+| Option/Alt+Right or Alt+F | Move right one word. |
+| Ctrl+R | Search backwards through command history. |
+| Ctrl+W | Delete the preceding word. |
+| Ctrl+U | Delete to the beginning of the line. |
+| Ctrl+K | Delete to the end of the line. |
 
 macOS Command+Arrow behavior is controlled by the terminal emulator. It works
 when the terminal maps those shortcuts to Home/End or Ctrl+A/Ctrl+E; otherwise
 use those portable bindings directly. Pressing Enter on an empty line repeats
 the last non-empty command.
+
+Debugger output is separated from the command and the following prompt by a
+blank line. A `PC` assignment is the exception: it produces no status message
+and the next prompt immediately shows the instruction at the new address.
 
 Addresses accept either `$`-prefixed hexadecimal or unsigned decimal:
 
@@ -105,6 +121,7 @@ Load a PRG after entering the debugger:
 
 ```text
 . $0000: 00         BRK > L program.prg
+
 Loaded PRG file: program.prg
   Segment 1: $1000 to $100A (11 bytes)
 Total: 11 bytes loaded
@@ -121,7 +138,7 @@ Use `R` to display all registers:
 
 ```text
 . $1000: A9 42      LDA #$42 > R
-Registers:
+
   A: $00  X: $00  Y: $00  PC: $1000  S: $FF
   Flags: $24 (%00100100) (..1..I..)  NV1BDIZC
 ```
@@ -147,15 +164,17 @@ PC=$C000
 ```
 
 Spaces around the equals sign are optional. `PC $C000` and decimal addresses
-such as `PC=49152` are also accepted. Setting PC also resets the implicit
-starting position used by the next `D` command. There is currently no command
-for directly changing the other registers or flags.
+such as `PC=49152` are also accepted. The command prints no confirmation;
+the updated address and instruction appear in the next prompt. Setting PC also
+resets the implicit starting position used by the next `D` command. There is
+currently no command for directly changing the other registers or flags.
 
 For a column-oriented view with full names, use `RV` or `RD`. The forms
-`R VERBOSE` and `R DESCRIPTIVE` are also accepted:
+`R V`, `R D`, `R VERBOSE`, `R DESCRIPTIVE`, and `R DETAILED` are also
+accepted:
 
 ```text
-Registers (descriptive):
+Registers:
   Accumulator          A    $80  (128)
   X index register     X    $10  (16)
   Y index register     Y    $20  (32)
@@ -233,8 +252,9 @@ Execute several instructions:
 S 5
 ```
 
-Each completed step shows the instruction and the registers after it executes.
-During a multi-step command, execution stops early if the resulting PC has a
+A single step shows the registers after the instruction executes. A multi-step
+command additionally prefixes each instruction with `Step n:` before showing
+its resulting registers. Execution stops early if the resulting PC has a
 breakpoint.
 
 Like `G`, `S` stops before executing `BRK` or a top-level `RTS` reached with an
@@ -346,16 +366,41 @@ Inspect the program, stop at the loop, and step through an iteration:
 
 ```text
 . $1000: A9 42      LDA #$42 > D $1000 6
+
+> $1000: A9 42      LDA #$42
+  $1002: 8D 00 02   STA $0200
+  $1005: A2 03      LDX #$03
+  $1007: CA         DEX
+  $1008: D0 FD      BNE $1007
+  $100A: 00         BRK
+
 . $1000: A9 42      LDA #$42 > B $1007
+
+Breakpoint set at $1007
+
 . $1000: A9 42      LDA #$42 > G
+
+Running from $1000... (Ctrl+C to stop)
+
 Breakpoint hit at $1007
 Next: $1007: CA         DEX
 
 . $1007: CA         DEX > R
+
+  A: $42  X: $03  Y: $00  PC: $1007  S: $FF
+  Flags: $24 (%00100100) (..1..I..)  NV1BDIZC
+
 . $1007: CA         DEX > S
-. $1008: D0 FD      BNE $1007 > R
+
+  A: $42  X: $02  Y: $00  PC: $1008  S: $FF
+  Flags: $24 (%00100100) (..1..I..)  NV1BDIZC
+
 . $1008: D0 FD      BNE $1007 > G
+
+Running from $1008... (Ctrl+C to stop)
+
 Breakpoint hit at $1007
+Next: $1007: CA         DEX
 ```
 
 Examine the value written by `STA $0200`:

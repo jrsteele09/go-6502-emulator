@@ -28,7 +28,7 @@ Select another output format or filename:
 ./asm6502 -i program.asm -o program.prg
 ./asm6502 -i program.asm -f d64 -n PROGRAM
 ./asm6502 -i program.asm -f t64 -n PROGRAM
-./asm6502 -i program.asm -v
+./asm6502 -i program.asm -verbose
 ```
 
 The available options are:
@@ -39,9 +39,9 @@ The available options are:
 | `-o` | Output filename |
 | `-f` | Output format: `prg`, `d64`, or `t64` |
 | `-n` | Program name stored in D64 or T64 output |
-| `-v` | Print segment and output details |
+| `-verbose` | Print segment and output details |
 | `-h` | Show command help |
-| `-version` | Show the assembler version |
+| `-v`, `-version` | Show the assembler version |
 
 ```mermaid
 flowchart LR

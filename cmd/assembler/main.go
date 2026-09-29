@@ -10,27 +10,27 @@ import (
 	"github.com/jrsteele09/go-6502-emulator/assembler"
 	"github.com/jrsteele09/go-6502-emulator/assembler/output"
 	"github.com/jrsteele09/go-6502-emulator/cpu"
+	"github.com/jrsteele09/go-6502-emulator/internal/buildinfo"
 	"github.com/jrsteele09/go-6502-emulator/memory"
 	"github.com/jrsteele09/go-6502-emulator/utils"
 )
 
-const (
-	version = "0.6"
-)
-
 func main() {
+	var showVersion bool
+
 	var (
 		inputFile    = flag.String("i", "", "Input assembly file (required)")
 		outputFile   = flag.String("o", "", "Output file (default: input filename with appropriate extension)")
 		outputFormat = flag.String("f", "prg", "Output format: prg, d64, or t64 (default: prg)")
 		programName  = flag.String("n", "", "Program name for D64/T64 formats (default: derived from output filename)")
 		showHelp     = flag.Bool("h", false, "Show help")
-		showVer      = flag.Bool("version", false, "Show version")
-		verbose      = flag.Bool("v", false, "Verbose output")
+		verbose      = flag.Bool("verbose", false, "Verbose output")
 	)
+	flag.BoolVar(&showVersion, "v", false, "Show version")
+	flag.BoolVar(&showVersion, "version", false, "Show version")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "6502 Assembler v%s\n\n", version)
+		fmt.Fprintf(os.Stderr, "6502 Assembler v%s\n\n", buildinfo.Version)
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] -i <input.asm>\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
@@ -42,7 +42,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  %s -i game.asm                    # Output to game.prg\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -i game.asm -f d64             # Output to game.d64\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -i game.asm -o disk.d64 -f d64 # Output to disk.d64\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -i game.asm -f t64 -v          # Output to game.t64 with verbose\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -i game.asm -f t64 -verbose    # Output to game.t64 with verbose output\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -i game.asm -f d64 -n MYGAME   # D64 with custom program name\n", os.Args[0])
 	}
 
@@ -53,8 +53,8 @@ func main() {
 		os.Exit(0)
 	}
 
-	if *showVer {
-		fmt.Printf("6502 Assembler v%s\n", version)
+	if showVersion {
+		fmt.Printf("6502 Assembler v%s\n", buildinfo.Version)
 		os.Exit(0)
 	}
 
@@ -86,7 +86,7 @@ func main() {
 	}
 
 	if *verbose {
-		fmt.Printf("6502 Assembler v%s\n", version)
+		fmt.Printf("6502 Assembler v%s\n", buildinfo.Version)
 		fmt.Printf("Input file:    %s\n", *inputFile)
 		fmt.Printf("Output file:   %s\n", *outputFile)
 		fmt.Printf("Output format: %s\n", strings.ToUpper(*outputFormat))
