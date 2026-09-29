@@ -20,7 +20,7 @@ A complete reference to the 6502 instructions, status flags, opcodes, addressing
 | `Y` | Y index register | 8 bits | Supplies an index for indexed addressing and can be used as a counter or temporary value. |
 | `S` | Stack pointer | 8 bits | Selects the next location in the hardware stack at `$0100`–`$01FF`. |
 | `PC` | Program counter | 16 bits | Holds the address of the next instruction byte to fetch. |
-| `P` | Processor status | 8 bits | Holds the condition and control flags described below. |
+| `P` | Processor status | 8 bits | Holds the condition and control flags. |
 
 ### Processor status register
 
@@ -29,24 +29,18 @@ shown as `N V 1 B D I Z C`, from bit 7 to bit 0:
 
 | Bit | Symbol | Name | Set (`1`) when |
 |---:|:---:|---|---|
-| 7 | `N` | Negative | The instruction-defined result has bit 7 set. |
-| 6 | `V` | Overflow | A signed addition or subtraction cannot be represented in the range -128 to 127, or `BIT` copied a set operand bit 6. |
-| 5 | `1` | Reserved | Set in a status byte written to the stack. It is not a writable flag. |
-| 4 | `B` | Break marker | The stacked status came from `BRK` or `PHP`. It is not a flag stored in P. |
-| 3 | `D` | Decimal mode | `ADC` and `SBC` perform packed-BCD arithmetic. |
-| 2 | `I` | Interrupt disable | Maskable IRQ recognition is disabled. NMI is unaffected. |
+| 7 | `N` | Negative | The result of an instruction has bit 7 set. |
+| 6 | `V` | Overflow | A signed addition or subtraction cannot be represented in the range -128 to 127. |
+| 5 | `1` | Reserved | Unused |
+| 4 | `B` | Break marker | The stacked status came from `BRK` or `PHP`. |
+| 3 | `D` | Decimal mode | `ADC` and `SBC` perform BCD arithmetic. |
+| 2 | `I` | Interrupt disable | IRQ interrupts are disabled. NMI is unaffected. |
 | 1 | `Z` | Zero | The instruction-defined result is zero. |
 | 0 | `C` | Carry | Addition produced a carry, subtraction required no borrow, or a shift/rotate moved out a one bit. |
 
-Only `N`, `V`, `D`, `I`, `Z`, and `C` are stored flags. `B` identifies a
-status byte pushed by `BRK` or `PHP`; bit 5 is also set in a pushed status
-byte. Neither bit is a stored flag.
-
-Every instruction has a status table immediately above its opcode table. The
-**Action** column says whether the instruction checks, sets or clears,
-restores, or stacks a flag. Only flags used by the instruction are listed.
-
 ## Addressing notation
+
+The instruction tables use the following notation for operands and addressing modes:
 
 | Notation | Addressing mode | Meaning |
 |---|---|---|
