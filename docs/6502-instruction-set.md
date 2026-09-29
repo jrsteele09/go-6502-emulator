@@ -32,8 +32,8 @@ layout is:
 | 7 | `N` | Negative | Records bit 7 of the result or tested value. |
 | 6 | `V` | Overflow | Records signed arithmetic overflow or bit 6 of the tested value. |
 | 5 | — | Unused |  |
-| 4 | `B` | Break | Never set int he status register. `PHP` and `BRK` push B=1; IRQ and NMI push B=0 when they push to the stack. |
-| 3 | `D` | Decimal mode | `SED` sets D=1; `CLD` sets D=0. `ADC` and `SBC` use BCD when D=1 and binary when D=0. |
+| 4 | `B` | Break | Never set in the status register. `PHP` and `BRK` push B=1; IRQ and NMI push B=0 when they push to the stack. |
+| 3 | `D` | Decimal mode | `SED` sets D=1; `CLD` sets D=0. When D=1, `ADC` and `SBC` treat each byte as two decimal digits; D=0 selects binary arithmetic. |
 | 2 | `I` | Interrupt disable | `SEI` sets I=1; `CLI` sets I=0. IRQ is disabled when I=1 and enabled when I=0; NMI is unaffected. |
 | 1 | `Z` | Zero | Records whether the instruction-defined result is zero. |
 | 0 | `C` | Carry | Addition: carry out. Subtraction: no borrow. Shifts and rotates: bit shifted out. |
@@ -71,16 +71,16 @@ The instruction tables use the following notation for operands and addressing mo
 
 ### ADC — Add with carry
 
-Adds the operand and the carry flag to the accumulator. It updates carry, zero, negative, and overflow; decimal mode uses BCD arithmetic.
+Adds the operand and the carry flag to the accumulator. It updates carry, zero, negative, and overflow; decimal mode treats each byte as two decimal digits.
 
 #### Status register
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `N` | Negative | Set or cleared | Binary mode: copies result bit 7. Decimal mode: copies bit 7 before the upper BCD digit is corrected. |
-| `V` | Overflow | Set or cleared | Binary mode: set when same-sign values produce an opposite-sign result. Decimal mode: calculated before the upper BCD digit is corrected. |
-| `D` | Decimal mode | Checked | Selects packed-BCD arithmetic when set and binary arithmetic when clear. |
-| `Z` | Zero | Set or cleared | Set when the binary sum before BCD correction is zero. |
+| `N` | Negative | Set or cleared | Binary mode: copies result bit 7. Decimal mode: copies bit 7 before the upper decimal digit is corrected. |
+| `V` | Overflow | Set or cleared | Binary mode: set when same-sign values produce an opposite-sign result. Decimal mode: calculated before the upper decimal digit is corrected. |
+| `D` | Decimal mode | Checked | Selects decimal-digit arithmetic when set and binary arithmetic when clear. |
+| `Z` | Zero | Set or cleared | Set when the binary sum before decimal correction is zero. |
 | `C` | Carry | Checked, then set or cleared | Its old value is added to A and the operand. Its new value is set when the unsigned sum produces a carry; in decimal mode it is the decimal carry. |
 
 #### Opcodes
@@ -881,16 +881,16 @@ Pulls the saved address from the stack, adds one, and loads the result into the 
 
 ### SBC — Subtract with carry
 
-Subtracts the operand and inverse carry from the accumulator. It updates carry, zero, negative, and overflow; decimal mode uses BCD arithmetic.
+Subtracts the operand and inverse carry from the accumulator. It updates carry, zero, negative, and overflow; decimal mode treats each byte as two decimal digits.
 
 #### Status register
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `N` | Negative | Set or cleared | Copies bit 7 of the binary difference before BCD correction. |
+| `N` | Negative | Set or cleared | Copies bit 7 of the binary difference before decimal correction. |
 | `V` | Overflow | Set or cleared | Set when opposite-sign values produce a binary difference whose sign differs from A. |
-| `D` | Decimal mode | Checked | Selects packed-BCD arithmetic when set and binary arithmetic when clear. |
-| `Z` | Zero | Set or cleared | Set when the binary difference before BCD correction is zero. |
+| `D` | Decimal mode | Checked | Selects decimal-digit arithmetic when set and binary arithmetic when clear. |
+| `Z` | Zero | Set or cleared | Set when the binary difference before decimal correction is zero. |
 | `C` | Carry | Checked, then set or cleared | A set old Carry means no incoming borrow; a clear old Carry subtracts one extra. The new Carry is set when no borrow is required. |
 
 #### Opcodes
@@ -924,13 +924,13 @@ Sets the carry flag.
 
 ### SED — Set decimal mode
 
-Sets the decimal flag, selecting BCD arithmetic for ADC and SBC.
+Sets the decimal flag so `ADC` and `SBC` treat each byte as two decimal digits.
 
 #### Status register
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `D` | Decimal mode | Set | Forced to one, selecting packed-BCD arithmetic for ADC and SBC. |
+| `D` | Decimal mode | Set | Set to 1, making `ADC` and `SBC` treat each byte as two decimal digits. |
 
 #### Opcodes
 
@@ -1230,10 +1230,10 @@ Increments memory, then subtracts the new value from the accumulator as `SBC` wo
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `N` | Negative | Set or cleared | Copies bit 7 of the binary difference before BCD correction. |
+| `N` | Negative | Set or cleared | Copies bit 7 of the binary difference before decimal correction. |
 | `V` | Overflow | Set or cleared | Set when A and the incremented memory value have opposite signs and the binary difference's sign differs from A. |
 | `D` | Decimal mode | Checked | Selects decimal or binary subtraction. |
-| `Z` | Zero | Set or cleared | Set when the binary difference before BCD correction is zero. |
+| `Z` | Zero | Set or cleared | Set when the binary difference before decimal correction is zero. |
 | `C` | Carry | Checked, then set or cleared | Used and updated as by SBC; set after the subtraction when no borrow is required. |
 
 #### Opcodes
@@ -1318,10 +1318,10 @@ Rotates memory right through carry, then adds the new memory value to the accumu
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `N` | Negative | Set or cleared | Binary mode: copies result bit 7. Decimal mode: copies bit 7 before the upper BCD digit is corrected. |
-| `V` | Overflow | Set or cleared | Binary mode: set when A and the rotated memory value have the same sign and the result has the opposite sign. Decimal mode: calculated before the upper BCD digit is corrected. |
+| `N` | Negative | Set or cleared | Binary mode: copies result bit 7. Decimal mode: copies bit 7 before the upper decimal digit is corrected. |
+| `V` | Overflow | Set or cleared | Binary mode: set when A and the rotated memory value have the same sign and the result has the opposite sign. Decimal mode: calculated before the upper decimal digit is corrected. |
 | `D` | Decimal mode | Checked | Selects decimal or binary addition. |
-| `Z` | Zero | Set or cleared | Set when the binary sum before BCD correction is zero. |
+| `Z` | Zero | Set or cleared | Set when the binary sum before decimal correction is zero. |
 | `C` | Carry | Checked, then set or cleared | The old Carry enters memory bit 7; the original memory bit 0 becomes ADC's carry-in, and ADC produces the final Carry. |
 
 #### Opcodes
@@ -1363,10 +1363,10 @@ Performs the same immediate subtract-with-carry operation as opcode `E9`.
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `N` | Negative | Set or cleared | Copies bit 7 of the binary difference before BCD correction. |
+| `N` | Negative | Set or cleared | Copies bit 7 of the binary difference before decimal correction. |
 | `V` | Overflow | Set or cleared | Set when opposite-sign values produce a binary difference whose sign differs from A. |
-| `D` | Decimal mode | Checked | Selects packed-BCD arithmetic when set and binary arithmetic when clear. |
-| `Z` | Zero | Set or cleared | Set when the binary difference before BCD correction is zero. |
+| `D` | Decimal mode | Checked | Selects decimal-digit arithmetic when set and binary arithmetic when clear. |
+| `Z` | Zero | Set or cleared | Set when the binary difference before decimal correction is zero. |
 | `C` | Carry | Checked, then set or cleared | A set old Carry means no incoming borrow; a clear old Carry subtracts one extra. The new Carry is set when no borrow is required. |
 
 #### Opcodes
