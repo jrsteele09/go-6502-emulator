@@ -29,8 +29,8 @@ layout is:
 
 | Bit | Symbol | Name | Notes |
 |---:|:---:|---|---|
-| 7 | `N` | Negative | Copies bit 7 of the result. |
-| 6 | `V` | Overflow | `ADC` and `SBC`: signed overflow. `BIT`: copies bit 6 of the tested memory value. |
+| 7 | `N` | Negative | Records bit 7 of the result or tested value. |
+| 6 | `V` | Overflow | Records signed arithmetic overflow or bit 6 of the tested value. |
 | 5 | — | Unused |  |
 | 4 | `B` | Break | Not stored in P. `PHP` and `BRK` push B=1; IRQ and NMI push B=0. |
 | 3 | `D` | Decimal mode | `SED` sets D=1; `CLD` sets D=0. `ADC` and `SBC` use BCD when D=1 and binary when D=0. |
