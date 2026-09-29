@@ -35,7 +35,7 @@ layout is:
 | 4 | `B` | Break | Not stored in P. `PHP` and `BRK` push B=1; IRQ and NMI push B=0. |
 | 3 | `D` | Decimal mode | `SED` sets D=1; `CLD` sets D=0. `ADC` and `SBC` use BCD when D=1 and binary when D=0. |
 | 2 | `I` | Interrupt disable | `SEI` sets I=1; `CLI` sets I=0. IRQ is disabled when I=1 and enabled when I=0; NMI is unaffected. |
-| 1 | `Z` | Zero | Set when the result is zero. |
+| 1 | `Z` | Zero | Records whether the instruction-defined result is zero. |
 | 0 | `C` | Carry | Addition: carry out. Subtraction: no borrow. Shifts and rotates: bit shifted out. |
 
 ## Addressing notation
@@ -77,10 +77,10 @@ Adds the operand and the carry flag to the accumulator. It updates carry, zero, 
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `N` | Negative | Set or cleared | In binary mode, copies bit 7 of the 8-bit result. In decimal mode it comes from an intermediate binary result. |
-| `V` | Overflow | Set or cleared | In binary mode, set when two inputs with the same sign produce a result with the opposite sign. Decimal-mode results come from an intermediate binary result. |
+| `N` | Negative | Set or cleared | Binary mode: copies result bit 7. Decimal mode: copies bit 7 before the upper BCD digit is corrected. |
+| `V` | Overflow | Set or cleared | Binary mode: set when same-sign values produce an opposite-sign result. Decimal mode: calculated before the upper BCD digit is corrected. |
 | `D` | Decimal mode | Checked | Selects packed-BCD arithmetic when set and binary arithmetic when clear. |
-| `Z` | Zero | Set or cleared | In binary mode, set when the 8-bit result is zero. In decimal mode it comes from an intermediate binary result. |
+| `Z` | Zero | Set or cleared | Set when the binary sum before BCD correction is zero. |
 | `C` | Carry | Checked, then set or cleared | Its old value is added to A and the operand. Its new value is set when the unsigned sum produces a carry; in decimal mode it is the decimal carry. |
 
 #### Opcodes
@@ -887,10 +887,10 @@ Subtracts the operand and inverse carry from the accumulator. It updates carry, 
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `N` | Negative | Set or cleared | In binary mode, copies bit 7 of the 8-bit result. In decimal mode it comes from an intermediate binary result. |
-| `V` | Overflow | Set or cleared | In binary mode, set when A and the operand have different signs and the result's sign differs from A. Decimal-mode results come from an intermediate binary result. |
+| `N` | Negative | Set or cleared | Copies bit 7 of the binary difference before BCD correction. |
+| `V` | Overflow | Set or cleared | Set when opposite-sign values produce a binary difference whose sign differs from A. |
 | `D` | Decimal mode | Checked | Selects packed-BCD arithmetic when set and binary arithmetic when clear. |
-| `Z` | Zero | Set or cleared | In binary mode, set when the 8-bit result is zero. In decimal mode it comes from an intermediate binary result. |
+| `Z` | Zero | Set or cleared | Set when the binary difference before BCD correction is zero. |
 | `C` | Carry | Checked, then set or cleared | A set old Carry means no incoming borrow; a clear old Carry subtracts one extra. The new Carry is set when no borrow is required. |
 
 #### Opcodes
@@ -1136,7 +1136,7 @@ ANDs an immediate value with the accumulator, shifts the result right, and store
 |:---:|---|---|---|
 | `N` | Negative | Cleared | Always cleared because the final right shift inserts zero into A bit 7. |
 | `Z` | Zero | Set or cleared | Set when the final A value is zero; otherwise cleared. |
-| `C` | Carry | Set or cleared | Receives bit 0 of the intermediate A AND operand value. |
+| `C` | Carry | Set or cleared | Receives bit 0 of `A AND operand` before the shift. |
 
 #### Opcodes
 
@@ -1230,10 +1230,10 @@ Increments memory, then subtracts the new value from the accumulator as `SBC` wo
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `N` | Negative | Set or cleared | In binary mode, copies bit 7 of A after subtracting the incremented memory value. In decimal mode it comes from an intermediate binary result. |
-| `V` | Overflow | Set or cleared | In binary mode, set when A and the incremented memory value have different signs and the result's sign differs from A. |
+| `N` | Negative | Set or cleared | Copies bit 7 of the binary difference before BCD correction. |
+| `V` | Overflow | Set or cleared | Set when A and the incremented memory value have opposite signs and the binary difference's sign differs from A. |
 | `D` | Decimal mode | Checked | Selects decimal or binary subtraction. |
-| `Z` | Zero | Set or cleared | In binary mode, set when A after the subtraction is zero. In decimal mode it comes from an intermediate binary result. |
+| `Z` | Zero | Set or cleared | Set when the binary difference before BCD correction is zero. |
 | `C` | Carry | Checked, then set or cleared | Used and updated as by SBC; set after the subtraction when no borrow is required. |
 
 #### Opcodes
@@ -1318,10 +1318,10 @@ Rotates memory right through carry, then adds the new memory value to the accumu
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `N` | Negative | Set or cleared | In binary mode, copies bit 7 of A after adding the rotated memory value. In decimal mode it comes from an intermediate binary result. |
-| `V` | Overflow | Set or cleared | In binary mode, set when A and the rotated memory value have the same sign and the result has the opposite sign. |
+| `N` | Negative | Set or cleared | Binary mode: copies result bit 7. Decimal mode: copies bit 7 before the upper BCD digit is corrected. |
+| `V` | Overflow | Set or cleared | Binary mode: set when A and the rotated memory value have the same sign and the result has the opposite sign. Decimal mode: calculated before the upper BCD digit is corrected. |
 | `D` | Decimal mode | Checked | Selects decimal or binary addition. |
-| `Z` | Zero | Set or cleared | In binary mode, set when A after the addition is zero. In decimal mode it comes from an intermediate binary result. |
+| `Z` | Zero | Set or cleared | Set when the binary sum before BCD correction is zero. |
 | `C` | Carry | Checked, then set or cleared | The old Carry enters memory bit 7; the original memory bit 0 becomes ADC's carry-in, and ADC produces the final Carry. |
 
 #### Opcodes
@@ -1363,10 +1363,10 @@ Performs the same immediate subtract-with-carry operation as opcode `E9`.
 
 | Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `N` | Negative | Set or cleared | In binary mode, copies bit 7 of the 8-bit result. In decimal mode it comes from an intermediate binary result. |
-| `V` | Overflow | Set or cleared | In binary mode, set when A and the operand have different signs and the result's sign differs from A. Decimal-mode results come from an intermediate binary result. |
+| `N` | Negative | Set or cleared | Copies bit 7 of the binary difference before BCD correction. |
+| `V` | Overflow | Set or cleared | Set when opposite-sign values produce a binary difference whose sign differs from A. |
 | `D` | Decimal mode | Checked | Selects packed-BCD arithmetic when set and binary arithmetic when clear. |
-| `Z` | Zero | Set or cleared | In binary mode, set when the 8-bit result is zero. In decimal mode it comes from an intermediate binary result. |
+| `Z` | Zero | Set or cleared | Set when the binary difference before BCD correction is zero. |
 | `C` | Carry | Checked, then set or cleared | A set old Carry means no incoming borrow; a clear old Carry subtracts one extra. The new Carry is set when no borrow is required. |
 
 #### Opcodes
