@@ -27,7 +27,7 @@ A complete reference to the 6502 instructions, status flags, opcodes, addressing
 The processor status register, **P**, contains six flags. Status bytes are
 shown as `N V 1 B D I Z C`, from bit 7 to bit 0:
 
-| Bit | Symbol | Name | notes |
+| Bit | Symbol | Name | Notes |
 |---:|:---:|---|---|
 | 7 | `N` | Negative | The result of an instruction has bit 7 set. |
 | 6 | `V` | Overflow | A signed addition or subtraction cannot be represented in the range -128 to 127. |
