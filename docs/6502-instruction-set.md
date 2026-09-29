@@ -865,7 +865,7 @@ Pulls status and the program counter from the stack, resuming the interrupted pr
 
 ### RTS — Return from subroutine
 
-Pulls the saved address from the stack, adds one, and resumes after the corresponding JSR.
+Pulls the saved address from the stack, adds one, and loads the result into the program counter.
 
 #### Status register
 
