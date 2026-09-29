@@ -76,7 +76,7 @@ Instruction mnemonics are case-insensitive.
 | Indirect | `jmp ($c000)` |
 | Relative | `bne loop` |
 
-An immediate operand must be from -128 through 255 and always emits one byte.
+An immediate operand always emits one byte.
 For a non-immediate numeric expression, values from -128 through 255 select an
 8-bit operand and values from -32768 through 65535 select a 16-bit operand. An
 8-bit address operand is only valid when the instruction has a matching
