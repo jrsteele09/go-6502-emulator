@@ -112,8 +112,7 @@ func brk(p *CPU, _ *OpCodeDef) (Completed, error) {
 	p.Reg.PC++
 	p.Push(byte(p.Reg.PC >> 8))
 	p.Push(byte(p.Reg.PC))
-	p.Reg.SetStatus(BreakFlag, true)
-	p.Push(p.Reg.Status | byte(BreakFlag) | byte(UnusedFlag))
+	p.Push(p.Reg.StatusForStack(true))
 	p.Reg.SetStatus(InterruptDisableFlag, true)
 	low := p.mem.Read(irqVector)
 	high := p.mem.Read(irqVector + 1)
@@ -293,7 +292,7 @@ func ora(p *CPU, opcode *OpCodeDef) (Completed, error) {
 
 func pha(p *CPU, _ *OpCodeDef) (Completed, error) { p.Push(p.Reg.A); return true, nil }
 func php(p *CPU, _ *OpCodeDef) (Completed, error) {
-	p.Push(p.Reg.Status | byte(BreakFlag) | byte(UnusedFlag))
+	p.Push(p.Reg.StatusForStack(true))
 	return true, nil
 }
 func pla(p *CPU, _ *OpCodeDef) (Completed, error) {
@@ -302,7 +301,10 @@ func pla(p *CPU, _ *OpCodeDef) (Completed, error) {
 	p.Reg.SetNegativeFlag(p.Reg.A)
 	return true, nil
 }
-func plp(p *CPU, _ *OpCodeDef) (Completed, error) { p.Reg.Status = p.Pop(); return true, nil }
+func plp(p *CPU, _ *OpCodeDef) (Completed, error) {
+	p.Reg.RestoreStatus(p.Pop())
+	return true, nil
+}
 
 func rol(p *CPU, opcode *OpCodeDef) (Completed, error) {
 	b, completed := loadOperand(p, opcode, true)
@@ -338,10 +340,9 @@ func ror(p *CPU, opcode *OpCodeDef) (Completed, error) {
 }
 
 func rti(p *CPU, _ *OpCodeDef) (Completed, error) {
-	p.Reg.Status = p.Pop()
+	p.Reg.RestoreStatus(p.Pop())
 	low, high := p.Pop(), p.Pop()
 	p.Reg.PC = uint16(low) | uint16(high)<<8
-	p.Reg.SetStatus(BreakFlag, false)
 	return true, nil
 }
 func rts(p *CPU, _ *OpCodeDef) (Completed, error) {

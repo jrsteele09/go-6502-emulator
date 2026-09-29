@@ -24,15 +24,15 @@ A complete reference to the 6502 instructions, status flags, opcodes, addressing
 
 ### Processor status register
 
-The processor status register, **P**, contains six flags. Status bytes are
-shown as `N V 1 B D I Z C`, from bit 7 to bit 0:
+The processor status register, **P**, stores the `N`, `V`, `D`, `I`, `Z`, and
+`C` flags. When P is represented as an 8-bit status byte, it uses this layout:
 
 | Bit | Symbol | Name | Notes |
 |---:|:---:|---|---|
 | 7 | `N` | Negative | The result of an instruction has bit 7 set. |
 | 6 | `V` | Overflow | A signed addition or subtraction cannot be represented in the range -128 to 127. |
-| 5 | `1` | Reserved | Unused |
-| 4 | `B` | Break marker | The stacked status came from `BRK` or `PHP`. |
+| 5 | — | Unused |  |
+| 4 | `B` | Break | Written as 1 in status bytes pushed by `PHP` and `BRK`. An interrupt handler can use it to distinguish `BRK` from IRQ or NMI. |
 | 3 | `D` | Decimal mode | `ADC` and `SBC` perform BCD arithmetic. |
 | 2 | `I` | Interrupt disable | IRQ interrupts are disabled. NMI is unaffected. |
 | 1 | `Z` | Zero | The instruction-defined result is zero. |
@@ -75,7 +75,7 @@ Adds the operand and the carry flag to the accumulator. It updates carry, zero, 
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | In binary mode, copies bit 7 of the 8-bit result. In decimal mode it comes from an intermediate binary result. |
 | `V` | Overflow | Set or cleared | In binary mode, set when two inputs with the same sign produce a result with the opposite sign. Decimal-mode results come from an intermediate binary result. |
@@ -102,7 +102,7 @@ ANDs the operand with the accumulator and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the new A value has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the new A value is zero; otherwise cleared. |
@@ -126,7 +126,7 @@ Shifts the accumulator or memory left by one bit. Bit 7 moves into carry and zer
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Copies bit 7 of the shifted result. |
 | `Z` | Zero | Set or cleared | Set when the shifted result is zero; otherwise cleared. |
@@ -148,7 +148,7 @@ Branches when the carry flag is clear.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `C` | Carry | Checked | The branch is taken when Carry is clear. |
 
@@ -164,7 +164,7 @@ Branches when the carry flag is set.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `C` | Carry | Checked | The branch is taken when Carry is set. |
 
@@ -180,7 +180,7 @@ Branches when the zero flag is set.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `Z` | Zero | Checked | The branch is taken when Zero is set. |
 
@@ -196,7 +196,7 @@ Tests the accumulator against memory without changing either value. Zero reflect
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Copies bit 7 of the memory operand. |
 | `V` | Overflow | Set or cleared | Copies bit 6 of the memory operand. |
@@ -215,7 +215,7 @@ Branches when the negative flag is set.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Checked | The branch is taken when Negative is set. |
 
@@ -231,7 +231,7 @@ Branches when the zero flag is clear.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `Z` | Zero | Checked | The branch is taken when Zero is clear. |
 
@@ -247,7 +247,7 @@ Branches when the negative flag is clear.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Checked | The branch is taken when Negative is clear. |
 
@@ -259,14 +259,13 @@ Branches when the negative flag is clear.
 
 ### BRK — Software interrupt
 
-Pushes the address following `BRK`'s padding byte and a status byte, sets interrupt disable, and loads the IRQ/BRK vector from `$FFFE-$FFFF`. The pushed status has its break marker set.
+Pushes the address following `BRK`'s padding byte and a status byte, sets interrupt disable, and loads the IRQ/BRK vector from `$FFFE-$FFFF`. The pushed status byte has `B` set to 1.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `1` | Reserved stack bit | Stacked as 1 | Bit 5 is set in the status byte pushed to the stack; it is not a stored flag. |
-| `B` | Break marker | Stacked as 1 | Marks the pushed status byte as coming from BRK; it is not a stored flag. |
+| `P` | Processor status | Pushed | Writes a status byte to the stack with `B` set to 1. |
 | `I` | Interrupt disable | Set | Set after the status byte is pushed, preventing maskable IRQ recognition. |
 
 #### Opcodes
@@ -281,7 +280,7 @@ Branches when the overflow flag is clear.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `V` | Overflow | Checked | The branch is taken when Overflow is clear. |
 
@@ -297,7 +296,7 @@ Branches when the overflow flag is set.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `V` | Overflow | Checked | The branch is taken when Overflow is set. |
 
@@ -313,7 +312,7 @@ Clears the carry flag.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `C` | Carry | Cleared | Forced to zero. |
 
@@ -329,7 +328,7 @@ Clears the decimal flag, selecting binary arithmetic for ADC and SBC.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `D` | Decimal mode | Cleared | Forced to zero, selecting binary arithmetic for ADC and SBC. |
 
@@ -345,7 +344,7 @@ Clears the interrupt-disable flag, allowing an asserted IRQ line to be serviced 
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `I` | Interrupt disable | Cleared | Forced to zero, allowing maskable IRQ recognition. |
 
@@ -361,7 +360,7 @@ Clears the overflow flag.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `V` | Overflow | Cleared | Forced to zero. |
 
@@ -377,7 +376,7 @@ Subtracts the operand from the accumulator for flag purposes without storing the
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when bit 7 of the 8-bit result of A minus the operand is set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when A equals the operand; otherwise cleared. |
@@ -402,7 +401,7 @@ Compares X with the operand without changing X. Carry means `X >= operand`; zero
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when bit 7 of the 8-bit result of X minus the operand is set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when X equals the operand; otherwise cleared. |
@@ -422,7 +421,7 @@ Compares Y with the operand without changing Y. Carry means `Y >= operand`; zero
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when bit 7 of the 8-bit result of Y minus the operand is set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when Y equals the operand; otherwise cleared. |
@@ -442,7 +441,7 @@ Subtracts one from a memory byte and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the decremented memory value has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the decremented memory value is zero; otherwise cleared. |
@@ -462,7 +461,7 @@ Subtracts one from X and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the new X value has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the new X value is zero; otherwise cleared. |
@@ -479,7 +478,7 @@ Subtracts one from Y and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the new Y value has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the new Y value is zero; otherwise cleared. |
@@ -496,7 +495,7 @@ Exclusive-ORs the operand with the accumulator and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the new A value has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the new A value is zero; otherwise cleared. |
@@ -520,7 +519,7 @@ Adds one to a memory byte and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the incremented memory value has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the incremented memory value is zero; otherwise cleared. |
@@ -540,7 +539,7 @@ Adds one to X and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the new X value has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the new X value is zero; otherwise cleared. |
@@ -557,7 +556,7 @@ Adds one to Y and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the new Y value has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the new Y value is zero; otherwise cleared. |
@@ -574,7 +573,7 @@ Loads the program counter with the target address. Indirect JMP uses the 6502 pa
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -591,7 +590,7 @@ Pushes the address immediately before the next instruction, then jumps to the ab
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -607,7 +606,7 @@ Loads the operand into A and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the value loaded into A has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the value loaded into A is zero; otherwise cleared. |
@@ -631,7 +630,7 @@ Loads the operand into X and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the value loaded into X has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the value loaded into X is zero; otherwise cleared. |
@@ -652,7 +651,7 @@ Loads the operand into Y and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the value loaded into Y has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the value loaded into Y is zero; otherwise cleared. |
@@ -673,7 +672,7 @@ Shifts the accumulator or memory right by one bit. Bit 0 moves into carry, bit 7
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Cleared | Always cleared because the shift inserts zero into result bit 7. |
 | `Z` | Zero | Set or cleared | Set when the shifted result is zero; otherwise cleared. |
@@ -695,7 +694,7 @@ Performs no state-changing operation.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -711,7 +710,7 @@ ORs the operand with the accumulator and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the new A value has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the new A value is zero; otherwise cleared. |
@@ -735,7 +734,7 @@ Pushes A onto the hardware stack and decrements the stack pointer.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -747,14 +746,13 @@ Pushes A onto the hardware stack and decrements the stack pointer.
 
 ### PHP — Push processor status
 
-Pushes a status byte with the break marker and reserved bit set.
+Pushes a copy of the processor status to the stack with `B` set to 1 in the pushed byte.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
-| `1` | Reserved stack bit | Stacked as 1 | Bit 5 is set in the status byte pushed to the stack; it is not a stored flag. |
-| `B` | Break marker | Stacked as 1 | Marks the pushed status byte as coming from PHP; it is not a stored flag. |
+| `P` | Processor status | Pushed | Writes a status byte to the stack with `B` set to 1. |
 
 #### Opcodes
 
@@ -768,7 +766,7 @@ Pulls A from the hardware stack and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the value pulled into A has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the value pulled into A is zero; otherwise cleared. |
@@ -785,7 +783,7 @@ Pulls the status register from the hardware stack.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Restored | Loaded from bit 7 of the status byte pulled from the stack. |
 | `V` | Overflow | Restored | Loaded from bit 6 of the status byte pulled from the stack. |
@@ -806,7 +804,7 @@ Rotates the accumulator or memory left through carry. Old bit 7 enters carry and
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Copies bit 7 of the rotated result. |
 | `Z` | Zero | Set or cleared | Set when the rotated result is zero; otherwise cleared. |
@@ -828,7 +826,7 @@ Rotates the accumulator or memory right through carry. Old bit 0 enters carry an
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Copies bit 7 of the rotated result. |
 | `Z` | Zero | Set or cleared | Set when the rotated result is zero; otherwise cleared. |
@@ -850,7 +848,7 @@ Pulls status and the program counter from the stack, resuming the interrupted pr
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Restored | Loaded from bit 7 of the status byte pulled from the stack. |
 | `V` | Overflow | Restored | Loaded from bit 6 of the status byte pulled from the stack. |
@@ -871,7 +869,7 @@ Pulls the saved address from the stack, adds one, and resumes after the correspo
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -887,7 +885,7 @@ Subtracts the operand and inverse carry from the accumulator. It updates carry, 
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | In binary mode, copies bit 7 of the 8-bit result. In decimal mode it comes from an intermediate binary result. |
 | `V` | Overflow | Set or cleared | In binary mode, set when A and the operand have different signs and the result's sign differs from A. Decimal-mode results come from an intermediate binary result. |
@@ -914,7 +912,7 @@ Sets the carry flag.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `C` | Carry | Set | Forced to one. |
 
@@ -930,7 +928,7 @@ Sets the decimal flag, selecting BCD arithmetic for ADC and SBC.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `D` | Decimal mode | Set | Forced to one, selecting packed-BCD arithmetic for ADC and SBC. |
 
@@ -946,7 +944,7 @@ Sets the interrupt-disable flag so an asserted IRQ line is not serviced. NMI is 
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `I` | Interrupt disable | Set | Forced to one, preventing maskable IRQ recognition. |
 
@@ -962,7 +960,7 @@ Stores A in memory. Store instructions have fixed timing even when indexed addre
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -984,7 +982,7 @@ Stores X in memory.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -1002,7 +1000,7 @@ Stores Y in memory.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -1020,7 +1018,7 @@ Copies A into X and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the new X value has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the new X value is zero; otherwise cleared. |
@@ -1037,7 +1035,7 @@ Copies A into Y and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the new Y value has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the new Y value is zero; otherwise cleared. |
@@ -1054,7 +1052,7 @@ Copies the stack pointer into X and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the new X value has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the new X value is zero; otherwise cleared. |
@@ -1071,7 +1069,7 @@ Copies X into A and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the new A value has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the new A value is zero; otherwise cleared. |
@@ -1088,7 +1086,7 @@ Copies X into the stack pointer.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -1104,7 +1102,7 @@ Copies Y into A and updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the new A value has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the new A value is zero; otherwise cleared. |
@@ -1134,7 +1132,7 @@ ANDs an immediate value with the accumulator, shifts the result right, and store
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Cleared | Always cleared because the final right shift inserts zero into A bit 7. |
 | `Z` | Zero | Set or cleared | Set when the final A value is zero; otherwise cleared. |
@@ -1152,7 +1150,7 @@ ANDs an immediate value with the accumulator, then copies result bit 7 into both
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Copies bit 7 of the final A value. |
 | `Z` | Zero | Set or cleared | Set when the final A value is zero; otherwise cleared. |
@@ -1170,7 +1168,7 @@ ANDs an immediate value with the accumulator, then rotates right through carry. 
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Copies bit 7 of the final A value. |
 | `V` | Overflow | Set or cleared | In binary mode, set when result bits 6 and 5 differ; decimal-mode behaviour can be unpredictable. |
@@ -1190,7 +1188,7 @@ Decrements memory, then compares the new value with the accumulator as CMP would
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when bit 7 of A minus the decremented memory value is set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when A equals the decremented memory value; otherwise cleared. |
@@ -1214,7 +1212,7 @@ Consumes an immediate operand without otherwise changing CPU state.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -1230,7 +1228,7 @@ Increments memory, then subtracts the new value from the accumulator as `SBC` wo
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | In binary mode, copies bit 7 of A after subtracting the incremented memory value. In decimal mode it comes from an intermediate binary result. |
 | `V` | Overflow | Set or cleared | In binary mode, set when A and the incremented memory value have different signs and the result's sign differs from A. |
@@ -1256,7 +1254,7 @@ Loads the same operand into both A and X, then updates zero and negative.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the value loaded into A and X has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the value loaded into A and X is zero; otherwise cleared. |
@@ -1278,7 +1276,7 @@ These opcodes behave like the documented `NOP` on the 6502.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -1294,7 +1292,7 @@ Rotates memory left through carry, then ANDs the new memory value into the accum
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Copies bit 7 of A after it is ANDed with the rotated memory value. |
 | `Z` | Zero | Set or cleared | Set when the final A value is zero; otherwise cleared. |
@@ -1318,7 +1316,7 @@ Rotates memory right through carry, then adds the new memory value to the accumu
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | In binary mode, copies bit 7 of A after adding the rotated memory value. In decimal mode it comes from an intermediate binary result. |
 | `V` | Overflow | Set or cleared | In binary mode, set when A and the rotated memory value have the same sign and the result has the opposite sign. |
@@ -1344,7 +1342,7 @@ Stores `A AND X` in memory without changing either register.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -1363,7 +1361,7 @@ Performs the same immediate subtract-with-carry operation as opcode `E9`.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | In binary mode, copies bit 7 of the 8-bit result. In decimal mode it comes from an intermediate binary result. |
 | `V` | Overflow | Set or cleared | In binary mode, set when A and the operand have different signs and the result's sign differs from A. Decimal-mode results come from an intermediate binary result. |
@@ -1383,7 +1381,7 @@ Reads a zero-page operand and otherwise behaves as a no operation.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -1399,7 +1397,7 @@ Reads a zero-page,X operand and otherwise behaves as a no operation.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -1415,7 +1413,7 @@ Shifts memory left, then ORs the new memory value into the accumulator.
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Copies bit 7 of A after it is ORed with the shifted memory value. |
 | `Z` | Zero | Set or cleared | Set when the final A value is zero; otherwise cleared. |
@@ -1439,7 +1437,7 @@ Shifts memory right, then exclusive-ORs the new memory value into the accumulato
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Copies bit 7 of A after it is XORed with the shifted memory value. |
 | `Z` | Zero | Set or cleared | Set when the final A value is zero; otherwise cleared. |
@@ -1463,7 +1461,7 @@ Reads an absolute operand and otherwise behaves as a no operation. The absolute,
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | — | — | — | No status flags are affected. |
 
@@ -1480,7 +1478,7 @@ On the 6502 this instruction combines X, an immediate operand, and an internal b
 
 #### Status register
 
-| Flag | Name | Action | Description |
+| Symbol | Name | Action | Description |
 |:---:|---|---|---|
 | `N` | Negative | Set or cleared | Set when the value placed in A has bit 7 set; otherwise cleared. |
 | `Z` | Zero | Set or cleared | Set when the value placed in A is zero; otherwise cleared. |

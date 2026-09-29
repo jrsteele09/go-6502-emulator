@@ -73,6 +73,9 @@ func TestNmiInterruptHandling(t *testing.T) {
 	assert.Equal(t, uint16(0xDEAD), cpu.Reg.PC)
 	assert.Equal(t, uint8(0xD0), cpu.mem.Read(stackAddress))
 	assert.Equal(t, uint8(0x02), cpu.mem.Read(stackAddress-1))
+	assert.Equal(t, uint8(0), cpu.mem.Read(stackAddress-2)&byte(BreakFlag))
+	assert.Equal(t, uint8(UnusedFlag), cpu.mem.Read(stackAddress-2)&byte(UnusedFlag))
+	assert.Equal(t, false, cpu.Reg.IsSet(BreakFlag))
 	assert.Equal(t, true, cpu.Reg.IsSet(InterruptDisableFlag))
 	assert.Equal(t, false, cpu.nmi)
 	assert.Equal(t, false, cpu.irq)
@@ -171,6 +174,9 @@ func TestIrqInterruptHandling(t *testing.T) {
 	assert.Equal(t, uint16(0xDEAD), cpu.Reg.PC)
 	assert.Equal(t, uint8(0xD0), cpu.mem.Read(stackAddress))
 	assert.Equal(t, uint8(0x02), cpu.mem.Read(stackAddress-1))
+	assert.Equal(t, uint8(0), cpu.mem.Read(stackAddress-2)&byte(BreakFlag))
+	assert.Equal(t, uint8(UnusedFlag), cpu.mem.Read(stackAddress-2)&byte(UnusedFlag))
+	assert.Equal(t, false, cpu.Reg.IsSet(BreakFlag))
 	assert.Equal(t, true, cpu.Reg.IsSet(InterruptDisableFlag))
 	assert.Equal(t, false, cpu.nmi)
 	assert.Equal(t, true, cpu.irq)
@@ -994,12 +1000,12 @@ func TestBRK(t *testing.T) {
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, uint16(0xF012), p.Reg.PC)
-			assert.Equal(t, true, p.Reg.IsSet(BreakFlag))
+			assert.Equal(t, false, p.Reg.IsSet(BreakFlag))
 			assert.Equal(t, uint8(0xD0), p.mem.Read(stackAddress)) // Check values on stack
 			assert.Equal(t, uint8(0x02), p.mem.Read(stackAddress-1))
 			assert.Equal(t, uint8(BreakFlag), p.mem.Read(stackAddress-2)&BreakFlag)
 			assert.Equal(t, uint8(UnusedFlag), p.mem.Read(stackAddress-2)&UnusedFlag)
-			assert.Equal(t, true, p.Reg.IsSet(BreakFlag))
+			assert.Equal(t, false, p.Reg.IsSet(BreakFlag))
 			assert.Equal(t, true, p.Reg.IsSet(InterruptDisableFlag))
 			assert.Equal(t, uint64(7), p.cycles, name)
 		}},
@@ -2296,6 +2302,7 @@ func TestPHP(t *testing.T) {
 		}, func(t *testing.T, p *CPU, name string) {
 			expected := byte(InterruptDisableFlag | BreakFlag | UnusedFlag)
 			assert.Equal(t, expected, p.mem.Read(stackAddress)) // Check values on stack
+			assert.Equal(t, false, p.Reg.IsSet(BreakFlag), name)
 			assert.Equal(t, uint64(3), p.cycles, name)
 		}},
 	}
@@ -2385,7 +2392,9 @@ func TestPLP(t *testing.T) {
 			p.Reg.Status = 0x00
 			return 1
 		}, func(t *testing.T, p *CPU, name string) {
-			assert.Equal(t, uint8(0xFF), p.Reg.Status) // Check values on stack
+			assert.Equal(t, uint8(0xEF), p.Reg.Status)
+			assert.Equal(t, false, p.Reg.IsSet(BreakFlag), name)
+			assert.Equal(t, true, p.Reg.IsSet(UnusedFlag), name)
 			assert.Equal(t, uint8(0xFF), p.Reg.S, name)
 			assert.Equal(t, uint64(4), p.cycles, name)
 		}},
@@ -2566,6 +2575,7 @@ func TestRTI(t *testing.T) {
 			assert.Equal(t, uint64(6), p.cycles, name)
 			assert.Equal(t, uint16(0xC000), p.Reg.PC, name)
 			assert.Equal(t, false, p.Reg.IsSet(BreakFlag), name)
+			assert.Equal(t, true, p.Reg.IsSet(UnusedFlag), name)
 		}},
 	}
 	executeTests(t, tests)

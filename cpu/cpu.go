@@ -237,8 +237,7 @@ func (p *CPU) interruptInstruction() (Completed, error) {
 func (p *CPU) interruptStackPush() {
 	p.Push(byte(p.Reg.PC >> 8))
 	p.Push(byte(p.Reg.PC & 0xff))
-	p.Reg.SetStatus(BreakFlag, false)
-	p.Push(p.Reg.Status | byte(UnusedFlag))
+	p.Push(p.Reg.StatusForStack(false))
 }
 
 // NextByte reads the next byte from memory and increments the program counter.

@@ -32,6 +32,29 @@ func TestNegativeFlag(t *testing.T) {
 	assert.Equal(t, false, regs.IsSet(NegativeFlag))
 }
 
+func TestStatusForStack(t *testing.T) {
+	regs := NewRegisters()
+	regs.Status = byte(NegativeFlag | ZeroFlag)
+
+	softwareStatus := regs.StatusForStack(true)
+	assert.True(t, softwareStatus&byte(BreakFlag) != 0)
+	assert.True(t, softwareStatus&byte(UnusedFlag) != 0)
+
+	hardwareStatus := regs.StatusForStack(false)
+	assert.False(t, hardwareStatus&byte(BreakFlag) != 0)
+	assert.True(t, hardwareStatus&byte(UnusedFlag) != 0)
+	assert.False(t, regs.IsSet(BreakFlag), "creating a stacked status must not mutate the register")
+}
+
+func TestRestoreStatusIgnoresBreakMarker(t *testing.T) {
+	regs := NewRegisters()
+	regs.RestoreStatus(0xFF)
+
+	assert.Equal(t, byte(0xEF), regs.Status)
+	assert.False(t, regs.IsSet(BreakFlag))
+	assert.True(t, regs.IsSet(UnusedFlag))
+}
+
 func TestOverFlowFlag(t *testing.T) {
 	regs := NewRegisters()
 	var m byte = 127
