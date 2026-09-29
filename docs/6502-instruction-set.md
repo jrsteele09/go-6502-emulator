@@ -13,8 +13,6 @@ A complete reference to the 6502 instructions, status flags, opcodes, addressing
 
 ## CPU registers
 
-The 6502 has six programmer-visible registers:
-
 | Register | Name | Size | Purpose |
 |:---:|---|---:|---|
 | `A` | Accumulator | 8 bits | Holds operands and results for arithmetic, logic, load, store, and shift operations. |
