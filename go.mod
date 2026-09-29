@@ -3,7 +3,7 @@ module github.com/jrsteele09/go-6502-emulator
 go 1.26.0
 
 require (
-	github.com/ergochat/readline v0.1.3
+	github.com/ergochacant/readline v0.1.3
 	github.com/jrsteele09/go-lexer v0.0.0-20260703110958-0ca32710cc2c
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20260611194520-c48552f49976

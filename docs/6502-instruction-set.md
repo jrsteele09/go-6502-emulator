@@ -32,7 +32,7 @@ layout is:
 | 7 | `N` | Negative | Records bit 7 of the result or tested value. |
 | 6 | `V` | Overflow | Records signed arithmetic overflow or bit 6 of the tested value. |
 | 5 | — | Unused |  |
-| 4 | `B` | Break | Not stored in P. `PHP` and `BRK` push B=1; IRQ and NMI push B=0. |
+| 4 | `B` | Break | Never set int he status register. `PHP` and `BRK` push B=1; IRQ and NMI push B=0 when they push to the stack. |
 | 3 | `D` | Decimal mode | `SED` sets D=1; `CLD` sets D=0. `ADC` and `SBC` use BCD when D=1 and binary when D=0. |
 | 2 | `I` | Interrupt disable | `SEI` sets I=1; `CLI` sets I=0. IRQ is disabled when I=1 and enabled when I=0; NMI is unaffected. |
 | 1 | `Z` | Zero | Records whether the instruction-defined result is zero. |
@@ -156,7 +156,7 @@ Branches when the carry flag is clear.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
 |:---:|---|---|---:|---:|---|
-| `90` | Relative | `BCC $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles total |
+| `90` | Relative | `BCC $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles |
 
 ### BCS — Branch if carry set
 
@@ -172,7 +172,7 @@ Branches when the carry flag is set.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
 |:---:|---|---|---:|---:|---|
-| `B0` | Relative | `BCS $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles total |
+| `B0` | Relative | `BCS $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles |
 
 ### BEQ — Branch if equal
 
@@ -188,7 +188,7 @@ Branches when the zero flag is set.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
 |:---:|---|---|---:|---:|---|
-| `F0` | Relative | `BEQ $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles total |
+| `F0` | Relative | `BEQ $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles |
 
 ### BIT — Bit test
 
@@ -223,7 +223,7 @@ Branches when the negative flag is set.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
 |:---:|---|---|---:|---:|---|
-| `30` | Relative | `BMI $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles total |
+| `30` | Relative | `BMI $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles |
 
 ### BNE — Branch if not equal
 
@@ -255,7 +255,7 @@ Branches when the negative flag is clear.
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
 |:---:|---|---|---:|---:|---|
-| `10` | Relative | `BPL $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles total |
+| `10` | Relative | `BPL $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles |
 
 ### BRK — Software interrupt
 

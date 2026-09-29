@@ -412,7 +412,7 @@ func TestADC(t *testing.T) {
 			assert.Equal(t, false, p.Reg.IsSet(CarryFlag), name)
 			assert.Equal(t, true, p.Reg.IsSet(OverflowFlag), name)
 		}},
-		{"TestADCDecimalMode", func(p *CPU) int {
+		{"TestADCDecimalFlagsBeforeUpperDigitCorrection", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x69, 0x49)
 			p.Reg.SetStatus(DecimalFlag, true)
 			p.Reg.A = 0x69
@@ -421,10 +421,10 @@ func TestADC(t *testing.T) {
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, byte(0x18), p.Reg.A, name)
 			assert.Equal(t, uint64(2), p.cycles, name)
-			assert.Equal(t, false, p.Reg.IsSet(NegativeFlag), name)
+			assert.Equal(t, true, p.Reg.IsSet(NegativeFlag), name)
 			assert.Equal(t, false, p.Reg.IsSet(ZeroFlag), name)
 			assert.Equal(t, true, p.Reg.IsSet(CarryFlag), name)
-			assert.Equal(t, false, p.Reg.IsSet(OverflowFlag), name)
+			assert.Equal(t, true, p.Reg.IsSet(OverflowFlag), name)
 		}},
 		{"TestADCDecimalMode", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x69, 0x08)
@@ -440,7 +440,7 @@ func TestADC(t *testing.T) {
 			assert.Equal(t, false, p.Reg.IsSet(CarryFlag), name)
 			assert.Equal(t, false, p.Reg.IsSet(OverflowFlag), name)
 		}},
-		{"TestADCDecimalMode", func(p *CPU) int {
+		{"TestADCDecimalZeroFlagUsesBinarySum", func(p *CPU) int {
 			p.mem.Write(startAddress, 0x69, 0x01)
 			p.Reg.SetStatus(DecimalFlag, true)
 			p.Reg.A = 0x99
@@ -449,8 +449,8 @@ func TestADC(t *testing.T) {
 		}, func(t *testing.T, p *CPU, name string) {
 			assert.Equal(t, byte(0x00), p.Reg.A, name)
 			assert.Equal(t, uint64(2), p.cycles, name)
-			assert.Equal(t, false, p.Reg.IsSet(NegativeFlag), name)
-			assert.Equal(t, true, p.Reg.IsSet(ZeroFlag), name)
+			assert.Equal(t, true, p.Reg.IsSet(NegativeFlag), name)
+			assert.Equal(t, false, p.Reg.IsSet(ZeroFlag), name)
 			assert.Equal(t, true, p.Reg.IsSet(CarryFlag), name)
 			assert.Equal(t, false, p.Reg.IsSet(OverflowFlag), name)
 		}},
@@ -2866,6 +2866,19 @@ func TestSBC(t *testing.T) {
 			assert.Equal(t, false, p.Reg.IsSet(NegativeFlag), name)
 			assert.Equal(t, false, p.Reg.IsSet(ZeroFlag), name)
 			assert.Equal(t, true, p.Reg.IsSet(CarryFlag), name)
+			assert.Equal(t, true, p.Reg.IsSet(OverflowFlag), name)
+		}},
+		{"TestSBCDecimalFlagsUseBinaryDifference", func(p *CPU) int {
+			p.mem.Write(startAddress, 0xE9, 0x80)
+			p.Reg.SetStatus(DecimalFlag, true)
+			p.Reg.SetStatus(CarryFlag, true)
+			p.Reg.A = 0x00
+			return 1
+		}, func(t *testing.T, p *CPU, name string) {
+			assert.Equal(t, byte(0x20), p.Reg.A, name)
+			assert.Equal(t, true, p.Reg.IsSet(NegativeFlag), name)
+			assert.Equal(t, false, p.Reg.IsSet(ZeroFlag), name)
+			assert.Equal(t, false, p.Reg.IsSet(CarryFlag), name)
 			assert.Equal(t, true, p.Reg.IsSet(OverflowFlag), name)
 		}},
 	}

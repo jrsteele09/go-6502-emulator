@@ -18,6 +18,8 @@ func adc(p *CPU, opcode *OpCodeDef) (Completed, error) {
 	if p.Reg.IsSet(CarryFlag) {
 		carry = 1
 	}
+	binarySum := uint16(m) + uint16(b) + carry
+	flagResult := byte(binarySum)
 	if p.Reg.IsSet(DecimalFlag) {
 		lowSum := uint16(p.Reg.A&0x0F) + uint16(b&0x0F) + carry
 		highSum := uint16(p.Reg.A&0xF0) + uint16(b&0xF0)
@@ -25,6 +27,7 @@ func adc(p *CPU, opcode *OpCodeDef) (Completed, error) {
 			lowSum += 0x06
 			highSum += 0x10
 		}
+		flagResult = byte(highSum | (lowSum & 0x0F))
 		sum := highSum | (lowSum & 0x0F)
 		if highSum >= 0xA0 {
 			sum += 0x60
@@ -32,13 +35,12 @@ func adc(p *CPU, opcode *OpCodeDef) (Completed, error) {
 		p.Reg.A = byte(sum)
 		p.Reg.SetStatus(CarryFlag, sum > 0xFF)
 	} else {
-		sum := uint16(m) + uint16(b) + carry
-		p.Reg.A = byte(sum)
-		p.Reg.SetStatus(CarryFlag, sum > 0xFF)
+		p.Reg.A = byte(binarySum)
+		p.Reg.SetStatus(CarryFlag, binarySum > 0xFF)
 	}
-	p.Reg.SetZeroFlag(p.Reg.A)
-	p.Reg.SetOverflowFlag(m, b, p.Reg.A, true)
-	p.Reg.SetNegativeFlag(p.Reg.A)
+	p.Reg.SetZeroFlag(byte(binarySum))
+	p.Reg.SetOverflowFlag(m, b, flagResult, true)
+	p.Reg.SetNegativeFlag(flagResult)
 	return true, nil
 }
 
@@ -357,12 +359,13 @@ func sbc(p *CPU, opcode *OpCodeDef) (Completed, error) {
 		return false, nil
 	}
 	m := p.Reg.A
+	carry := 0
+	if p.Reg.IsSet(CarryFlag) {
+		carry = 1
+	}
+	diff := int(m) - int(b) - (1 - carry)
+	flagResult := byte(diff)
 	if p.Reg.IsSet(DecimalFlag) {
-		carry := 0
-		if p.Reg.IsSet(CarryFlag) {
-			carry = 1
-		}
-		diff := int(p.Reg.A) - int(b) - (1 - carry)
 		result := diff
 		if int(p.Reg.A&0x0F)-int(b&0x0F)-(1-carry) < 0 {
 			result -= 0x06
@@ -373,16 +376,12 @@ func sbc(p *CPU, opcode *OpCodeDef) (Completed, error) {
 		p.Reg.A = byte(result)
 		p.Reg.SetStatus(CarryFlag, diff >= 0)
 	} else {
-		borrow := uint16(1)
-		if p.Reg.IsSet(CarryFlag) {
-			borrow = 0
-		}
-		p.Reg.A = m - b - byte(borrow)
-		p.Reg.SetStatus(CarryFlag, uint16(m) >= uint16(b)+borrow)
+		p.Reg.A = flagResult
+		p.Reg.SetStatus(CarryFlag, diff >= 0)
 	}
-	p.Reg.SetZeroFlag(p.Reg.A)
-	p.Reg.SetNegativeFlag(p.Reg.A)
-	p.Reg.SetOverflowFlag(m, b, p.Reg.A, false)
+	p.Reg.SetZeroFlag(flagResult)
+	p.Reg.SetNegativeFlag(flagResult)
+	p.Reg.SetOverflowFlag(m, b, flagResult, false)
 	return true, nil
 }
 
