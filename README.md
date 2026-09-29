@@ -36,7 +36,7 @@ The assembler will continue to evolve over time, but the vision is to be compati
   syntax, labels, expressions, macros, directives, includes, and output formats.
 - [Debugger user manual](docs/debugger.md) — loading programs, commands,
   disassembly, stepping, breakpoints, memory tools, and worked examples.
-- [6502 instruction set manual](docs/instruction-set.md) — instruction
+- [6502 instruction set](docs/instruction-set.md) — instruction
   behaviour, addressing modes, opcodes, byte counts, and cycle timings.
 
 ## Installation

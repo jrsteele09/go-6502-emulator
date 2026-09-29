@@ -2,7 +2,7 @@
 
 This manual describes the accepted source syntax and command-line behaviour.
 For instruction meanings, opcodes, byte counts, and cycle counts, see the
-[6502 instruction set manual](instruction-set.md).
+[6502 instruction set](instruction-set.md).
 
 ## Quick example
 
@@ -57,7 +57,7 @@ Comment markers inside quoted text are not treated as comments.
 ## Instructions and addressing
 
 The assembler accepts the documented 6502 instructions and the undocumented
-instructions listed in the [instruction-set manual](instruction-set.md).
+instructions listed in the [instruction-set reference](instruction-set.md).
 Instruction mnemonics are case-insensitive.
 
 | Addressing mode | Example |
