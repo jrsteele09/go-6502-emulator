@@ -27,7 +27,7 @@ A complete reference to the 6502 instructions, status flags, opcodes, addressing
 The processor status register, **P**, contains six flags. Status bytes are
 shown as `N V 1 B D I Z C`, from bit 7 to bit 0:
 
-| Bit | Symbol | Name | Set (`1`) when |
+| Bit | Symbol | Name | notes |
 |---:|:---:|---|---|
 | 7 | `N` | Negative | The result of an instruction has bit 7 set. |
 | 6 | `V` | Overflow | A signed addition or subtraction cannot be represented in the range -128 to 127. |
@@ -86,7 +86,7 @@ Adds the operand and the carry flag to the accumulator. It updates carry, zero, 
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `69` | Immediate | `ADC #$nn` | 2 | 2 |  |
 | `65` | Zero page | `ADC $nn` | 2 | 3 |  |
 | `75` | Zero page,X | `ADC $nn,X` | 2 | 4 |  |
@@ -110,7 +110,7 @@ ANDs the operand with the accumulator and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `29` | Immediate | `AND #$nn` | 2 | 2 |  |
 | `25` | Zero page | `AND $nn` | 2 | 3 |  |
 | `35` | Zero page,X | `AND $nn,X` | 2 | 4 |  |
@@ -135,7 +135,7 @@ Shifts the accumulator or memory left by one bit. Bit 7 moves into carry and zer
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `0A` | Accumulator | `ASL A` | 1 | 2 |  |
 | `06` | Zero page | `ASL $nn` | 2 | 5 |  |
 | `16` | Zero page,X | `ASL $nn,X` | 2 | 6 |  |
@@ -155,7 +155,7 @@ Branches when the carry flag is clear.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `90` | Relative | `BCC $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles total |
 
 ### BCS — Branch if carry set
@@ -171,7 +171,7 @@ Branches when the carry flag is set.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `B0` | Relative | `BCS $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles total |
 
 ### BEQ — Branch if equal
@@ -187,7 +187,7 @@ Branches when the zero flag is set.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `F0` | Relative | `BEQ $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles total |
 
 ### BIT — Bit test
@@ -205,7 +205,7 @@ Tests the accumulator against memory without changing either value. Zero reflect
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `24` | Zero page | `BIT $nn` | 2 | 3 |  |
 | `2C` | Absolute | `BIT $nnnn` | 3 | 4 |  |
 
@@ -222,7 +222,7 @@ Branches when the negative flag is set.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `30` | Relative | `BMI $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles total |
 
 ### BNE — Branch if not equal
@@ -238,7 +238,7 @@ Branches when the zero flag is clear.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `D0` | Relative | `BNE $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles total |
 
 ### BPL — Branch if plus
@@ -254,7 +254,7 @@ Branches when the negative flag is clear.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `10` | Relative | `BPL $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles total |
 
 ### BRK — Software interrupt
@@ -272,7 +272,7 @@ Pushes the address following `BRK`'s padding byte and a status byte, sets interr
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `00` | Implied | `BRK` | 1 | 7 |  |
 
 ### BVC — Branch if overflow clear
@@ -288,7 +288,7 @@ Branches when the overflow flag is clear.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `50` | Relative | `BVC $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles total |
 
 ### BVS — Branch if overflow set
@@ -304,7 +304,7 @@ Branches when the overflow flag is set.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `70` | Relative | `BVS $relative` | 2 | 2 | Branch taken: +1 cycle; page boundary crossed: +2 cycles total |
 
 ### CLC — Clear carry
@@ -320,7 +320,7 @@ Clears the carry flag.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `18` | Implied | `CLC` | 1 | 2 |  |
 
 ### CLD — Clear decimal mode
@@ -336,7 +336,7 @@ Clears the decimal flag, selecting binary arithmetic for ADC and SBC.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `D8` | Implied | `CLD` | 1 | 2 |  |
 
 ### CLI — Clear interrupt disable
@@ -352,7 +352,7 @@ Clears the interrupt-disable flag, allowing an asserted IRQ line to be serviced 
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `58` | Implied | `CLI` | 1 | 2 |  |
 
 ### CLV — Clear overflow
@@ -368,7 +368,7 @@ Clears the overflow flag.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `B8` | Implied | `CLV` | 1 | 2 |  |
 
 ### CMP — Compare accumulator
@@ -386,7 +386,7 @@ Subtracts the operand from the accumulator for flag purposes without storing the
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `C9` | Immediate | `CMP #$nn` | 2 | 2 |  |
 | `C5` | Zero page | `CMP $nn` | 2 | 3 |  |
 | `D5` | Zero page,X | `CMP $nn,X` | 2 | 4 |  |
@@ -411,7 +411,7 @@ Compares X with the operand without changing X. Carry means `X >= operand`; zero
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `E0` | Immediate | `CPX #$nn` | 2 | 2 |  |
 | `E4` | Zero page | `CPX $nn` | 2 | 3 |  |
 | `EC` | Absolute | `CPX $nnnn` | 3 | 4 |  |
@@ -431,7 +431,7 @@ Compares Y with the operand without changing Y. Carry means `Y >= operand`; zero
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `C0` | Immediate | `CPY #$nn` | 2 | 2 |  |
 | `C4` | Zero page | `CPY $nn` | 2 | 3 |  |
 | `CC` | Absolute | `CPY $nnnn` | 3 | 4 |  |
@@ -450,7 +450,7 @@ Subtracts one from a memory byte and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `C6` | Zero page | `DEC $nn` | 2 | 5 |  |
 | `D6` | Zero page,X | `DEC $nn,X` | 2 | 6 |  |
 | `CE` | Absolute | `DEC $nnnn` | 3 | 6 |  |
@@ -470,7 +470,7 @@ Subtracts one from X and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `CA` | Implied | `DEX` | 1 | 2 |  |
 
 ### DEY — Decrement Y
@@ -487,7 +487,7 @@ Subtracts one from Y and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `88` | Implied | `DEY` | 1 | 2 |  |
 
 ### EOR — Exclusive OR
@@ -504,7 +504,7 @@ Exclusive-ORs the operand with the accumulator and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `49` | Immediate | `EOR #$nn` | 2 | 2 |  |
 | `45` | Zero page | `EOR $nn` | 2 | 3 |  |
 | `55` | Zero page,X | `EOR $nn,X` | 2 | 4 |  |
@@ -528,7 +528,7 @@ Adds one to a memory byte and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `E6` | Zero page | `INC $nn` | 2 | 5 |  |
 | `F6` | Zero page,X | `INC $nn,X` | 2 | 6 |  |
 | `EE` | Absolute | `INC $nnnn` | 3 | 6 |  |
@@ -548,7 +548,7 @@ Adds one to X and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `E8` | Implied | `INX` | 1 | 2 |  |
 
 ### INY — Increment Y
@@ -565,7 +565,7 @@ Adds one to Y and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `C8` | Implied | `INY` | 1 | 2 |  |
 
 ### JMP — Jump
@@ -581,7 +581,7 @@ Loads the program counter with the target address. Indirect JMP uses the 6502 pa
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `4C` | Absolute | `JMP $nnnn` | 3 | 3 |  |
 | `6C` | Indirect | `JMP ($nnnn)` | 3 | 5 |  |
 
@@ -598,7 +598,7 @@ Pushes the address immediately before the next instruction, then jumps to the ab
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `20` | Absolute | `JSR $nnnn` | 3 | 6 |  |
 
 ### LDA — Load accumulator
@@ -615,7 +615,7 @@ Loads the operand into A and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `A9` | Immediate | `LDA #$nn` | 2 | 2 |  |
 | `A5` | Zero page | `LDA $nn` | 2 | 3 |  |
 | `B5` | Zero page,X | `LDA $nn,X` | 2 | 4 |  |
@@ -639,7 +639,7 @@ Loads the operand into X and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `A2` | Immediate | `LDX #$nn` | 2 | 2 |  |
 | `A6` | Zero page | `LDX $nn` | 2 | 3 |  |
 | `B6` | Zero page,Y | `LDX $nn,Y` | 2 | 4 |  |
@@ -660,7 +660,7 @@ Loads the operand into Y and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `A0` | Immediate | `LDY #$nn` | 2 | 2 |  |
 | `A4` | Zero page | `LDY $nn` | 2 | 3 |  |
 | `B4` | Zero page,X | `LDY $nn,X` | 2 | 4 |  |
@@ -682,7 +682,7 @@ Shifts the accumulator or memory right by one bit. Bit 0 moves into carry, bit 7
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `4A` | Accumulator | `LSR A` | 1 | 2 |  |
 | `46` | Zero page | `LSR $nn` | 2 | 5 |  |
 | `56` | Zero page,X | `LSR $nn,X` | 2 | 6 |  |
@@ -702,7 +702,7 @@ Performs no state-changing operation.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `EA` | Implied | `NOP` | 1 | 2 |  |
 
 ### ORA — Logical inclusive OR
@@ -719,7 +719,7 @@ ORs the operand with the accumulator and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `09` | Immediate | `ORA #$nn` | 2 | 2 |  |
 | `05` | Zero page | `ORA $nn` | 2 | 3 |  |
 | `15` | Zero page,X | `ORA $nn,X` | 2 | 4 |  |
@@ -742,7 +742,7 @@ Pushes A onto the hardware stack and decrements the stack pointer.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `48` | Implied | `PHA` | 1 | 3 |  |
 
 ### PHP — Push processor status
@@ -759,7 +759,7 @@ Pushes a status byte with the break marker and reserved bit set.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `08` | Implied | `PHP` | 1 | 3 |  |
 
 ### PLA — Pull accumulator
@@ -776,7 +776,7 @@ Pulls A from the hardware stack and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `68` | Implied | `PLA` | 1 | 4 |  |
 
 ### PLP — Pull processor status
@@ -797,7 +797,7 @@ Pulls the status register from the hardware stack.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `28` | Implied | `PLP` | 1 | 4 |  |
 
 ### ROL — Rotate left
@@ -815,7 +815,7 @@ Rotates the accumulator or memory left through carry. Old bit 7 enters carry and
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `2A` | Accumulator | `ROL A` | 1 | 2 |  |
 | `26` | Zero page | `ROL $nn` | 2 | 5 |  |
 | `36` | Zero page,X | `ROL $nn,X` | 2 | 6 |  |
@@ -837,7 +837,7 @@ Rotates the accumulator or memory right through carry. Old bit 0 enters carry an
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `6A` | Accumulator | `ROR A` | 1 | 2 |  |
 | `66` | Zero page | `ROR $nn` | 2 | 5 |  |
 | `76` | Zero page,X | `ROR $nn,X` | 2 | 6 |  |
@@ -862,7 +862,7 @@ Pulls status and the program counter from the stack, resuming the interrupted pr
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `40` | Implied | `RTI` | 1 | 6 |  |
 
 ### RTS — Return from subroutine
@@ -878,7 +878,7 @@ Pulls the saved address from the stack, adds one, and resumes after the correspo
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `60` | Implied | `RTS` | 1 | 6 |  |
 
 ### SBC — Subtract with carry
@@ -898,7 +898,7 @@ Subtracts the operand and inverse carry from the accumulator. It updates carry, 
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `E9` | Immediate | `SBC #$nn` | 2 | 2 |  |
 | `E5` | Zero page | `SBC $nn` | 2 | 3 |  |
 | `F5` | Zero page,X | `SBC $nn,X` | 2 | 4 |  |
@@ -921,7 +921,7 @@ Sets the carry flag.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `38` | Implied | `SEC` | 1 | 2 |  |
 
 ### SED — Set decimal mode
@@ -937,7 +937,7 @@ Sets the decimal flag, selecting BCD arithmetic for ADC and SBC.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `F8` | Implied | `SED` | 1 | 2 |  |
 
 ### SEI — Set interrupt disable
@@ -953,7 +953,7 @@ Sets the interrupt-disable flag so an asserted IRQ line is not serviced. NMI is 
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `78` | Implied | `SEI` | 1 | 2 |  |
 
 ### STA — Store accumulator
@@ -969,7 +969,7 @@ Stores A in memory. Store instructions have fixed timing even when indexed addre
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `85` | Zero page | `STA $nn` | 2 | 3 |  |
 | `95` | Zero page,X | `STA $nn,X` | 2 | 4 |  |
 | `8D` | Absolute | `STA $nnnn` | 3 | 4 |  |
@@ -991,7 +991,7 @@ Stores X in memory.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `86` | Zero page | `STX $nn` | 2 | 3 |  |
 | `96` | Zero page,Y | `STX $nn,Y` | 2 | 4 |  |
 | `8E` | Absolute | `STX $nnnn` | 3 | 4 |  |
@@ -1009,7 +1009,7 @@ Stores Y in memory.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `84` | Zero page | `STY $nn` | 2 | 3 |  |
 | `94` | Zero page,X | `STY $nn,X` | 2 | 4 |  |
 | `8C` | Absolute | `STY $nnnn` | 3 | 4 |  |
@@ -1028,7 +1028,7 @@ Copies A into X and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `AA` | Implied | `TAX` | 1 | 2 |  |
 
 ### TAY — Transfer accumulator to Y
@@ -1045,7 +1045,7 @@ Copies A into Y and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `A8` | Implied | `TAY` | 1 | 2 |  |
 
 ### TSX — Transfer stack pointer to X
@@ -1062,7 +1062,7 @@ Copies the stack pointer into X and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `BA` | Implied | `TSX` | 1 | 2 |  |
 
 ### TXA — Transfer X to accumulator
@@ -1079,7 +1079,7 @@ Copies X into A and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `8A` | Implied | `TXA` | 1 | 2 |  |
 
 ### TXS — Transfer X to stack pointer
@@ -1095,7 +1095,7 @@ Copies X into the stack pointer.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `9A` | Implied | `TXS` | 1 | 2 |  |
 
 ### TYA — Transfer Y to accumulator
@@ -1112,7 +1112,7 @@ Copies Y into A and updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `98` | Implied | `TYA` | 1 | 2 |  |
 
 ## Undocumented Instructions
@@ -1143,7 +1143,7 @@ ANDs an immediate value with the accumulator, shifts the result right, and store
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `4B` | Immediate | `ALR #$nn` | 2 | 2 |  |
 
 ### ANC — AND and copy negative to carry (Undocumented)
@@ -1161,7 +1161,7 @@ ANDs an immediate value with the accumulator, then copies result bit 7 into both
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `0B`, `2B` | Immediate | `ANC #$nn` | 2 | 2 |  |
 
 ### ARR — AND then rotate right (Undocumented)
@@ -1181,7 +1181,7 @@ ANDs an immediate value with the accumulator, then rotates right through carry. 
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `6B` | Immediate | `ARR #$nn` | 2 | 2 |  |
 
 ### DCP — Decrement then compare (Undocumented)
@@ -1199,7 +1199,7 @@ Decrements memory, then compares the new value with the accumulator as CMP would
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `C7` | Zero page | `DCP $nn` | 2 | 5 |  |
 | `D7` | Zero page,X | `DCP $nn,X` | 2 | 6 |  |
 | `CF` | Absolute | `DCP $nnnn` | 3 | 6 |  |
@@ -1221,7 +1221,7 @@ Consumes an immediate operand without otherwise changing CPU state.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `80`, `82`, `C2`, `E2` | Immediate | `DOP #$nn` | 2 | 2 |  |
 
 ### ISC — Increment then subtract with carry (Undocumented)
@@ -1241,7 +1241,7 @@ Increments memory, then subtracts the new value from the accumulator as `SBC` wo
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `E7` | Zero page | `ISC $nn` | 2 | 5 |  |
 | `F7` | Zero page,X | `ISC $nn,X` | 2 | 6 |  |
 | `EF` | Absolute | `ISC $nnnn` | 3 | 6 |  |
@@ -1264,7 +1264,7 @@ Loads the same operand into both A and X, then updates zero and negative.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `A7` | Zero page | `LAX $nn` | 2 | 3 |  |
 | `B7` | Zero page,Y | `LAX $nn,Y` | 2 | 4 |  |
 | `AF` | Absolute | `LAX $nnnn` | 3 | 4 |  |
@@ -1285,7 +1285,7 @@ These opcodes behave like the documented `NOP` on the 6502.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `1A`, `3A`, `5A`, `7A`, `DA`, `FA` | Implied | `NOP*` | 1 | 2 |  |
 
 ### RLA — Rotate left then AND (Undocumented)
@@ -1303,7 +1303,7 @@ Rotates memory left through carry, then ANDs the new memory value into the accum
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `27` | Zero page | `RLA $nn` | 2 | 5 |  |
 | `37` | Zero page,X | `RLA $nn,X` | 2 | 6 |  |
 | `2F` | Absolute | `RLA $nnnn` | 3 | 6 |  |
@@ -1329,7 +1329,7 @@ Rotates memory right through carry, then adds the new memory value to the accumu
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `67` | Zero page | `RRA $nn` | 2 | 5 |  |
 | `77` | Zero page,X | `RRA $nn,X` | 2 | 6 |  |
 | `6F` | Absolute | `RRA $nnnn` | 3 | 6 |  |
@@ -1351,7 +1351,7 @@ Stores `A AND X` in memory without changing either register.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `87` | Zero page | `SAX $nn` | 2 | 3 |  |
 | `97` | Zero page,Y | `SAX $nn,Y` | 2 | 4 |  |
 | `8F` | Absolute | `SAX $nnnn` | 3 | 4 |  |
@@ -1374,7 +1374,7 @@ Performs the same immediate subtract-with-carry operation as opcode `E9`.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `EB` | Immediate | `SBC* #$nn` | 2 | 2 |  |
 
 ### SKB — Skip byte through zero page (Undocumented)
@@ -1390,7 +1390,7 @@ Reads a zero-page operand and otherwise behaves as a no operation.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `04`, `44`, `64` | Zero page | `SKB $nn` | 2 | 3 |  |
 
 ### SKW — Skip byte through zero page,X (Undocumented)
@@ -1406,7 +1406,7 @@ Reads a zero-page,X operand and otherwise behaves as a no operation.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `14`, `34`, `54`, `74`, `D4`, `F4` | Zero page,X | `SKW $nn,X` | 2 | 4 |  |
 
 ### SLO — Shift left then OR (Undocumented)
@@ -1424,7 +1424,7 @@ Shifts memory left, then ORs the new memory value into the accumulator.
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `07` | Zero page | `SLO $nn` | 2 | 5 |  |
 | `17` | Zero page,X | `SLO $nn,X` | 2 | 6 |  |
 | `0F` | Absolute | `SLO $nnnn` | 3 | 6 |  |
@@ -1448,7 +1448,7 @@ Shifts memory right, then exclusive-ORs the new memory value into the accumulato
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `47` | Zero page | `SRE $nn` | 2 | 5 |  |
 | `57` | Zero page,X | `SRE $nn,X` | 2 | 6 |  |
 | `4F` | Absolute | `SRE $nnnn` | 3 | 6 |  |
@@ -1470,7 +1470,7 @@ Reads an absolute operand and otherwise behaves as a no operation. The absolute,
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `0C` | Absolute | `TOP $nnnn` | 3 | 4 |  |
 | `1C`, `3C`, `5C`, `7C`, `DC`, `FC` | Absolute,X | `TOP $nnnn,X` | 3 | 4 | Page boundary crossed: +1 cycle |
 
@@ -1488,5 +1488,5 @@ On the 6502 this instruction combines X, an immediate operand, and an internal b
 #### Opcodes
 
 | Opcode | Addressing mode | Syntax | Bytes | Cycles | Cycle penalty |
-|---:|---|---|---:|---:|---|
+|:---:|---|---|---:|---:|---|
 | `8B` | Immediate | `XAA #$nn` | 2 | 2 |  |
