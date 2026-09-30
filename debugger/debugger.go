@@ -1,11 +1,15 @@
 package debugger
 
 import (
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
 
+	"github.com/jrsteele09/go-6502-emulator/assembler"
 	"github.com/jrsteele09/go-6502-emulator/assembler/output"
 	"github.com/jrsteele09/go-6502-emulator/cpu"
 	"github.com/jrsteele09/go-6502-emulator/memory"
@@ -99,21 +103,29 @@ func (d *Debugger) AutoLoadPRGs(files []string) string {
 	return b.String()
 }
 
-// parseAddress parses an address string (hex or decimal)
-func (d *Debugger) ParseAddress(addr string) (uint16, error) {
+// ParseAddress parses an address string as hexadecimal when it has a $ prefix
+// or contains A-F, and as decimal otherwise.
+func ParseAddress(addr string) (uint16, error) {
 	if addr == "" {
 		return 0, fmt.Errorf("address required")
 	}
 
 	if strings.HasPrefix(addr, "$") {
-		// Hex address
 		val, err := strconv.ParseUint(addr[1:], 16, 16)
 		return uint16(val), err
-	} else {
-		// Decimal address
-		val, err := strconv.ParseUint(addr, 10, 16)
-		return uint16(val), err
 	}
+
+	base := 10
+	if strings.ContainsAny(addr, "abcdefABCDEF") {
+		base = 16
+	}
+	val, err := strconv.ParseUint(addr, base, 16)
+	return uint16(val), err
+}
+
+// ParseAddress parses an address string (hexadecimal or decimal).
+func (d *Debugger) ParseAddress(addr string) (uint16, error) {
+	return ParseAddress(addr)
 }
 
 // parseValue parses a value string (hex or decimal)
@@ -375,44 +387,92 @@ func (d *Debugger) HexDump(args []string) string {
 	return result
 }
 
-// LoadPRG loads a PRG file into memory
+// LoadFile loads a PRG or BIN file. BIN files require an explicit load address.
+func (d *Debugger) LoadFile(filename, binLoadAddress string) string {
+	if binLoadAddress != "" {
+		return d.LoadBIN(filename, binLoadAddress)
+	}
+
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".bin":
+		return d.LoadBIN(filename, binLoadAddress)
+	case ".d64", ".t64":
+		return fmt.Sprintf("Error loading file: %s files are not supported\n", strings.ToUpper(filepath.Ext(filename)[1:]))
+	default:
+		return d.LoadPRG(filename)
+	}
+}
+
+// LoadBIN loads a raw binary file into memory at the supplied address.
+func (d *Debugger) LoadBIN(filename, loadAddress string) string {
+	if loadAddress == "" {
+		return "Error loading BIN file: load address required (for example, L program.bin $1000)\n"
+	}
+
+	address, err := d.ParseAddress(loadAddress)
+	if err != nil {
+		return fmt.Sprintf("Error loading BIN file: invalid load address %q\n", loadAddress)
+	}
+
+	segments, err := output.NewBINFormat(address).LoadFile(filename, false)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Sprintf("Error: file not found: %s\n", filename)
+		}
+		return fmt.Sprintf("Error loading BIN file: %v\n", err)
+	}
+	return d.loadSegments("BIN", filename, segments)
+}
+
+// LoadPRG loads a PRG file into memory.
 func (d *Debugger) LoadPRG(filename string) string {
-	// Use the PRG format loader
 	prgFormat := output.NewPRGFormat()
 	segments, err := prgFormat.LoadFile(filename, false)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Sprintf("Error: file not found: %s\n", filename)
+		}
 		return fmt.Sprintf("Error loading PRG file: %v\n", err)
 	}
+	return d.loadSegments("PRG", filename, segments)
+}
 
+func (d *Debugger) loadSegments(fileType, filename string, segments []assembler.AssembledData) string {
 	if len(segments) == 0 {
-		return "No segments found in PRG file\n"
+		return fmt.Sprintf("No segments found in %s file\n", fileType)
 	}
 
-	result := fmt.Sprintf("Loaded PRG file: %s\n", filename)
+	result := fmt.Sprintf("Loaded %s file: %s\n", fileType, filename)
 
 	totalBytes := 0
 	for i, segment := range segments {
+		segmentData := segment.Data.Bytes()
+		if len(segmentData) == 0 {
+			return fmt.Sprintf("Error loading %s file: segment %d is empty\n", fileType, i+1)
+		}
+		if int(segment.StartAddress)+len(segmentData) > 1<<16 {
+			return fmt.Sprintf("Error loading %s file: segment %d does not fit in memory\n", fileType, i+1)
+		}
+
 		// Load segment into memory
-		for j, b := range segment.Data.Bytes() {
+		for j, b := range segmentData {
 			d.memory.Write(segment.StartAddress+uint16(j), b)
 		}
 
-		totalBytes += len(segment.Data.Bytes())
+		totalBytes += len(segmentData)
 		result += fmt.Sprintf("  Segment %d: %s to %s (%d bytes)\n",
 			i+1,
 			d.FormatAddress(segment.StartAddress),
-			d.FormatAddress(segment.StartAddress+uint16(len(segment.Data.Bytes()))-1),
-			len(segment.Data.Bytes()))
+			d.FormatAddress(segment.StartAddress+uint16(len(segmentData)-1)),
+			len(segmentData))
 	}
 
 	result += fmt.Sprintf("Total: %d bytes loaded\n", totalBytes)
 
 	// Set PC to first segment's start address
-	if len(segments) > 0 {
-		d.cpu.Registers().PC = segments[0].StartAddress
-		d.lastDisasmAddr = segments[0].StartAddress // Reset disassembly position to PC
-		result += fmt.Sprintf("PC set to %s\n", d.FormatAddress(segments[0].StartAddress))
-	}
+	d.cpu.Registers().PC = segments[0].StartAddress
+	d.lastDisasmAddr = segments[0].StartAddress // Reset disassembly position to PC
+	result += fmt.Sprintf("PC set to %s\n", d.FormatAddress(segments[0].StartAddress))
 
 	return result
 }

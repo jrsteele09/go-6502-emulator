@@ -1,12 +1,47 @@
 package debugger
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/jrsteele09/go-6502-emulator/cpu"
 	"github.com/stretchr/testify/require"
 )
+
+func TestLoadBIN(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "program.321")
+	require.NoError(t, os.WriteFile(filename, []byte{0xA9, 0x42, 0x60}, 0o644))
+	dbg := NewDebugger()
+
+	output := dbg.LoadFile(filename, "$2000")
+
+	require.Contains(t, output, "Loaded BIN file:")
+	require.Contains(t, output, "Segment 1: $2000 to $2002 (3 bytes)")
+	require.Equal(t, byte(0xA9), dbg.GetMemory().Read(0x2000))
+	require.Equal(t, byte(0x42), dbg.GetMemory().Read(0x2001))
+	require.Equal(t, byte(0x60), dbg.GetMemory().Read(0x2002))
+	require.Equal(t, uint16(0x2000), dbg.GetCPU().Registers().PC)
+	require.Equal(t, uint16(0x2000), dbg.GetLastDisasmAddr())
+}
+
+func TestLoadBINRequiresAddress(t *testing.T) {
+	dbg := NewDebugger()
+
+	output := dbg.LoadFile("program.bin", "")
+
+	require.Contains(t, output, "load address required")
+}
+
+func TestLoadBINReportsMissingFile(t *testing.T) {
+	dbg := NewDebugger()
+	filename := filepath.Join(t.TempDir(), "missing.bin")
+
+	output := dbg.LoadFile(filename, "C000")
+
+	require.Equal(t, "Error: file not found: "+filename+"\n", output)
+}
 
 func runDebuggerWithTimeout(t *testing.T, dbg *Debugger) string {
 	t.Helper()
@@ -32,7 +67,8 @@ func TestSetProgramCounter(t *testing.T) {
 		value    string
 		expected uint16
 	}{
-		{name: "hexadecimal", value: "$C000", expected: 0xC000},
+		{name: "prefixed hexadecimal", value: "$C000", expected: 0xC000},
+		{name: "bare hexadecimal", value: "c000", expected: 0xC000},
 		{name: "decimal", value: "49152", expected: 0xC000},
 	}
 

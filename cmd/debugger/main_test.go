@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -48,5 +49,40 @@ func TestPromptShowsCurrentInstruction(t *testing.T) {
 	prompt := repl.prompt()
 
 	require.Contains(t, prompt, "$C000: A9 42      LDA #$42")
+	require.NotContains(t, prompt, ". $C000")
 	require.True(t, strings.HasSuffix(prompt, Reset+" > "))
+}
+
+func TestValidateAddressOption(t *testing.T) {
+	tests := []struct {
+		name     string
+		address  string
+		provided bool
+		files    []string
+		wantErr  string
+	}{
+		{name: "not provided"},
+		{name: "valid with file", address: "C000", provided: true, files: []string{"test.bin"}},
+		{name: "invalid before missing file", address: "test.bin", provided: true, wantErr: "invalid address \"test.bin\""},
+		{name: "empty address", provided: true, files: []string{"test.bin"}, wantErr: "invalid address \"\""},
+		{name: "valid without file", address: "C000", provided: true, wantErr: "missing .bin file"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateAddressOption(test.address, test.provided, test.files)
+			if test.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, test.wantErr)
+		})
+	}
+}
+
+func TestAutoLoadReportsFailure(t *testing.T) {
+	repl := &DebuggerRepl{debugger: debugger.NewDebugger()}
+	missingFile := filepath.Join(t.TempDir(), "missing.bin")
+
+	require.False(t, repl.AutoLoad([]string{missingFile}, "C000"))
 }

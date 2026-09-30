@@ -1,13 +1,8 @@
 # 6502 Debugger User Manual
 
-The debugger provides an interactive command prompt for loading Commodore PRG
+The debugger provides an interactive command prompt for loading PRG and BIN
 files, inspecting 6502 state, disassembling memory, stepping instructions,
 running to breakpoints, and editing memory.
-
-It uses a flat 64 KiB address space. It does not provide C64 ROM routines or
-hardware peripherals, so programs that depend on KERNAL calls, the VIC-II,
-CIAs, or other memory-mapped devices cannot run as they would on a complete
-C64.
 
 ## Starting the debugger
 
@@ -24,20 +19,32 @@ debug6502 program.prg
 debug6502 code.prg data.prg
 ```
 
+A BIN file does not contain a load address, so supply one with `-address`:
+
+```bash
+debug6502 -address 4096 program.bin
+debug6502 -address C000 program.bin
+```
+
+A bare address containing `A` through `F` is hexadecimal. If a `$` prefix is
+used on the command line, quote the address so that the shell does not treat it
+as a shell variable.
+
 Display the version injected when the command was built:
 
 ```bash
 debug6502 -version
 ```
 
-Files are loaded from left to right. Each file's two-byte PRG load address
-determines where its payload is placed. After loading, the program counter is
-set to that file's load address, so with multiple files it finishes at the
-load address of the last file. Later files replace earlier bytes if their
-address ranges overlap.
+Files are loaded from left to right. A PRG file's two-byte load address or the
+address supplied for a BIN file determines where its bytes are placed. After
+loading, the program counter is set to that address, so with multiple files it
+finishes at the load address of the last file. Later files replace earlier
+bytes if their address ranges overlap. The command-line address applies to
+every BIN file in the list.
 
-Only PRG files can be loaded directly. D64 and T64 containers are not accepted
-by the debugger.
+PRG and BIN files can be loaded directly. D64 and T64 containers are not
+accepted by the debugger.
 
 ## The prompt
 
@@ -45,7 +52,7 @@ The prompt disassembles the instruction at the current program counter. It
 shows the address, raw instruction bytes, and decoded instruction:
 
 ```text
-. $1000: A9 42      LDA #$42 >
+$1000: A9 42      LDA #$42 >
 ```
 
 The prompt refreshes after every command, so changes made by stepping, running,
@@ -80,10 +87,12 @@ Debugger output is separated from the command and the following prompt by a
 blank line. A `PC` assignment is the exception: it produces no status message
 and the next prompt immediately shows the instruction at the new address.
 
-Addresses accept either `$`-prefixed hexadecimal or unsigned decimal:
+Addresses accept `$`-prefixed hexadecimal, bare hexadecimal containing `A`
+through `F`, or unsigned decimal:
 
 ```text
 $1000
+C000
 4096
 ```
 
@@ -102,7 +111,7 @@ in one byte.
 | `PC=address` | — | Set the program counter. `PC address` and `PC = address` are also accepted. |
 | `D [address] [count]` | `DISASSEMBLE` | Disassemble instructions. The default count is 10. |
 | `M [address] [count]` | `MEMORY` | Display a hexadecimal and ASCII memory dump. Defaults to `$0000` and 16 bytes. |
-| `L filename` | `LOAD` | Load a PRG file and set PC to its load address. |
+| `L filename [address]` | `LOAD` | Load a PRG, or load a BIN at the required address, and set PC to its load address. |
 | `G [address]` | `GO` | Run from an address, or from the current PC when omitted. |
 | `S [count]` | `STEP` | Execute one or more instructions. Stops before `BRK` or a top-level `RTS`; the default count is 1. |
 | `B address` | `BREAK` | Set a breakpoint. |
@@ -120,7 +129,7 @@ passed to `L`.
 Load a PRG after entering the debugger:
 
 ```text
-. $0000: 00         BRK > L program.prg
+$0000: 00         BRK > L program.prg
 
 Loaded PRG file: program.prg
   Segment 1: $1000 to $100A (11 bytes)
@@ -132,12 +141,23 @@ Loading changes PC but does not reset A, X, Y, the stack pointer, status flags,
 memory outside the loaded range, or existing breakpoints. Start a new debugger
 session when a completely clean machine state is required.
 
+Load a raw BIN file by supplying its destination address:
+
+```text
+$0000: 00         BRK > L program.bin $1000
+
+Loaded BIN file: program.bin
+  Segment 1: $1000 to $100A (11 bytes)
+Total: 11 bytes loaded
+PC set to $1000
+```
+
 ## Inspecting registers
 
 Use `R` to display all registers:
 
 ```text
-. $1000: A9 42      LDA #$42 > R
+$1000: A9 42      LDA #$42 > R
 
   A: $00  X: $00  Y: $00  PC: $1000  S: $FF
   Flags: $24 (%00100100) (..1..I..)  NV1BDIZC
@@ -365,7 +385,7 @@ debug6502 loop.prg
 Inspect the program, stop at the loop, and step through an iteration:
 
 ```text
-. $1000: A9 42      LDA #$42 > D $1000 6
+$1000: A9 42      LDA #$42 > D $1000 6
 
 > $1000: A9 42      LDA #$42
   $1002: 8D 00 02   STA $0200
@@ -374,28 +394,28 @@ Inspect the program, stop at the loop, and step through an iteration:
   $1008: D0 FD      BNE $1007
   $100A: 00         BRK
 
-. $1000: A9 42      LDA #$42 > B $1007
+$1000: A9 42      LDA #$42 > B $1007
 
 Breakpoint set at $1007
 
-. $1000: A9 42      LDA #$42 > G
+$1000: A9 42      LDA #$42 > G
 
 Running from $1000... (Ctrl+C to stop)
 
 Breakpoint hit at $1007
 Next: $1007: CA         DEX
 
-. $1007: CA         DEX > R
+$1007: CA         DEX > R
 
   A: $42  X: $03  Y: $00  PC: $1007  S: $FF
   Flags: $24 (%00100100) (..1..I..)  NV1BDIZC
 
-. $1007: CA         DEX > S
+$1007: CA         DEX > S
 
   A: $42  X: $02  Y: $00  PC: $1008  S: $FF
   Flags: $24 (%00100100) (..1..I..)  NV1BDIZC
 
-. $1008: D0 FD      BNE $1007 > G
+$1008: D0 FD      BNE $1007 > G
 
 Running from $1008... (Ctrl+C to stop)
 
@@ -406,13 +426,13 @@ Next: $1007: CA         DEX
 Examine the value written by `STA $0200`:
 
 ```text
-. $1007: CA         DEX > M $0200 1
+$1007: CA         DEX > M $0200 1
 ```
 
 To run to the final `BRK`, replace the loop breakpoint with one at `$100A`:
 
 ```text
-. $1007: CA         DEX > C $1007
-. $1007: CA         DEX > B $100A
-. $1007: CA         DEX > G
+$1007: CA         DEX > C $1007
+$1007: CA         DEX > B $100A
+$1007: CA         DEX > G
 ```

@@ -52,17 +52,47 @@ func NewDebuggerRepl() (*DebuggerRepl, error) {
 }
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
+	var binLoadAddress string
+	var showHelp bool
+
 	showVersion := flag.Bool("version", false, "Show version")
+	flag.StringVar(&binLoadAddress, "address", "", "Load address for BIN files")
+	flag.BoolVar(&showHelp, "h", false, "Show help")
+	flag.BoolVar(&showHelp, "help", false, "Show help")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [options] [file ...]\n\n", os.Args[0])
+		fmt.Fprintln(os.Stderr, "Files may be PRG files or BIN files. BIN files require -address.")
+		fmt.Fprintln(os.Stderr, "\nOptions:")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
+	addressProvided := false
+	flag.Visit(func(parsedFlag *flag.Flag) {
+		if parsedFlag.Name == "address" {
+			addressProvided = true
+		}
+	})
+	if showHelp {
+		flag.Usage()
+		return 0
+	}
 	if *showVersion {
 		fmt.Printf("6502 Debugger v%s\n", buildinfo.Version)
-		return
+		return 0
+	}
+	if err := validateAddressOption(binLoadAddress, addressProvided, flag.Args()); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return 2
 	}
 
 	repl, err := NewDebuggerRepl()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialise debugger input: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 	defer repl.lineEditor.Close()
 
@@ -78,9 +108,25 @@ func main() {
 
 	// Auto-load any files passed on the command line
 	if flag.NArg() > 0 {
-		repl.AutoLoad(flag.Args())
+		if !repl.AutoLoad(flag.Args(), binLoadAddress) {
+			return 1
+		}
 	}
 	repl.Run()
+	return 0
+}
+
+func validateAddressOption(address string, provided bool, files []string) error {
+	if !provided {
+		return nil
+	}
+	if _, err := debugger.ParseAddress(address); err != nil {
+		return fmt.Errorf("invalid address %q\nTip: use a bare hexadecimal address such as C000, or quote a $-prefixed address such as '$C000'", address)
+	}
+	if len(files) == 0 {
+		return fmt.Errorf("missing .bin file")
+	}
+	return nil
 }
 
 // Run starts the debugger REPL
@@ -121,12 +167,18 @@ func (r *DebuggerRepl) Run() {
 	fmt.Printf("%sQuitting...%s\n", Yellow, Reset)
 }
 
-// AutoLoad loads a list of PRG files on startup before entering the REPL
-func (r *DebuggerRepl) AutoLoad(files []string) {
+// AutoLoad loads a list of program files before entering the REPL and reports
+// whether every file loaded successfully.
+func (r *DebuggerRepl) AutoLoad(files []string, binLoadAddress string) bool {
+	success := true
 	for _, f := range files {
-		out := r.debugger.LoadPRG(f)
+		out := r.debugger.LoadFile(f, binLoadAddress)
 		fmt.Print(colorizeOutput(out))
+		if strings.HasPrefix(out, "Error") || strings.HasPrefix(out, "No segments") {
+			success = false
+		}
 	}
+	return success
 }
 
 // printBanner displays the debugger banner
@@ -146,7 +198,7 @@ func (r *DebuggerRepl) printBanner() {
 
 // prompt shows the address, bytes, and decoded instruction at the current PC.
 func (r *DebuggerRepl) prompt() string {
-	return fmt.Sprintf("%s.%s %s%s > ", Bold, Green, r.debugger.CurrentInstruction(), Reset)
+	return fmt.Sprintf("%s%s%s%s > ", Bold, Green, r.debugger.CurrentInstruction(), Reset)
 }
 
 // processCommand processes a user command and returns true if exit is requested
@@ -189,10 +241,14 @@ func (r *DebuggerRepl) processCommand(input string) bool {
 		output := r.debugger.ShowRegistersVerbose()
 		fmt.Print(colorizeOutput(output))
 	case "L", "LOAD":
-		if len(args) == 0 {
-			fmt.Printf("%sUsage: L <filename>%s\n", Red, Reset)
+		if len(args) == 0 || len(args) > 2 {
+			fmt.Printf("%sUsage: L <filename> [BIN load address]%s\n", Red, Reset)
 		} else {
-			output := r.debugger.LoadPRG(args[0])
+			loadAddress := ""
+			if len(args) == 2 {
+				loadAddress = args[1]
+			}
+			output := r.debugger.LoadFile(args[0], loadAddress)
 			fmt.Print(colorizeOutput(output))
 		}
 	case "G", "GO":
@@ -264,7 +320,7 @@ func (r *DebuggerRepl) showHelp() {
 	fmt.Printf("%s  PC=<address>%s      - Set the program counter (for example PC=$C000)\n", Cyan, Reset)
 	fmt.Printf("%s  D [addr] [count]%s  - Disassemble memory (default: PC, 10 instructions)\n", Cyan, Reset)
 	fmt.Printf("%s  M [addr] [count]%s  - Memory hex dump (default: $0000, 16 bytes)\n", Cyan, Reset)
-	fmt.Printf("%s  L <filename>%s      - Load PRG file into memory\n", Cyan, Reset)
+	fmt.Printf("%s  L <file> [addr]%s   - Load a PRG, or a BIN at the required address\n", Cyan, Reset)
 	fmt.Printf("%s  G [addr]%s          - Go/Run from address (default: current PC)\n", Cyan, Reset)
 	fmt.Printf("%s  S [count]%s         - Step instruction(s); stop before BRK/top-level RTS\n", Cyan, Reset)
 	fmt.Printf("%s  B <addr>%s          - Set breakpoint at address\n", Cyan, Reset)
@@ -275,7 +331,7 @@ func (r *DebuggerRepl) showHelp() {
 	fmt.Printf("%s  T <src> <dest> <len>%s - Transfer memory block\n", Cyan, Reset)
 	fmt.Println()
 	fmt.Printf("%s%sNotes:%s\n", Bold, Yellow, Reset)
-	fmt.Printf("  - Addresses can be in hex ($1000) or decimal (4096)\n")
+	fmt.Printf("  - Addresses can be hexadecimal ($C000 or C000) or decimal (49152)\n")
 	fmt.Printf("  - Press Enter to repeat last command\n")
 	fmt.Printf("  - Up/Down browse command history; Left/Right edit the current line\n")
 	fmt.Printf("  - Home/End or Ctrl+A/Ctrl+E jump to the start/end of the line\n")

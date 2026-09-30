@@ -485,10 +485,11 @@ Assemble a source file with:
 ```
 
 Without `-o`, this produces `program.prg`. Use `-f` to select another output
-container:
+format:
 
 ```bash
 ./asm6502 -i program.asm -o game.prg
+./asm6502 -i program.asm -f bin
 ./asm6502 -i program.asm -f d64 -n GAME
 ./asm6502 -i program.asm -f t64 -n GAME
 ```
@@ -497,13 +498,15 @@ container:
 | --- | --- |
 | `-i` | Input assembly file; required |
 | `-o` | Output filename; defaults from the input name |
-| `-f` | Output format: `prg`, `d64`, or `t64` |
+| `-f` | Output format: `prg`, `bin`, `d64`, or `t64` |
 | `-n` | Program name stored in D64 or T64 output |
 | `-verbose` | Print segment and output details |
 | `-h` | Show help |
 | `-v`, `-version` | Show the assembler version |
 
-PRG output currently accepts one segment. D64 and T64 output combine multiple
-segments into one loadable image and zero-fill gaps. D64 and T64 do not reject
-overlapping segments; data from a later segment replaces earlier data in the
-overlapping range.
+BIN output contains raw bytes without a header or load address. Multiple
+segments are ordered by address and gaps are filled with zero bytes; overlapping
+segments are rejected. PRG output currently accepts one segment. D64 and T64
+output combine multiple segments into one loadable image and zero-fill gaps.
+D64 and T64 do not reject overlapping segments; data from a later segment
+replaces earlier data in the overlapping range.

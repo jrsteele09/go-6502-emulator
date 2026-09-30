@@ -21,7 +21,7 @@ func main() {
 	var (
 		inputFile    = flag.String("i", "", "Input assembly file (required)")
 		outputFile   = flag.String("o", "", "Output file (default: input filename with appropriate extension)")
-		outputFormat = flag.String("f", "prg", "Output format: prg, d64, or t64 (default: prg)")
+		outputFormat = flag.String("f", "prg", "Output format: prg, bin, d64, or t64 (default: prg)")
 		programName  = flag.String("n", "", "Program name for D64/T64 formats (default: derived from output filename)")
 		showHelp     = flag.Bool("h", false, "Show help")
 		verbose      = flag.Bool("verbose", false, "Verbose output")
@@ -35,11 +35,13 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nOutput Formats:\n")
-		fmt.Fprintf(os.Stderr, "  prg  - Commodore 64 PRG file (default)\n")
-		fmt.Fprintf(os.Stderr, "  d64  - Commodore 64 disk image (1541 format)\n")
-		fmt.Fprintf(os.Stderr, "  t64  - Commodore 64 tape archive\n")
+		fmt.Fprintf(os.Stderr, "  prg  - Program with a two-byte load address (default)\n")
+		fmt.Fprintf(os.Stderr, "  bin  - Raw binary without a load address\n")
+		fmt.Fprintf(os.Stderr, "  d64  - D64 disk image\n")
+		fmt.Fprintf(os.Stderr, "  t64  - T64 tape archive\n")
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  %s -i game.asm                    # Output to game.prg\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -i game.asm -f bin             # Output to game.bin\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -i game.asm -f d64             # Output to game.d64\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -i game.asm -o disk.d64 -f d64 # Output to disk.d64\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -i game.asm -f t64 -verbose    # Output to game.t64 with verbose output\n", os.Args[0])
@@ -66,9 +68,9 @@ func main() {
 
 	// Validate output format
 	*outputFormat = strings.ToLower(*outputFormat)
-	validFormats := map[string]bool{"prg": true, "d64": true, "t64": true}
+	validFormats := map[string]bool{"prg": true, "bin": true, "d64": true, "t64": true}
 	if !validFormats[*outputFormat] {
-		fmt.Fprintf(os.Stderr, "Error: Invalid output format '%s'. Valid formats: prg, d64, t64\n", *outputFormat)
+		fmt.Fprintf(os.Stderr, "Error: Invalid output format '%s'. Valid formats: prg, bin, d64, t64\n", *outputFormat)
 		os.Exit(1)
 	}
 
@@ -122,6 +124,8 @@ func main() {
 	switch *outputFormat {
 	case "prg":
 		format = output.NewPRGFormat()
+	case "bin":
+		format = output.NewBINFormat(0)
 	case "d64":
 		// Extract base name for disk name
 		diskName := strings.ToUpper(filepath.Base(strings.TrimSuffix(*outputFile, filepath.Ext(*outputFile))))

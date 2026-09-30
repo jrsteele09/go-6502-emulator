@@ -2,7 +2,7 @@
 
 The `assembler` package assembles standard 6502 source into one or more memory
 segments. It supports labels, expressions, macros, conditional assembly,
-includes, and Commodore PRG, D64, and T64 output through the `output` package.
+includes, and PRG, BIN, D64, and T64 output through the `output` package.
 
 For the complete implemented-language reference, including label forms,
 macros, `EQU` variants, directives, and compatibility notes, see
@@ -26,6 +26,7 @@ Select another output format or filename:
 
 ```bash
 ./asm6502 -i program.asm -o program.prg
+./asm6502 -i program.asm -f bin
 ./asm6502 -i program.asm -f d64 -n PROGRAM
 ./asm6502 -i program.asm -f t64 -n PROGRAM
 ./asm6502 -i program.asm -verbose
@@ -37,7 +38,7 @@ The available options are:
 | --- | --- |
 | `-i` | Input assembly file; required |
 | `-o` | Output filename |
-| `-f` | Output format: `prg`, `d64`, or `t64` |
+| `-f` | Output format: `prg`, `bin`, `d64`, or `t64` |
 | `-n` | Program name stored in D64 or T64 output |
 | `-verbose` | Print segment and output details |
 | `-h` | Show command help |
@@ -48,8 +49,9 @@ flowchart LR
     A[Assembly source] --> B[asm6502]
     B --> C{Output format}
     C -->|prg| D[PRG program]
-    C -->|d64| E[D64 disk image]
-    C -->|t64| F[T64 tape image]
+    C -->|bin| E[Raw binary]
+    C -->|d64| F[D64 disk image]
+    C -->|t64| G[T64 tape image]
 ```
 
 ## Go API
@@ -178,7 +180,7 @@ flowchart TD
     E1 --> E2[Resolve deferred conditions]
     E2 --> F[Generation pass]
     F --> G[AssembledData segments]
-    G --> H[PRG, D64, or T64 formatter]
+    G --> H[PRG, BIN, D64, or T64 formatter]
     D[Shared expression parser]
     B3 -. expressions .-> D
     E -. expressions .-> D

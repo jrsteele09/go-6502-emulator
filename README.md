@@ -13,7 +13,7 @@ The assembler will continue to evolve over time, but the vision is to be compati
 **Assembler:**
 
 - Full 6502 instruction set support
-- PRG, D64, and T64 file output formats
+- PRG, BIN, D64, and T64 file output formats
 - Comprehensive error reporting with line numbers
 - Support for labels, constants, expressions, and include files
 
@@ -24,7 +24,7 @@ The assembler will continue to evolve over time, but the vision is to be compati
 - Disassembly with PC and breakpoint markers
 - Single-step execution with register display
 - Breakpoint management
-- PRG loading and execution control
+- PRG and BIN loading and execution control
 
 **Testing:**
 
