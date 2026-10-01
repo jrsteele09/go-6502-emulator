@@ -162,7 +162,6 @@ func (p *CPU) Execute() (Completed, error) {
 	return true, nil
 }
 
-//go:inline
 func (p *CPU) executionStage() (Completed, error) {
 	var completed Completed
 	var err error
@@ -180,7 +179,6 @@ func (p *CPU) executionStage() (Completed, error) {
 	return completed, nil
 }
 
-//go:inline
 func (p *CPU) checkInterrupts() bool {
 	if p.nmi {
 		return true
@@ -190,7 +188,6 @@ func (p *CPU) checkInterrupts() bool {
 	return false
 }
 
-//go:inline
 func (p *CPU) readOpCode() (Completed, error) {
 	opCode := p.NextByte()
 	opCodeDef := &p.opCodes[opCode]
@@ -205,7 +202,6 @@ func (p *CPU) readOpCode() (Completed, error) {
 	return false, nil
 }
 
-//go:inline
 func (p *CPU) setExecutionState(opCodeDef *OpCodeDef) {
 	p.execute = executionState{
 		opcode:            opCodeDef,
@@ -215,7 +211,6 @@ func (p *CPU) setExecutionState(opCodeDef *OpCodeDef) {
 	}
 }
 
-//go:inline
 func (p *CPU) interruptInstruction() (Completed, error) {
 	p.interruptStackPush()
 	p.Reg.SetStatus(InterruptDisableFlag, true)
@@ -233,7 +228,6 @@ func (p *CPU) interruptInstruction() (Completed, error) {
 	return true, nil
 }
 
-//go:inline
 func (p *CPU) interruptStackPush() {
 	p.Push(byte(p.Reg.PC >> 8))
 	p.Push(byte(p.Reg.PC & 0xff))
@@ -241,8 +235,6 @@ func (p *CPU) interruptStackPush() {
 }
 
 // NextByte reads the next byte from memory and increments the program counter.
-//
-//go:inline
 func (p *CPU) NextByte() byte {
 	b := p.mem.Read(uint16(p.Reg.PC))
 	p.Reg.PC++
@@ -250,8 +242,6 @@ func (p *CPU) NextByte() byte {
 }
 
 // Push pushes a byte onto the stack.
-//
-//go:inline
 func (p *CPU) Push(b byte) {
 	a := stackPageAddress + uint16(p.Reg.S)
 	p.mem.Write(uint16(a), b)
@@ -259,8 +249,6 @@ func (p *CPU) Push(b byte) {
 }
 
 // Pop pops a byte from the stack.
-//
-//go:inline
 func (p *CPU) Pop() byte {
 	p.Reg.S++
 	a := stackPageAddress + uint16(p.Reg.S)
@@ -269,15 +257,11 @@ func (p *CPU) Pop() byte {
 }
 
 // Nmi triggers a non-maskable interrupt.
-//
-//go:inline
 func (p *CPU) Nmi() {
 	p.nmi = true
 }
 
 // Irq triggers an interrupt request.
-//
-//go:inline
 func (p *CPU) Irq() {
 	p.SetIRQ(true)
 }
@@ -290,8 +274,6 @@ func (p *CPU) SetIRQ(asserted bool) {
 }
 
 // Reset resets the CPU to its initial state.
-//
-//go:inline
 func (p *CPU) Reset() {
 	p.Reg.SetStatus(InterruptDisableFlag, true)
 	resetVecLow := p.mem.Read(uint16(resetVectorAddr))
